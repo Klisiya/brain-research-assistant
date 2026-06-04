@@ -1,0 +1,438 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Frontiers in Brain Science and Brain-Inspired Intelligence</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+
+<body class="home-page">
+
+    <div id="particles-js"></div>
+
+    <div class="menu-icon">☰</div>
+    <div class="moon-icon">☾</div>
+
+<div class="brain-model-wrap" aria-hidden="true">
+    <svg class="brain-svg" viewBox="0 0 520 380" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+            <filter id="brainGlow">
+                <feGaussianBlur stdDeviation="4" result="blur"/>
+                <feMerge>
+                    <feMergeNode in="blur"/>
+                    <feMergeNode in="SourceGraphic"/>
+                </feMerge>
+            </filter>
+
+            <linearGradient id="brainGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" stop-color="#38bdf8"/>
+                <stop offset="55%" stop-color="#2563eb"/>
+                <stop offset="100%" stop-color="#0f172a"/>
+            </linearGradient>
+        </defs>
+
+        <ellipse class="brain-ring ring-one" cx="260" cy="190" rx="215" ry="120"/>
+        <ellipse class="brain-ring ring-two" cx="260" cy="190" rx="180" ry="95"/>
+
+        <path class="brain-shape"
+            d="M133 208
+            C82 202 56 165 68 124
+            C78 91 107 77 137 83
+            C151 48 196 38 226 63
+            C255 31 316 39 334 79
+            C374 68 419 92 424 132
+            C461 147 465 199 433 222
+            C423 265 377 284 338 265
+            C309 305 244 304 218 265
+            C181 287 136 260 133 208 Z"/>
+
+        <path class="brain-fold fold-one"
+            d="M132 158 C170 127 210 150 197 186 C188 211 220 223 246 199"/>
+        <path class="brain-fold fold-two"
+            d="M214 92 C194 125 233 144 270 126 C306 109 330 132 315 165"/>
+        <path class="brain-fold fold-three"
+            d="M318 87 C352 105 357 139 332 158 C305 179 337 205 375 190"/>
+        <path class="brain-fold fold-four"
+            d="M151 220 C190 196 214 235 195 259"/>
+        <path class="brain-fold fold-five"
+            d="M256 222 C293 199 335 222 320 258"/>
+        <path class="brain-fold fold-six"
+            d="M365 220 C391 239 382 265 352 270"/>
+
+        <line class="brain-link" x1="150" y1="150" x2="220" y2="120"/>
+        <line class="brain-link" x1="220" y1="120" x2="305" y2="145"/>
+        <line class="brain-link" x1="305" y1="145" x2="380" y2="190"/>
+        <line class="brain-link" x1="190" y1="230" x2="270" y2="210"/>
+        <line class="brain-link" x1="270" y1="210" x2="350" y2="250"/>
+
+        <circle class="brain-node node-a" cx="150" cy="150" r="6"/>
+        <circle class="brain-node node-b" cx="220" cy="120" r="6"/>
+        <circle class="brain-node node-c" cx="305" cy="145" r="6"/>
+        <circle class="brain-node node-d" cx="380" cy="190" r="6"/>
+        <circle class="brain-node node-e" cx="190" cy="230" r="6"/>
+        <circle class="brain-node node-f" cx="270" cy="210" r="6"/>
+        <circle class="brain-node node-g" cx="350" cy="250" r="6"/>
+    </svg>
+</div>
+
+    <nav class="navbar">
+        <ul class="nav-menu">
+            <li class="active"><a href=" ">⌂ Home</a ></li>
+
+            <li class="dropdown">
+                <a href="#">📖 Learning Center⌄</a >
+                <div class="dropdown-menu">
+                    <a href="#overview">Course Overview</a >
+                    <a href="#modules">Learning Units</a >
+                    <a href="#ai-section">AI Tutor</a >
+                    <a href="#">Knowledge Quiz</a >
+                </div>
+            </li>
+
+            <li class="dropdown">
+                <a href="#">◎ Research Areas⌄</a >
+                <div class="dropdown-menu">
+                    <a href="#">Neuroscience</a >
+                    <a href="#">Cognitive Science</a >
+                    <a href="#">Brain-Computer Interfaces</a >
+                    <a href="#">Brain-Inspired Computing</a >
+                    <a href="#">Artificial Intelligence</a >
+                    <a href="#">Brain Disorders</a >
+                </div>
+            </li>
+
+            <li class="dropdown">
+                <a href="#">▤ Papers⌄</a >
+                <div class="dropdown-menu">
+                    <a href="#">Research Recommendations</a >
+                    <a href="#">Learning Resources</a >
+                    <a href="#">Latest News</a >
+                    <a href="#">About This Project</a >
+                </div>
+            </li>
+
+            <li class="dropdown">
+                <a href="#">▦ More⌄</a >
+                <div class="dropdown-menu">
+                    <a href="#">Learning Evaluation</a >
+                    <a href="{{ url_for('about') }}">About & Disclaimer</a >
+                    <a href="{{ url_for('contact') }}">Contact</a >
+                </div>
+            </li>
+        </ul>
+
+        <div class="search-box">
+            <input type="text" placeholder="Search scientific topics...">
+            <button>⌕</button>
+        </div>
+    </nav>
+
+<header class="hero hero-intro">
+    <span class="hero-kicker">Interactive Brain Research Platform</span>
+
+    <h1>Frontiers in Brain Science and Brain-Inspired Intelligence</h1>
+
+    <p>
+        Explore neuroscience, cognitive science, brain-computer interfaces,
+        brain-inspired computing, and artificial intelligence through an immersive learning experience.
+    </p >
+</header>
+
+<section class="brain-showcase-section" id="brain-showcase">
+
+    <div class="showcase-copy showcase-left reveal-item">
+        <span class="section-tag">Neural Visualization</span>
+
+        <h2>A digital brain built from signals, data, and cognition.</h2>
+
+        <p>
+            This interactive model represents the brain as a dynamic system of neural activity,
+            information flow, and intelligent computation.
+        </p >
+
+        <div class="showcase-mini-stats">
+            <div>
+                <strong>3D</strong>
+                <span>Interactive Model</span>
+            </div>
+
+            <div>
+                <strong>AI</strong>
+                <span>Learning Support</span>
+            </div>
+        </div>
+    </div>
+
+    <div class="showcase-brain-stage">
+        <div class="showcase-glow"></div>
+        <div class="showcase-orbit orbit-one"></div>
+        <div class="showcase-orbit orbit-two"></div>
+
+        <model-viewer
+            id="brainShowcaseModel"
+            src="{{ url_for('static', filename='models/brain.glb') }}"
+            alt="3D brain model"
+            camera-controls
+            disable-zoom
+            interaction-prompt="none"
+            camera-orbit="0deg 72deg 3m"
+            camaera-target="0m 0m 0m"
+            field-of-view="28deg"
+            exposure="1.25"
+            shadow-intensity="0">
+        </model-viewer>
+    </div>
+
+    <div class="showcase-copy showcase-right reveal-item">
+        <div class="showcase-info-card">
+            <span>01</span>
+            <h3>Brain Science</h3>
+            <p>Understand neural structure, cognitive function, memory, learning, and brain activity.</p >
+        </div>
+
+        <div class="showcase-info-card">
+            <span>02</span>
+            <h3>Brain-Inspired Intelligence</h3>
+            <p>Explore how biological neural systems inspire artificial intelligence and intelligent computing.</p >
+        </div>
+
+        <div class="showcase-info-card">
+            <span>03</span>
+            <h3>AI Tutor</h3>
+            <p>Ask questions and receive guided explanations for complex brain research topics.</p >
+        </div>
+    </div>
+
+</section>
+
+<section class="feature-bar reveal-section" id="overview">
+    <div class="feature-item reveal-item">
+        <div class="feature-icon">▥</div>
+        <div>
+            <h3><span class="stat-number" data-target="10">0</span> Learning Modules</h3>
+            <p>Structured learning path</p >
+        </div>
+    </div>
+
+    <div class="feature-item reveal-item">
+        <div class="feature-icon">●</div>
+        <div>
+            <h3><span class="stat-number" data-target="6">0</span> Research Areas</h3>
+            <p>Core topics in brain science</p >
+        </div>
+    </div>
+
+    <div class="feature-item reveal-item">
+        <div class="feature-icon">◴</div>
+        <div>
+            <h3><span class="stat-number" data-target="24">0</span>/7 Learning</h3>
+            <p>Self-paced study experience</p >
+        </div>
+    </div>
+
+    <div class="feature-item reveal-item">
+        <div class="feature-icon">☆</div>
+        <div>
+            <h3><span class="stat-number" data-target="100">0</span>% Educational</h3>
+            <p>Designed for learning support</p >
+        </div>
+    </div>
+</section>
+
+    <section class="content reveal-section" id="modules">
+
+    <div class="flip-card reveal-item">
+        <div class="flip-card-inner">
+
+            <div class="flip-card-front">
+                <div class="card-img neuron"></div>
+                <div class="card-text">
+                    <span class="module-label">Module 1</span>
+                    <h2>Nervous System Basics</h2>
+                    <p>Basic structure and function of the nervous system</p >
+                    <span class="flip-hint">Hover to explore →</span>
+                </div>
+            </div>
+
+            <div class="flip-card-back">
+                <span class="module-label">Key Concepts</span>
+                <h2>Nervous System Basics</h2>
+
+                <ul>
+                    <li>Central and peripheral nervous systems</li>
+                    <li>Brain regions and core functions</li>
+                    <li>Neural communication overview</li>
+                </ul>
+
+                <div class="module-meta">
+                    <span>Estimated time: 20 min</span>
+                    <a href=" ">Start Module →</a >
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <div class="flip-card reveal-item">
+        <div class="flip-card-inner">
+
+            <div class="flip-card-front">
+                <div class="card-img synapse"></div>
+                <div class="card-text">
+                    <span class="module-label">Module 2</span>
+                    <h2>Neurons and Synapses</h2>
+                    <p>Neurons, synapses, and neural signal transmission</p >
+                    <span class="flip-hint">Hover to explore →</span>
+                </div>
+            </div>
+
+            <div class="flip-card-back">
+                <span class="module-label">Key Concepts</span>
+                <h2>Neurons and Synapses</h2>
+
+                <ul>
+                    <li>Neuron structure and signal flow</li>
+                    <li>Synaptic transmission</li>
+                    <li>Excitatory and inhibitory signals</li>
+                </ul>
+
+                <div class="module-meta">
+                    <span>Estimated time: 25 min</span>
+                    <a href="#">Start Module →</a >
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <div class="flip-card reveal-item">
+        <div class="flip-card-inner">
+
+            <div class="flip-card-front">
+                <div class="card-img brain"></div>
+                <div class="card-text">
+                    <span class="module-label">Module 3</span>
+                    <h2>Memory and Intelligence</h2>
+                    <p>Memory, learning, cognition, and intelligence</p >
+                    <span class="flip-hint">Hover to explore →</span>
+                </div>
+            </div>
+
+            <div class="flip-card-back">
+                <span class="module-label">Key Concepts</span>
+                <h2>Memory and Intelligence</h2>
+
+                <ul>
+                    <li>Memory encoding and retrieval</li>
+                    <li>Learning and plasticity</li>
+                    <li>Cognition and intelligent behavior</li>
+                </ul>
+
+                <div class="module-meta">
+                    <span>Estimated time: 30 min</span>
+                    <a href="#">Start Module →</a >
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+</section>
+
+    <section class="ai-section" id="ai-section">
+    <div class="ai-panel reveal-item">
+
+        <div class="ai-header">
+            <div>
+                <span class="ai-label">AI Tutor</span>
+                <h2>Ask the Brain Science Tutor</h2>
+                <p>
+                    Explore neuroscience, cognition, brain-computer interfaces,
+                    and brain-inspired intelligence with guided explanations.
+                </p >
+            </div>
+
+            <div class="ai-status">
+                <span></span>
+                Online
+            </div>
+        </div>
+
+        <div class="quick-prompts">
+            <button type="button" data-question="What is a brain-computer interface?">
+                Brain-Computer Interface
+            </button>
+
+            <button type="button" data-question="How is brain-inspired intelligence different from artificial intelligence?">
+                Brain-Inspired Intelligence
+            </button>
+
+            <button type="button" data-question="How do neurons transmit information?">
+                Neural Communication
+            </button>
+
+            <button type="button" data-question="What is the relationship between memory and learning in the brain?">
+                Memory and Learning
+            </button>
+        </div>
+
+<div class="chat-window">
+    {% if question %}
+    <div class="message user-message">
+        <div class="message-avatar">You</div>
+        <div class="message-content">{{ question }}</div>
+    </div>
+    {% endif %}
+
+    {% if answer %}
+    <div class="message ai-message">
+        <div class="message-avatar">AI</div>
+        <div class="message-content">{{ answer }}</div>
+    </div>
+    {% else %}
+    <div class="empty-chat">
+        <div class="empty-icon">🧠</div>
+        <h3>Ready to explore the brain?</h3>
+        <p>Ask a question or choose a suggested topic above to begin.</p >
+    </div>
+    {% endif %}
+
+    <div class="message ai-message loading-message" id="loadingMessage">
+        <div class="message-avatar">AI</div>
+
+        <div class="message-content loading-content">
+            <span>Generating response</span>
+
+            <div class="loading-dots">
+                <i></i>
+                <i></i>
+                <i></i>
+            </div>
+        </div>
+    </div>
+</div>
+
+        <form method="POST" class="chat-form">
+            <textarea
+                id="questionInput"
+                name="question"
+                placeholder="Ask a question about brain science or brain-inspired intelligence..."
+                required></textarea>
+
+            <button type="submit" id="submitBtn">
+                Send Question →
+            </button>
+        </form>
+
+    </div>
+</section>
+
+{%include'footer.html'%}
+
+<script src="https://cdn.jsdelivr.net/npm/particles.js@2.0.0/particles.min.js"></script>
+<script type="module" src="https://unpkg.com/@google/model-viewer/dist/model-viewer.min.js"></script>
+<script src="{{ url_for('static', filename='script.js') }}"></script>
+
+</body>
+</html>

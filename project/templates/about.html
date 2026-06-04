@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>About & Disclaimer | Frontiers in Brain Science and Brain-Inspired Intelligence</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+
+<body>
+
+    <div id="particles-js"></div>
+
+    <div class="menu-icon">☰</div>
+    <div class="moon-icon">☾</div>
+
+    <nav class="navbar">
+        <ul class="nav-menu">
+            <li>
+                <a href="{{ url_for('home') }}">⌂ Home</a >
+            </li>
+
+            <li class="dropdown">
+                <a href="#">📖 Learning Center⌄</a >
+                <div class="dropdown-menu">
+                    <a href="{{ url_for('home') }}#overview">Course Overview</a >
+                    <a href="{{ url_for('home') }}#modules">Learning Units</a >
+                    <a href="{{ url_for('home') }}#ai-section">AI Tutor</a >
+                    <a href="#">Knowledge Quiz</a >
+                </div>
+            </li>
+
+            <li class="dropdown">
+                <a href="#">◎ Research Areas⌄</a >
+                <div class="dropdown-menu">
+                    <a href="#">Neuroscience</a >
+                    <a href="#">Cognitive Science</a >
+                    <a href="#">Brain-Computer Interfaces</a >
+                    <a href="#">Brain-Inspired Computing</a >
+                    <a href="#">Artificial Intelligence</a >
+                    <a href="#">Brain Disorders</a >
+                </div>
+            </li>
+
+            <li class="dropdown">
+                <a href="#">▤ Papers⌄</a >
+                <div class="dropdown-menu">
+                    <a href="#">Research Recommendations</a >
+                    <a href="#">Learning Resources</a >
+                    <a href="#">Latest News</a >
+                    <a href="{{ url_for('about') }}">About & Disclaimer</a >
+                </div>
+            </li>
+
+            <li class="dropdown active">
+                <a href="#">▦ More⌄</a >
+                <div class="dropdown-menu">
+                    <a href="#">Learning Evaluation</a >
+                    <a href="{{ url_for('about') }}">About & Disclaimer</a >
+                    <a href="{{ url_for('contact') }}">Contact</a >
+                </div>
+            </li>
+        </ul>
+
+        <div class="search-box">
+            <input type="text" placeholder="Search scientific topics...">
+            <button>⌕</button>
+        </div>
+    </nav>
+
+    <main class="about-page">
+
+        <section class="about-hero">
+            <span class="page-label">About & Disclaimer</span>
+            <h1>About This Project</h1>
+            <p>
+                This platform is an educational web project focused on frontiers in brain science
+                and brain-inspired intelligence. It is designed to help learners explore core concepts,
+                research directions, and emerging technologies through structured modules and an AI tutor.
+            </p >
+        </section>
+
+        <section class="about-grid">
+
+            <div class="about-card">
+                <h2>Project Purpose</h2>
+                <p>
+                    The purpose of this website is to provide an accessible learning environment for topics
+                    such as neuroscience, cognitive science, brain-computer interfaces, artificial intelligence,
+                    and brain-inspired computing.
+                </p >
+                <p>
+                    The platform combines visual design, topic-based learning modules, and AI-assisted explanations
+                    to support independent study and conceptual understanding.
+                </p >
+            </div>
+
+            <div class="about-card">
+                <h2>Developer Information</h2>
+                <p>
+                    This website was designed and developed by Klisiya. Have any questions or feedback? Send an e-mail 
+                    to txf5268@psu.edu
+                </p >
+                <p>
+                    The interface, layout, AI tutor interaction, and visual components were built to create a
+                    modern educational experience for users interested in brain research and intelligent systems.
+                </p >
+            </div>
+
+            <div class="about-card wide-card">
+                <h2>Educational Disclaimer</h2>
+                <p>
+                    The content provided on this website is for educational and informational purposes only.
+                    It should not be considered medical advice, clinical guidance, diagnosis, or treatment.
+                </p >
+                <p>
+                    Some topics may involve brain disorders, cognitive function, or neuroscience-related health
+                    concepts. Users should consult qualified professionals or authoritative academic sources
+                    for medical, clinical, or research-critical decisions.
+                </p >
+            </div>
+
+            <div class="about-card wide-card">
+                <h2>AI Tutor Disclaimer</h2>
+                <p>
+                    The AI Tutor is designed to support learning by explaining concepts, summarizing ideas,
+                    and answering questions related to brain science and brain-inspired intelligence.
+                </p >
+                <p>
+                    AI-generated responses may contain inaccuracies, incomplete explanations, or outdated information.
+                    Users should verify important information with textbooks, peer-reviewed papers, official resources,
+                    or professional guidance.
+                </p >
+            </div>
+
+        </section>
+
+    </main>
+
+{%include'footer.html'%}
+
+<script src="https://cdn.jsdelivr.net/npm/particles.js@2.0.0/particles.min.js"></script>
+<script src="{{ url_for('static', filename='script.js') }}"></script>
+
+</body>
+</html>

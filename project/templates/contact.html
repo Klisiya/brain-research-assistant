@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Contact | Frontiers in Brain Science and Brain-Inspired Intelligence</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+
+<body>
+
+    <div id="particles-js"></div>
+
+    <div class="menu-icon">☰</div>
+    <div class="moon-icon">☾</div>
+
+<nav class="navbar">
+    <ul class="nav-menu">
+        <li>
+            <a href="{{ url_for('home') }}">⌂ Home</a >
+        </li>
+
+        <li class="dropdown">
+            <a href="#">▣ Learning Center⌄</a >
+            <div class="dropdown-menu">
+                <a href="{{ url_for('home') }}#overview">Course Overview</a >
+                <a href="{{ url_for('home') }}#modules">Learning Units</a >
+                <a href="{{ url_for('home') }}#ai-section">AI Tutor</a >
+                <a href="#">Knowledge Quiz</a >
+            </div>
+        </li>
+
+        <li class="dropdown">
+            <a href="#">◎ Research Areas⌄</a >
+            <div class="dropdown-menu">
+                <a href="#">Neuroscience</a >
+                <a href="#">Cognitive Science</a >
+                <a href="#">Brain-Computer Interfaces</a >
+                <a href="#">Brain-Inspired Computing</a >
+                <a href="#">Artificial Intelligence</a >
+                <a href="#">Brain Disorders</a >
+            </div>
+        </li>
+
+        <li class="dropdown">
+            <a href="#">▤ Papers⌄</a >
+            <div class="dropdown-menu">
+                <a href="#">Research Recommendations</a >
+                <a href="#">Learning Resources</a >
+                <a href="#">Latest News</a >
+                <a href="{{ url_for('about') }}">About & Disclaimer</a >
+            </div>
+        </li>
+
+        <li class="dropdown active">
+            <a href="#">▦ More⌄</a >
+            <div class="dropdown-menu">
+                <a href="#">Learning Evaluation</a >
+                <a href="{{ url_for('about') }}">About & Disclaimer</a >
+                <a href="{{ url_for('contact') }}">Contact</a >
+            </div>
+        </li>
+    </ul>
+
+    <div class="search-box">
+        <input type="text" placeholder="Search scientific topics...">
+        <button>⌕</button>
+    </div>
+</nav>
+
+    <main class="contact-page">
+
+        <section class="contact-hero">
+            <span class="page-label">Contact</span>
+            <h1>Get in Touch</h1>
+            <p>
+                Have questions, feedback, or suggestions about this brain science learning platform?
+                Send a message!!!
+            </p >
+        </section>
+
+        <section class="contact-grid contact-single-grid">
+
+    <div class="contact-card contact-info-card contact-main-card">
+        <h2>Project Contact</h2>
+
+        <div class="contact-profile">
+            <div class="profile-icon">PG</div>
+
+            <div>
+                <h3>Ping Gan</h3>
+                <p>Associate Professor / Ph.D.</p >
+            </div>
+        </div>
+
+        <div class="contact-info-item">
+            <span>⌂</span>
+            <div>
+                <h3>Affiliation</h3>
+                <p>
+                    Biochemistry and Molecular Department,<br>
+                    College of Basic Medicine,<br>
+                    Kunming Medical University,<br>
+                    Kunming 650500, Yunnan, China
+                </p >
+            </div>
+        </div>
+
+        <div class="contact-info-item">
+            <span>☎</span>
+            <div>
+                <h3>Telephone</h3>
+                <p>
+                    +86-871-65922863<br>
+                    +86-15087106898
+                </p >
+            </div>
+        </div>
+
+        <div class="contact-info-item">
+            <span>✉</span>
+            <div>
+                <h3>Email</h3>
+                <p>
+                    <a href=" ">ganping@kmmu.edu.cn</a >
+                </p >
+            </div>
+        </div>
+    </div>
+
+</section>
+
+    </main>
+
+{%include'footer.html'%}
+
+<script src="https://cdn.jsdelivr.net/npm/particles.js@2.0.0/particles.min.js"></script>
+<script src="{{ url_for('static', filename='script.js') }}"></script>
+
+</body>
+</html>
