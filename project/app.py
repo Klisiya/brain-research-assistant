@@ -52,5 +52,14 @@ def contact():
 def about():
     return render_template("about.html")
 
+@app.route("/login", methods=["GET", "POST"])
+def login():
+    status_message = ""
+
+    if request.method == "POST":
+        status_message = "Login interface is ready for authentication integration."
+
+    return render_template("login.html", status_message=status_message)
+
 if __name__ == "__main__":
     app.run(debug=True)
