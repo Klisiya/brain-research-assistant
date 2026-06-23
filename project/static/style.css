@@ -1509,6 +1509,45 @@ body {
     font-size: 14px !important;
 }
 
+.login-status.error {
+    border-color: rgba(248, 113, 113, 0.32);
+    background: rgba(127, 29, 29, 0.28);
+    color: #fecaca !important;
+}
+
+.login-status.info {
+    border-color: rgba(125, 211, 252, 0.30);
+    background: rgba(14, 165, 233, 0.12);
+    color: #bae6fd !important;
+}
+
+.login-status.success {
+    border-color: rgba(16, 185, 129, 0.24);
+    background: rgba(16, 185, 129, 0.12);
+    color: #86efac !important;
+}
+
+.auth-switch {
+    margin-top: 20px !important;
+    text-align: center;
+    color: rgba(226, 232, 240, 0.82) !important;
+    font-size: 14px !important;
+}
+
+.auth-switch a {
+    color: #7dd3fc;
+    text-decoration: none;
+    font-weight: 900;
+}
+
+.auth-switch a:hover {
+    color: white;
+}
+
+.register-panel {
+    width: min(470px, 100%);
+}
+
 @media (max-width: 560px) {
     .login-home-link {
         right: 18px;
