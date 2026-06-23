@@ -85,7 +85,7 @@
                 <div class="dropdown-menu">
                     <a href="#overview">Course Overview</a >
                     <a href="#modules">Learning Units</a >
-                    <a href="#ai-section">AI Tutor</a >
+                    <a href="{{ url_for('ai_tutor') }}#ai-section">AI Tutor</a >
                     <a href="#">Knowledge Quiz</a >
                 </div>
             </li>
@@ -127,7 +127,11 @@
             <button>⌕</button>
         </div>
 
+        {% if current_user.is_authenticated %}
+        <a class="login-nav-button" href="{{ url_for('logout') }}">Logout</a>
+        {% else %}
         <a class="login-nav-button" href="{{ url_for('login') }}">Login</a>
+        {% endif %}
     </nav>
 
 <header class="hero hero-intro">
@@ -415,7 +419,7 @@
     </div>
 </div>
 
-        <form method="POST" class="chat-form">
+        <form method="POST" class="chat-form" action="{{ url_for('ai_tutor') }}">
             <textarea
                 id="questionInput"
                 name="question"

@@ -24,10 +24,12 @@
                 Sign in to continue your brain science learning journey with the AI tutor.
             </p>
 
-            <form class="login-form" method="POST">
+            <form class="login-form" method="POST" action="{{ url_for('login') }}">
+                <input type="hidden" name="next" value="{{ next_url }}">
+
                 <label class="login-field">
                     <span>Email</span>
-                    <input type="email" name="email" placeholder="name@example.com" autocomplete="email" required>
+                    <input type="email" name="email" placeholder="name@example.com" autocomplete="email" value="{{ email or '' }}" required>
                 </label>
 
                 <label class="login-field">
@@ -41,131 +43,31 @@
                         <span>Remember me</span>
                     </label>
 
-                    <a href="#">Forgot password?</a>
+                    <a href="{{ url_for('forgot_password') }}">Forgot password?</a>
                 </div>
 
                 <button class="login-submit" type="submit">Sign In</button>
 
+                {% with messages = get_flashed_messages(with_categories=true) %}
+                    {% if messages %}
+                        {% for category, message in messages %}
+                            <p class="login-status {{ category }}">{{ message }}</p>
+                        {% endfor %}
+                    {% endif %}
+                {% endwith %}
+
                 {% if status_message %}
-                <p class="login-status">{{ status_message }}</p>
+                <p class="login-status {{ status_type }}">{{ status_message }}</p>
                 {% endif %}
             </form>
+
+            <p class="auth-switch">
+                New to the tutor?
+                <a href="{{ url_for('register') }}">Create an account</a>
+            </p>
         </section>
     </main>
 
-    <script>
-        const canvas = document.getElementById("loginShader");
-        const gl = canvas.getContext("webgl", { antialias: true });
-
-        if (!gl) {
-            canvas.style.display = "none";
-        } else {
-        let animationId = 0;
-        let shaderTime = 1.0;
-
-        const vertexShaderSource = `
-            attribute vec2 position;
-
-            void main() {
-                gl_Position = vec4(position, 0.0, 1.0);
-            }
-        `;
-
-        const fragmentShaderSource = `
-            #define TWO_PI 6.2831853072
-            #define PI 3.14159265359
-
-            precision highp float;
-            uniform vec2 resolution;
-            uniform float time;
-
-            void main(void) {
-                vec2 uv = (gl_FragCoord.xy * 2.0 - resolution.xy) / min(resolution.x, resolution.y);
-                float t = time * 0.05;
-                float lineWidth = 0.002;
-
-                vec3 color = vec3(0.0);
-                for (int j = 0; j < 3; j++) {
-                    for (int i = 0; i < 5; i++) {
-                        color[j] += lineWidth * float(i * i) / abs(fract(t - 0.01 * float(j) + float(i) * 0.01) * 5.0 - length(uv) + mod(uv.x + uv.y, 0.2));
-                    }
-                }
-
-                gl_FragColor = vec4(color[0], color[1], color[2], 1.0);
-            }
-        `;
-
-        function createShader(type, source) {
-            const shader = gl.createShader(type);
-            gl.shaderSource(shader, source);
-            gl.compileShader(shader);
-            return shader;
-        }
-
-        const vertexShader = createShader(gl.VERTEX_SHADER, vertexShaderSource);
-        const fragmentShader = createShader(gl.FRAGMENT_SHADER, fragmentShaderSource);
-        const shaderProgram = gl.createProgram();
-
-        gl.attachShader(shaderProgram, vertexShader);
-        gl.attachShader(shaderProgram, fragmentShader);
-        gl.linkProgram(shaderProgram);
-        gl.useProgram(shaderProgram);
-
-        const positionBuffer = gl.createBuffer();
-        gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
-        gl.bufferData(
-            gl.ARRAY_BUFFER,
-            new Float32Array([
-                -1, -1,
-                1, -1,
-                -1, 1,
-                -1, 1,
-                1, -1,
-                1, 1
-            ]),
-            gl.STATIC_DRAW
-        );
-
-        const positionLocation = gl.getAttribLocation(shaderProgram, "position");
-        const resolutionLocation = gl.getUniformLocation(shaderProgram, "resolution");
-        const timeLocation = gl.getUniformLocation(shaderProgram, "time");
-
-        gl.enableVertexAttribArray(positionLocation);
-        gl.vertexAttribPointer(positionLocation, 2, gl.FLOAT, false, 0, 0);
-
-        function resizeShader() {
-            const width = window.innerWidth;
-            const height = window.innerHeight;
-            const pixelRatio = Math.min(window.devicePixelRatio || 1, 2);
-
-            canvas.width = Math.floor(width * pixelRatio);
-            canvas.height = Math.floor(height * pixelRatio);
-            canvas.style.width = `${width}px`;
-            canvas.style.height = `${height}px`;
-
-            gl.viewport(0, 0, canvas.width, canvas.height);
-            gl.uniform2f(resolutionLocation, canvas.width, canvas.height);
-        }
-
-        function animateShader() {
-            animationId = requestAnimationFrame(animateShader);
-            shaderTime += 0.05;
-            gl.uniform1f(timeLocation, shaderTime);
-            gl.drawArrays(gl.TRIANGLES, 0, 6);
-        }
-
-        window.addEventListener("resize", resizeShader);
-        resizeShader();
-        animateShader();
-
-        window.addEventListener("pagehide", () => {
-            cancelAnimationFrame(animationId);
-            gl.deleteProgram(shaderProgram);
-            gl.deleteShader(vertexShader);
-            gl.deleteShader(fragmentShader);
-            gl.deleteBuffer(positionBuffer);
-        });
-        }
-    </script>
+    {% include 'auth_shader.html' %}
 </body>
 </html>

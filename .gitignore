@@ -1,9 +1,18 @@
 **/.venv/
 **/venv/
+.python/
 **/__pycache__/
 *.pyc
+python-*.exe
 
 .env
 **/.env
 
 instance/
+project/instance/
+*.db
+*.sqlite
+*.sqlite3
+users.db
+app.db
+AGENTS.md
