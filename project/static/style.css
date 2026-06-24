@@ -17,12 +17,17 @@ body {
  inset: 0; 
  width: 100%; 
  height: 100%; 
+ pointer-events: none;
  background: 
  radial-gradient(circle at 15% 40%, rgba(37, 99, 235, 0.22), transparent 26%), 
  radial-gradient(circle at 80% 30%, rgba(56, 189, 248, 0.16), transparent 28%), 
  linear-gradient(135deg, #020617, #07111f 55%, #020617); 
  z-index: -5; 
 } 
+#particles-js canvas {
+ display: block;
+ pointer-events: none;
+}
 /* Decorative icons */ 
 .menu-icon { 
  position: fixed; 
