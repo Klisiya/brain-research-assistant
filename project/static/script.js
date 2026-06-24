@@ -1,3 +1,15 @@
+const particleMotionQuery = window.matchMedia
+    ? window.matchMedia("(prefers-reduced-motion: reduce)")
+    : null;
+const particlePointerQuery = window.matchMedia
+    ? window.matchMedia("(hover: hover) and (pointer: fine)")
+    : null;
+const enableParticleMouseFollow = (
+    (!particleMotionQuery || !particleMotionQuery.matches) &&
+    (!particlePointerQuery || particlePointerQuery.matches)
+);
+
+if (window.particlesJS) {
 particlesJS("particles-js", {
     particles: {
         number: {
@@ -38,11 +50,11 @@ particlesJS("particles-js", {
         }
     },
     interactivity: {
-        detect_on: "canvas",
+        detect_on: "window",
         events: {
             onhover: {
-                enable: true,
-                mode: "grab"
+                enable: enableParticleMouseFollow,
+                mode: ["grab", "bubble"]
             },
             onclick: {
                 enable: true,
@@ -52,18 +64,26 @@ particlesJS("particles-js", {
         },
         modes: {
             grab: {
-                distance: 180,
+                distance: 175,
                 line_linked: {
-                    opacity: 0.75
+                    opacity: 0.5
                 }
             },
             push: {
                 particles_nb: 3
+            },
+            bubble: {
+                distance: 165,
+                size: 3.6,
+                duration: 1.2,
+                opacity: 0.55,
+                speed: 2
             }
         }
     },
     retina_detect: true
 });
+}
 
 const promptButtons = document.querySelectorAll(".quick-prompts button");
 const questionInput = document.getElementById("questionInput");
