@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ region.name }} | Brain Region Explorer</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+
+<body class="region-page">
+    <div id="particles-js"></div>
+
+    <main class="region-detail">
+        <div class="region-detail-header">
+            <a class="region-back-link" href="{{ url_for('home') }}#brain-showcase">Back to Brain Explorer</a>
+            <span class="section-tag">Brain Region</span>
+            <h1>{{ region.name }}</h1>
+            <p>{{ region.overview }}</p>
+
+            <div class="region-actions">
+                <a href="{{ url_for('ai_tutor') }}#ai-section">Ask the AI Tutor</a>
+                <a href="{{ url_for('home') }}">Return Home</a>
+            </div>
+        </div>
+
+        <div class="region-detail-grid">
+            <section class="region-detail-panel">
+                <h2>Main functions</h2>
+                <ul>
+                    {% for item in region.main_functions %}
+                    <li>{{ item }}</li>
+                    {% endfor %}
+                </ul>
+            </section>
+
+            <section class="region-detail-panel">
+                <h2>Related cognitive processes</h2>
+                <ul>
+                    {% for item in region.related_cognitive_processes %}
+                    <li>{{ item }}</li>
+                    {% endfor %}
+                </ul>
+            </section>
+
+            <section class="region-detail-panel">
+                <h2>Clinical relevance</h2>
+                <p>{{ region.clinical_relevance }}</p>
+            </section>
+
+            <section class="region-detail-panel">
+                <h2>Key research topics</h2>
+                <ul>
+                    {% for item in region.key_research_topics %}
+                    <li>{{ item }}</li>
+                    {% endfor %}
+                </ul>
+            </section>
+        </div>
+    </main>
+
+    {% include 'footer.html' %}
+
+    <script src="https://cdn.jsdelivr.net/npm/particles.js@2.0.0/particles.min.js"></script>
+    <script src="{{ url_for('static', filename='script.js') }}"></script>
+</body>
+</html>
