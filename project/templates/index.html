@@ -4,15 +4,18 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Frontiers in Brain Science and Brain-Inspired Intelligence</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+    <link rel="modulepreload" href="{{ url_for('static', filename='vendor/model-viewer.min.js') }}">
+    <link rel="preload" href="{{ url_for('brain_model_asset') }}" as="fetch" type="model/gltf-binary" crossorigin="anonymous" fetchpriority="high">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css', v='module-cards-2') }}">
 </head>
 
 <body class="home-page">
 
     <div id="particles-js"></div>
 
-    <div class="menu-icon">☰</div>
-    <div class="moon-icon">☾</div>
+    <div class="menu-icon" aria-hidden="true">&#9776;</div>
+    <div class="moon-icon" aria-hidden="true">&#9790;</div>
 
 <div class="brain-model-wrap" aria-hidden="true">
     <svg class="brain-svg" viewBox="0 0 520 380" xmlns="http://www.w3.org/2000/svg">
@@ -78,10 +81,10 @@
 
     <nav class="navbar">
         <ul class="nav-menu">
-            <li class="active"><a href=" ">⌂ Home</a ></li>
+            <li class="active"><a href=" ">&#8962; Home</a ></li>
 
             <li class="dropdown">
-                <a href="#">📖 Learning Center⌄</a >
+                <a href="#">&#128214; Learning Center&#9662;</a >
                 <div class="dropdown-menu">
                     <a href="#overview">Course Overview</a >
                     <a href="#modules">Learning Units</a >
@@ -91,7 +94,7 @@
             </li>
 
             <li class="dropdown">
-                <a href="#">◎ Research Areas⌄</a >
+                <a href="#">&#9678; Research Areas&#9662;</a >
                 <div class="dropdown-menu">
                     <a href="#">Neuroscience</a >
                     <a href="#">Cognitive Science</a >
@@ -103,7 +106,7 @@
             </li>
 
             <li class="dropdown">
-                <a href="#">▤ Papers⌄</a >
+                <a href="#">&#9636; Papers&#9662;</a >
                 <div class="dropdown-menu">
                     <a href="#">Research Recommendations</a >
                     <a href="#">Learning Resources</a >
@@ -113,7 +116,7 @@
             </li>
 
             <li class="dropdown">
-                <a href="#">▦ More⌄</a >
+                <a href="#">&#9638; More&#9662;</a >
                 <div class="dropdown-menu">
                     <a href="#">Learning Evaluation</a >
                     <a href="{{ url_for('about') }}">About & Disclaimer</a >
@@ -124,7 +127,7 @@
 
         <div class="search-box">
             <input type="text" placeholder="Search scientific topics...">
-            <button>⌕</button>
+            <button>&#8981;</button>
         </div>
 
         {% if current_user.is_authenticated %}
@@ -141,7 +144,7 @@
 
     <p>
         Explore neuroscience, cognitive science, brain-computer interfaces,
-        brain-inspired computing, and artificial intelligence through an immersive learning experience.
+        brain-inspired Intelligence, and artificial intelligence through an immersive learning experience.
     </p >
 </header>
 
@@ -174,16 +177,22 @@
         <div class="showcase-glow"></div>
         <div class="showcase-orbit orbit-one"></div>
         <div class="showcase-orbit orbit-two"></div>
+        <svg class="brain-region-lines" aria-hidden="true"></svg>
+        <div class="brain-region-label-layer" aria-label="Brain region labels"></div>
 
         <model-viewer
             id="brainShowcaseModel"
-            src="{{ url_for('static', filename='models/brain.glb') }}"
+            src="{{ url_for('brain_model_asset') }}"
             alt="3D brain model"
+            loading="eager"
+            crossorigin="anonymous"
             camera-controls
             disable-zoom
             interaction-prompt="none"
             camera-orbit="0deg 72deg 3m"
-            camaera-target="0m 0m 0m"
+            camera-target="0m 0m 0m"
+            min-camera-orbit="auto auto 2.35m"
+            max-camera-orbit="auto auto 3.5m"
             field-of-view="28deg"
             exposure="1.25"
             shadow-intensity="0">
@@ -214,7 +223,7 @@
 
 <section class="feature-bar reveal-section" id="overview">
     <div class="feature-item reveal-item">
-        <div class="feature-icon">▥</div>
+        <div class="feature-icon">&#9637;</div>
         <div>
             <h3><span class="stat-number" data-target="10">0</span> Learning Modules</h3>
             <p>Structured learning path</p >
@@ -222,7 +231,7 @@
     </div>
 
     <div class="feature-item reveal-item">
-        <div class="feature-icon">●</div>
+        <div class="feature-icon">&#9679;</div>
         <div>
             <h3><span class="stat-number" data-target="6">0</span> Research Areas</h3>
             <p>Core topics in brain science</p >
@@ -230,7 +239,7 @@
     </div>
 
     <div class="feature-item reveal-item">
-        <div class="feature-icon">◴</div>
+        <div class="feature-icon">&#9716;</div>
         <div>
             <h3><span class="stat-number" data-target="24">0</span>/7 Learning</h3>
             <p>Self-paced study experience</p >
@@ -238,7 +247,7 @@
     </div>
 
     <div class="feature-item reveal-item">
-        <div class="feature-icon">☆</div>
+        <div class="feature-icon">&#9734;</div>
         <div>
             <h3><span class="stat-number" data-target="100">0</span>% Educational</h3>
             <p>Designed for learning support</p >
@@ -257,7 +266,7 @@
                     <span class="module-label">Module 1</span>
                     <h2>Nervous System Basics</h2>
                     <p>Basic structure and function of the nervous system</p >
-                    <span class="flip-hint">Hover to explore →</span>
+                    <span class="flip-hint">Hover to explore &rarr;</span>
                 </div>
             </div>
 
@@ -273,7 +282,7 @@
 
                 <div class="module-meta">
                     <span>Estimated time: 20 min</span>
-                    <a href=" ">Start Module →</a >
+                    <a href=" ">Start Module &rarr;</a >
                 </div>
             </div>
 
@@ -289,7 +298,7 @@
                     <span class="module-label">Module 2</span>
                     <h2>Neurons and Synapses</h2>
                     <p>Neurons, synapses, and neural signal transmission</p >
-                    <span class="flip-hint">Hover to explore →</span>
+                    <span class="flip-hint">Hover to explore &rarr;</span>
                 </div>
             </div>
 
@@ -305,7 +314,7 @@
 
                 <div class="module-meta">
                     <span>Estimated time: 25 min</span>
-                    <a href="#">Start Module →</a >
+                    <a href="#">Start Module &rarr;</a >
                 </div>
             </div>
 
@@ -321,7 +330,7 @@
                     <span class="module-label">Module 3</span>
                     <h2>Memory and Intelligence</h2>
                     <p>Memory, learning, cognition, and intelligence</p >
-                    <span class="flip-hint">Hover to explore →</span>
+                    <span class="flip-hint">Hover to explore &rarr;</span>
                 </div>
             </div>
 
@@ -337,7 +346,7 @@
 
                 <div class="module-meta">
                     <span>Estimated time: 30 min</span>
-                    <a href="#">Start Module →</a >
+                    <a href="#">Start Module &rarr;</a >
                 </div>
             </div>
 
@@ -347,25 +356,63 @@
 </section>
 
     <section class="ai-section" id="ai-section">
-    <div class="ai-panel reveal-item">
+    <div class="ai-tutor-shell{% if question or answer %} has-chat{% endif %}">
+        <header class="ai-tutor-heading">
+            <h2>Ready to explore the brain?</h2>
+            <p>Ask a question</p>
+        </header>
 
-        <div class="ai-header">
-            <div>
-                <span class="ai-label">AI Tutor</span>
-                <h2>Ask the Brain Science Tutor</h2>
-                <p>
-                    Explore neuroscience, cognition, brain-computer interfaces,
-                    and brain-inspired intelligence with guided explanations.
-                </p >
+        {% if question or answer %}
+        <div class="ai-chat-log" id="chatWindow">
+            {% if question %}
+            <div class="ai-chat-message ai-chat-message-user">
+                <div class="ai-message-avatar">You</div>
+                <div class="ai-message-bubble">{{ question }}</div>
             </div>
+            {% endif %}
 
-            <div class="ai-status">
-                <span></span>
-                Online
+            {% if answer %}
+            <div class="ai-chat-message ai-chat-message-assistant">
+                <div class="ai-message-avatar">AI</div>
+                <div class="ai-message-bubble">{{ answer }}</div>
             </div>
+            {% endif %}
         </div>
+        {% endif %}
 
-        <div class="quick-prompts">
+        <form method="POST" class="ai-composer" action="{{ url_for('ai_tutor') }}">
+            <label class="sr-only" for="questionInput">Ask a question</label>
+            <textarea
+                class="ai-composer-input"
+                id="questionInput"
+                name="question"
+                placeholder="Ask a question about brain science or brain-inspired intelligence..."
+                rows="1"
+                required></textarea>
+
+            <div class="ai-composer-bar">
+                <div class="ai-composer-meta">
+                    <span>Brain Science Tutor</span>
+                    <div class="ai-composer-loading" id="composerLoading" aria-live="polite" hidden>
+                        <span>AI is thinking</span>
+                        <div class="loading-dots" aria-hidden="true">
+                            <i></i>
+                            <i></i>
+                            <i></i>
+                        </div>
+                    </div>
+                </div>
+
+                <button class="ai-send-button" type="submit" id="submitBtn" aria-label="Send question" disabled>
+                    <svg class="send-icon" viewBox="0 0 24 24" aria-hidden="true">
+                        <path d="M5 12L19 5L14 19L11 13L5 12Z"></path>
+                    </svg>
+                    <span class="send-label">Send</span>
+                </button>
+            </div>
+        </form>
+
+        <div class="ai-quick-prompts" aria-label="Suggested brain science questions">
             <button type="button" data-question="What is a brain-computer interface?">
                 Brain-Computer Interface
             </button>
@@ -382,63 +429,14 @@
                 Memory and Learning
             </button>
         </div>
-
-<div class="chat-window">
-    {% if question %}
-    <div class="message user-message">
-        <div class="message-avatar">You</div>
-        <div class="message-content">{{ question }}</div>
-    </div>
-    {% endif %}
-
-    {% if answer %}
-    <div class="message ai-message">
-        <div class="message-avatar">AI</div>
-        <div class="message-content">{{ answer }}</div>
-    </div>
-    {% else %}
-    <div class="empty-chat">
-        <div class="empty-icon">🧠</div>
-        <h3>Ready to explore the brain?</h3>
-        <p>Ask a question or choose a suggested topic above to begin.</p >
-    </div>
-    {% endif %}
-
-    <div class="message ai-message loading-message" id="loadingMessage">
-        <div class="message-avatar">AI</div>
-
-        <div class="message-content loading-content">
-            <span>Generating response</span>
-
-            <div class="loading-dots">
-                <i></i>
-                <i></i>
-                <i></i>
-            </div>
-        </div>
-    </div>
-</div>
-
-        <form method="POST" class="chat-form" action="{{ url_for('ai_tutor') }}">
-            <textarea
-                id="questionInput"
-                name="question"
-                placeholder="Ask a question about brain science or brain-inspired intelligence..."
-                required></textarea>
-
-            <button type="submit" id="submitBtn">
-                Send Question →
-            </button>
-        </form>
-
     </div>
 </section>
 
 {%include'footer.html'%}
 
 <script src="https://cdn.jsdelivr.net/npm/particles.js@2.0.0/particles.min.js"></script>
-<script type="module" src="https://unpkg.com/@google/model-viewer/dist/model-viewer.min.js"></script>
-<script src="{{ url_for('static', filename='script.js') }}"></script>
+<script type="module" src="{{ url_for('static', filename='vendor/model-viewer.min.js') }}"></script>
+<script src="{{ url_for('static', filename='script.js', v='ai-tutor-21') }}"></script>
 
 </body>
 </html>

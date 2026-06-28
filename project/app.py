@@ -5,7 +5,7 @@ from urllib.parse import urljoin, urlparse
 
 import click
 from dotenv import load_dotenv
-from flask import Flask, flash, redirect, render_template, request, url_for
+from flask import Flask, abort, flash, redirect, render_template, request, send_file, url_for
 from flask_login import (
     LoginManager,
     UserMixin,
@@ -23,6 +23,7 @@ load_dotenv()
 
 app = Flask(__name__)
 app.config["SECRET_KEY"] = os.getenv("SECRET_KEY") or os.urandom(32)
+app.config["SEND_FILE_MAX_AGE_DEFAULT"] = 31536000
 
 
 def get_database_url():
@@ -64,6 +65,184 @@ Explain clearly and step by step.
 Use beginner-friendly language first.
 Give example and analogies when useful.
 """
+
+BRAIN_REGIONS = {
+    "frontal-lobe": {
+        "name": "Frontal Lobe",
+        "overview": (
+            "The frontal lobe supports planning, decision-making, voluntary movement, "
+            "language production, and flexible control of behavior."
+        ),
+        "main_functions": [
+            "Executive control and goal-directed planning",
+            "Voluntary motor control",
+            "Speech production and expressive language",
+            "Impulse regulation and social behavior",
+        ],
+        "related_cognitive_processes": [
+            "Working memory",
+            "Attention control",
+            "Reasoning",
+            "Cognitive flexibility",
+        ],
+        "clinical_relevance": (
+            "Frontal lobe injury can affect personality, inhibition, planning, speech, "
+            "and motor function. It is also important in research on ADHD, depression, "
+            "addiction, and traumatic brain injury."
+        ),
+        "key_research_topics": [
+            "Prefrontal cortex networks",
+            "Executive function and self-control",
+            "Motor planning",
+            "Neuromodulation and frontal circuits",
+        ],
+    },
+    "parietal-lobe": {
+        "name": "Parietal Lobe",
+        "overview": (
+            "The parietal lobe integrates sensory information and helps the brain build "
+            "spatial maps of the body and the surrounding world."
+        ),
+        "main_functions": [
+            "Touch, pressure, pain, and temperature processing",
+            "Spatial attention",
+            "Body awareness",
+            "Sensorimotor integration",
+        ],
+        "related_cognitive_processes": [
+            "Mental rotation",
+            "Numerical reasoning",
+            "Visual attention",
+            "Hand-eye coordination",
+        ],
+        "clinical_relevance": (
+            "Damage can lead to neglect, impaired spatial awareness, difficulty with "
+            "calculation, or problems coordinating sensory input with action."
+        ),
+        "key_research_topics": [
+            "Multisensory integration",
+            "Attention networks",
+            "Body schema",
+            "Spatial cognition and navigation",
+        ],
+    },
+    "temporal-lobe": {
+        "name": "Temporal Lobe",
+        "overview": (
+            "The temporal lobe is central to auditory processing, language comprehension, "
+            "object recognition, memory, and emotion-linked learning."
+        ),
+        "main_functions": [
+            "Auditory perception",
+            "Language comprehension",
+            "Memory encoding and retrieval",
+            "Recognition of objects and faces",
+        ],
+        "related_cognitive_processes": [
+            "Semantic memory",
+            "Episodic memory",
+            "Speech perception",
+            "Emotion and memory interactions",
+        ],
+        "clinical_relevance": (
+            "Temporal lobe dysfunction is associated with memory disorders, language "
+            "comprehension problems, epilepsy, and some forms of dementia."
+        ),
+        "key_research_topics": [
+            "Hippocampal memory systems",
+            "Auditory cortex organization",
+            "Language networks",
+            "Temporal lobe epilepsy",
+        ],
+    },
+    "occipital-lobe": {
+        "name": "Occipital Lobe",
+        "overview": (
+            "The occipital lobe is the brain's primary visual processing hub, converting "
+            "signals from the eyes into patterns, motion, color, and form."
+        ),
+        "main_functions": [
+            "Primary visual processing",
+            "Color and motion analysis",
+            "Shape and pattern detection",
+            "Visual field mapping",
+        ],
+        "related_cognitive_processes": [
+            "Visual perception",
+            "Object recognition",
+            "Reading support",
+            "Visual attention",
+        ],
+        "clinical_relevance": (
+            "Occipital damage can cause visual field loss, visual agnosia, hallucinations, "
+            "or cortical blindness depending on the affected pathway."
+        ),
+        "key_research_topics": [
+            "Visual cortex plasticity",
+            "Retinotopic mapping",
+            "Visual attention pathways",
+            "Computer vision and neural coding",
+        ],
+    },
+    "cerebellum": {
+        "name": "Cerebellum",
+        "overview": (
+            "The cerebellum fine-tunes movement, timing, balance, and motor learning, "
+            "and it is increasingly studied for roles in cognition and emotion."
+        ),
+        "main_functions": [
+            "Balance and posture",
+            "Movement coordination",
+            "Motor learning",
+            "Timing and prediction",
+        ],
+        "related_cognitive_processes": [
+            "Procedural learning",
+            "Prediction error processing",
+            "Sequence learning",
+            "Attention timing",
+        ],
+        "clinical_relevance": (
+            "Cerebellar dysfunction may cause ataxia, tremor, poor coordination, speech "
+            "difficulties, and cognitive-affective changes."
+        ),
+        "key_research_topics": [
+            "Motor adaptation",
+            "Cerebellar prediction models",
+            "Cerebellar contributions to cognition",
+            "Rehabilitation after movement disorders",
+        ],
+    },
+    "brainstem": {
+        "name": "Brainstem",
+        "overview": (
+            "The brainstem connects the brain with the spinal cord and regulates vital "
+            "functions such as breathing, heart rate, arousal, and basic reflexes."
+        ),
+        "main_functions": [
+            "Breathing and cardiovascular regulation",
+            "Sleep-wake arousal systems",
+            "Cranial nerve functions",
+            "Basic reflex control",
+        ],
+        "related_cognitive_processes": [
+            "Arousal",
+            "Attention readiness",
+            "Pain modulation",
+            "Autonomic regulation",
+        ],
+        "clinical_relevance": (
+            "Brainstem injury is medically serious because it can disrupt consciousness, "
+            "breathing, swallowing, eye movements, and core autonomic functions."
+        ),
+        "key_research_topics": [
+            "Arousal and consciousness",
+            "Autonomic nervous system control",
+            "Neuromodulatory nuclei",
+            "Brainstem reflex circuits",
+        ],
+    },
+}
 
 
 class User(UserMixin, db.Model):
@@ -143,6 +322,11 @@ def ask_ai_tutor(question):
     return response.output_text
 
 
+def cache_static_response(response):
+    response.headers["Cache-Control"] = "public, max-age=31536000, immutable"
+    return response
+
+
 @app.cli.command("init-db")
 def init_db_command():
     db.create_all()
@@ -152,6 +336,45 @@ def init_db_command():
 @app.route("/")
 def home():
     return render_template("index.html", answer="", question="")
+
+
+@app.route("/brain-region/<slug>")
+def brain_region(slug):
+    region = BRAIN_REGIONS.get(slug)
+
+    if not region:
+        abort(404)
+
+    return render_template("brain_region.html", region=region, slug=slug)
+
+
+@app.route("/assets/models/brain.glb")
+def brain_model_asset():
+    model_dir = os.path.join(app.root_path, "static", "models")
+    accepts_gzip = "gzip" in request.headers.get("Accept-Encoding", "").lower()
+    gzip_path = os.path.join(model_dir, "brain.glb.gz")
+    plain_path = os.path.join(model_dir, "brain.glb")
+
+    if accepts_gzip and os.path.exists(gzip_path):
+        response = send_file(
+            gzip_path,
+            mimetype="model/gltf-binary",
+            conditional=True,
+            etag=True,
+            max_age=31536000,
+        )
+        response.headers["Content-Encoding"] = "gzip"
+    else:
+        response = send_file(
+            plain_path,
+            mimetype="model/gltf-binary",
+            conditional=True,
+            etag=True,
+            max_age=31536000,
+        )
+
+    response.headers["Vary"] = "Accept-Encoding"
+    return cache_static_response(response)
 
 
 @app.route("/ai-tutor", methods=["GET", "POST"])
