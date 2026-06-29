@@ -3409,11 +3409,13 @@ body.brain-model-dragging .showcase-brain-stage model-viewer {
 
 .brain-region-line {
     stroke: rgba(186, 230, 253, 0.9);
-    stroke-width: 1.35;
+    stroke-width: 1.55;
     stroke-linecap: round;
+    stroke-linejoin: round;
+    fill: none;
     filter:
-        drop-shadow(0 0 5px rgba(56, 189, 248, 0.55))
-        drop-shadow(0 0 12px rgba(255, 255, 255, 0.20));
+        drop-shadow(0 0 4px rgba(56, 189, 248, 0.55))
+        drop-shadow(0 0 10px rgba(255, 255, 255, 0.18));
     vector-effect: non-scaling-stroke;
     opacity: 0;
 }
@@ -3493,29 +3495,34 @@ body.brain-model-dragging .showcase-brain-stage model-viewer {
     white-space: nowrap;
 
     pointer-events: auto;
+    user-select: none;
+    -webkit-user-select: none;
+    touch-action: manipulation;
     opacity: 0;
+    transform: none;
+    will-change: left, top, opacity, filter;
 
     transition:
         border-color 0.22s ease,
         box-shadow 0.22s ease,
         background 0.22s ease,
-        scale 0.22s ease;
+        filter 0.22s ease;
 }
 
 .brain-region-label:hover,
 .brain-region-label:focus-visible {
-    scale: 1.045;
-    border-color: rgba(125, 211, 252, 0.72);
+    border-color: rgba(125, 211, 252, 0.56);
     background:
         linear-gradient(
             135deg,
-            rgba(30, 41, 59, 0.84),
-            rgba(14, 116, 144, 0.42)
+            rgba(30, 41, 59, 0.78),
+            rgba(14, 116, 144, 0.34)
         );
     box-shadow:
-        0 20px 54px rgba(0, 0, 0, 0.42),
-        0 0 34px rgba(56, 189, 248, 0.32),
+        0 18px 46px rgba(0, 0, 0, 0.38),
+        0 0 22px rgba(56, 189, 248, 0.24),
         inset 0 1px 0 rgba(255, 255, 255, 0.18);
+    filter: brightness(1.04);
 }
 
 /* Brain region detail pages */

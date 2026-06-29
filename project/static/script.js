@@ -371,9 +371,10 @@ if (brainShowcaseModel && brainShowcaseSection && brainShowcaseStage) {
             dot.className = "brain-hotspot-dot";
             hotspot.appendChild(dot);
 
-            const line = document.createElementNS(svgNamespace, "line");
+            const line = document.createElementNS(svgNamespace, "path");
             line.classList.add("brain-region-line");
             line.dataset.regionId = region.id;
+            line.setAttribute("aria-hidden", "true");
             brainRegionLineLayer.appendChild(line);
 
             const label = document.createElement("a");
@@ -388,15 +389,27 @@ if (brainShowcaseModel && brainShowcaseSection && brainShowcaseStage) {
             brainRegionLabelLayer.appendChild(label);
             brainShowcaseModel.appendChild(hotspot);
 
-            labelStates.set(region.id, {
+            const labelState = {
                 region,
                 hotspot,
                 line,
                 label,
                 x: null,
                 y: null,
-                opacity: 0
+                opacity: 0,
+                hovered: false,
+                side: null
+            };
+
+            label.addEventListener("pointerenter", () => {
+                labelState.hovered = true;
             });
+
+            label.addEventListener("pointerleave", () => {
+                labelState.hovered = false;
+            });
+
+            labelStates.set(region.id, labelState);
         });
     }
 
@@ -462,7 +475,9 @@ if (brainShowcaseModel && brainShowcaseSection && brainShowcaseStage) {
             brainShowcaseSection.style.getPropertyValue("--brain-label-opacity") || 0
         );
         const isPhone = window.innerWidth < 680;
-        const lineLength = window.innerWidth < 760 ? 34 : 64;
+        const connectorGap = window.innerWidth < 760 ? 24 : 42;
+        const columnGap = window.innerWidth < 760 ? 34 : 56;
+        const horizontalFollowLimit = window.innerWidth < 760 ? 10 : 18;
         const minLeft = window.innerWidth < 760 ? 10 : 18;
         const maxLeft = overlayRect.width - minLeft;
         const navSafeTop = navRect ? Math.max(18, navRect.bottom - overlayRect.top + 14) : 24;
@@ -492,7 +507,7 @@ if (brainShowcaseModel && brainShowcaseSection && brainShowcaseStage) {
 
         labelStates.forEach(state => {
             const { region, hotspot, label, line } = state;
-            const hiddenOnPhone = isPhone && region.priority > 4;
+            const hiddenOnPhone = window.innerWidth < 760 && region.priority > 4;
             const visible = !hiddenOnPhone && labelOpacity > 0.02 && hotspotIsVisible(hotspot);
 
             if (!visible) {
@@ -513,22 +528,32 @@ if (brainShowcaseModel && brainShowcaseSection && brainShowcaseStage) {
                 return;
             }
 
-            let side = dotX < modelCenterX ? -1 : 1;
+            const preferredSide = region.preferredSide === "left" ? -1 : 1;
+            const canFitRight = brainBounds.right + columnGap + labelWidth <= maxLeft;
+            const canFitLeft = brainBounds.left - columnGap - labelWidth >= minLeft;
+            let side = state.hovered && state.side ? state.side : preferredSide;
 
-            if (Math.abs(dotX - modelCenterX) < modelWidth * 0.08) {
-                side = region.preferredSide === "left" ? -1 : 1;
-            }
-
-            if (side > 0 && brainBounds.right + lineLength + labelWidth > maxLeft) {
+            if (side > 0 && !canFitRight && canFitLeft) {
                 side = -1;
-            } else if (side < 0 && brainBounds.left - lineLength - labelWidth < minLeft) {
+            } else if (side < 0 && !canFitLeft && canFitRight) {
                 side = 1;
             }
 
+            const horizontalNudge = clamp(
+                (dotX - modelCenterX) * 0.10,
+                -horizontalFollowLimit,
+                horizontalFollowLimit
+            );
+            let rawLeft = side > 0
+                ? brainBounds.right + columnGap + Math.max(0, horizontalNudge)
+                : brainBounds.left - columnGap - labelWidth + Math.min(0, horizontalNudge);
+
+            rawLeft = side > 0
+                ? Math.max(rawLeft, dotX + connectorGap)
+                : Math.min(rawLeft, dotX - connectorGap - labelWidth);
+
             const targetLeft = clamp(
-                side > 0
-                    ? Math.max(dotX + lineLength, brainBounds.right + lineLength * 0.55)
-                    : Math.min(dotX - lineLength - labelWidth, brainBounds.left - labelWidth - lineLength * 0.55),
+                rawLeft,
                 minLeft,
                 maxLeft - labelWidth
             );
@@ -555,25 +580,62 @@ if (brainShowcaseModel && brainShowcaseSection && brainShowcaseStage) {
         resolveLabelColumn(candidates.right, minTop, maxTop);
 
         [...candidates.left, ...candidates.right].forEach(item => {
-            const { state, side, dotX, dotY, targetLeft, targetTop, width, height } = item;
-            const ease = prefersReducedShowcaseMotion?.matches ? 1 : 0.22;
+            const { state, side, dotX, dotY, targetLeft, targetTop } = item;
+            const ease = prefersReducedShowcaseMotion?.matches ? 1 : (state.hovered ? 0.035 : 0.12);
+            const deadzone = state.hovered ? 28 : 1.8;
             const targetOpacity = labelOpacity;
 
-            state.x = state.x === null ? targetLeft : lerp(state.x, targetLeft, ease);
-            state.y = state.y === null ? targetTop : lerp(state.y, targetTop, ease);
+            if (state.x === null) {
+                state.x = targetLeft;
+            } else if (Math.abs(targetLeft - state.x) > deadzone) {
+                state.x = lerp(state.x, targetLeft, ease);
+            }
+
+            if (state.y === null) {
+                state.y = targetTop;
+            } else if (Math.abs(targetTop - state.y) > deadzone) {
+                state.y = lerp(state.y, targetTop, ease);
+            }
+
             state.opacity = lerp(state.opacity, targetOpacity, ease);
+            state.side = side;
 
-            const labelCenterY = state.y + height / 2;
-            const lineEndX = side > 0 ? state.x : state.x + width;
-
-            state.label.style.transform = `translate3d(${state.x}px, ${state.y}px, 0)`;
+            state.label.style.left = `${state.x.toFixed(1)}px`;
+            state.label.style.top = `${state.y.toFixed(1)}px`;
+            state.label.style.transform = "none";
             state.label.style.opacity = state.opacity.toFixed(3);
             state.label.style.pointerEvents = state.opacity > 0.35 ? "auto" : "none";
+            state.label.dataset.side = side > 0 ? "right" : "left";
 
-            state.line.setAttribute("x1", dotX.toFixed(1));
-            state.line.setAttribute("y1", dotY.toFixed(1));
-            state.line.setAttribute("x2", lineEndX.toFixed(1));
-            state.line.setAttribute("y2", labelCenterY.toFixed(1));
+            const labelRect = state.label.getBoundingClientRect();
+            const labelInset = window.innerWidth < 760 ? 5 : 8;
+            const labelEdgeX = side > 0
+                ? labelRect.left - overlayRect.left + labelInset
+                : labelRect.right - overlayRect.left - labelInset;
+            const labelCenterY = labelRect.top + labelRect.height / 2 - overlayRect.top;
+            const lineDeltaX = labelEdgeX - dotX;
+            const lineDeltaY = labelCenterY - dotY;
+            const lineDistance = Math.hypot(lineDeltaX, lineDeltaY) || 1;
+            const dotRadius = window.innerWidth < 760 ? 5 : 6;
+            const lineStartX = dotX + (lineDeltaX / lineDistance) * dotRadius;
+            const lineStartY = dotY + (lineDeltaY / lineDistance) * dotRadius;
+            const direction = side > 0 ? 1 : -1;
+            const spanX = Math.abs(labelEdgeX - lineStartX);
+            const curveReach = clamp(spanX * 0.52, 24, window.innerWidth < 760 ? 58 : 118);
+            const naturalBend = (state.region.priority % 2 === 0 ? -1 : 1) * (window.innerWidth < 760 ? 7 : 14);
+            const curveLift = clamp((labelCenterY - lineStartY) * 0.18 + naturalBend, -34, 34);
+            const controlOneX = lineStartX + direction * curveReach * 0.52;
+            const controlOneY = lineStartY + curveLift;
+            const controlTwoX = labelEdgeX - direction * curveReach;
+            const controlTwoY = labelCenterY + curveLift * 0.62;
+            const connectorPath = [
+                `M ${lineStartX.toFixed(1)} ${lineStartY.toFixed(1)}`,
+                `C ${controlOneX.toFixed(1)} ${controlOneY.toFixed(1)}`,
+                `${controlTwoX.toFixed(1)} ${controlTwoY.toFixed(1)}`,
+                `${labelEdgeX.toFixed(1)} ${labelCenterY.toFixed(1)}`
+            ].join(" ");
+
+            state.line.setAttribute("d", connectorPath);
             state.line.style.opacity = state.opacity.toFixed(3);
         });
 
