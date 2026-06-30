@@ -5,17 +5,3 @@
   background: #020617;
   isolation: isolate;
 }
-
-.home-main {
-  position: relative;
-  min-height: 100vh;
-}
-
-.home-dark-continuation {
-  position: relative;
-  z-index: 1;
-  min-height: 36vh;
-  background:
-    radial-gradient(circle at 50% 0%, rgba(37, 99, 235, 0.1), transparent 36%),
-    linear-gradient(180deg, rgba(2, 6, 23, 0), #020617 42%);
-}
