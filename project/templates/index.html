@@ -7,7 +7,7 @@
     <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
     <link rel="modulepreload" href="{{ url_for('static', filename='vendor/model-viewer.min.js') }}">
     <link rel="preload" href="{{ url_for('brain_model_asset') }}" as="fetch" type="model/gltf-binary" crossorigin="anonymous" fetchpriority="high">
-    <link rel="stylesheet" href="{{ url_for('static', filename='style.css', v='brain-connectors-3') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css', v='brain-connectors-3-module-cards-1-login-button-2-border-glow-1') }}">
 </head>
 
 <body class="home-page">
@@ -131,9 +131,9 @@
         </div>
 
         {% if current_user.is_authenticated %}
-        <a class="login-nav-button" href="{{ url_for('logout') }}">Logout</a>
+        <a class="login-nav-button" href="{{ url_for('logout') }}"><span>Logout</span></a>
         {% else %}
-        <a class="login-nav-button" href="{{ url_for('login') }}">Login</a>
+        <a class="login-nav-button" href="{{ url_for('login') }}"><span>Login</span></a>
         {% endif %}
     </nav>
 
@@ -357,6 +357,17 @@
 
     <section class="ai-section" id="ai-section">
     <div class="ai-tutor-shell{% if question or answer %} has-chat{% endif %}">
+        <svg class="ai-border-glow" aria-hidden="true" focusable="false">
+            <path class="ai-border-glow-path ai-border-glow-base" pathLength="1000"></path>
+            <g class="ai-border-glow-runner ai-border-glow-runner-one">
+                <path class="ai-border-glow-path ai-border-glow-trace ai-border-glow-halo" pathLength="1000"></path>
+                <path class="ai-border-glow-path ai-border-glow-trace ai-border-glow-core" pathLength="1000"></path>
+            </g>
+            <g class="ai-border-glow-runner ai-border-glow-runner-two">
+                <path class="ai-border-glow-path ai-border-glow-trace ai-border-glow-halo" pathLength="1000"></path>
+                <path class="ai-border-glow-path ai-border-glow-trace ai-border-glow-core" pathLength="1000"></path>
+            </g>
+        </svg>
         <header class="ai-tutor-heading">
             <h2>Ready to explore the brain?</h2>
             <p>Ask a question</p>
@@ -436,7 +447,7 @@
 
 <script src="https://cdn.jsdelivr.net/npm/particles.js@2.0.0/particles.min.js"></script>
 <script type="module" src="{{ url_for('static', filename='vendor/model-viewer.min.js') }}"></script>
-<script src="{{ url_for('static', filename='script.js', v='brain-connectors-3') }}"></script>
+<script src="{{ url_for('static', filename='script.js', v='brain-connectors-3-border-glow-1') }}"></script>
 
 </body>
 </html>

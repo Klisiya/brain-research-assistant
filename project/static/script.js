@@ -90,7 +90,99 @@ const questionInput = document.getElementById("questionInput");
 const submitBtn = document.getElementById("submitBtn");
 const chatForm = document.querySelector(".ai-composer");
 const composerLoading = document.getElementById("composerLoading");
+const aiTutorShell = document.querySelector(".ai-tutor-shell");
+const aiBorderGlow = aiTutorShell ? aiTutorShell.querySelector(".ai-border-glow") : null;
+const aiBorderGlowPaths = aiBorderGlow ? aiBorderGlow.querySelectorAll(".ai-border-glow-path") : [];
+const aiBorderGlowRunners = aiBorderGlow ? aiBorderGlow.querySelectorAll(".ai-border-glow-runner") : [];
 const textareaMaxHeight = 220;
+
+function createAiBorderPath(width, height, radius, inset = 1) {
+    const left = inset;
+    const top = inset;
+    const right = width - inset;
+    const bottom = height - inset;
+    const r = Math.max(0, Math.min(radius - inset, (right - left) / 2, (bottom - top) / 2));
+
+    return [
+        `M ${left + r} ${top}`,
+        `H ${right - r}`,
+        `A ${r} ${r} 0 0 1 ${right} ${top + r}`,
+        `V ${bottom - r}`,
+        `A ${r} ${r} 0 0 1 ${right - r} ${bottom}`,
+        `H ${left + r}`,
+        `A ${r} ${r} 0 0 1 ${left} ${bottom - r}`,
+        `V ${top + r}`,
+        `A ${r} ${r} 0 0 1 ${left + r} ${top}`
+    ].join(" ");
+}
+
+function updateAiBorderPath() {
+    if (!aiTutorShell || !aiBorderGlow || !aiBorderGlowPaths.length) return;
+
+    const width = aiTutorShell.clientWidth;
+    const height = aiTutorShell.clientHeight;
+    if (!width || !height) return;
+
+    const style = window.getComputedStyle(aiTutorShell);
+    const radius = parseFloat(style.borderTopLeftRadius) || 28;
+    const path = createAiBorderPath(width, height, radius, 1.2);
+
+    aiBorderGlow.setAttribute("viewBox", `0 0 ${width} ${height}`);
+    aiBorderGlowPaths.forEach(borderPath => {
+        borderPath.setAttribute("d", path);
+    });
+}
+
+function updateAiBorderRunnerVariation(runner, index) {
+    const sizeMin = index === 0 ? 94 : 74;
+    const sizeMax = index === 0 ? 146 : 120;
+    const size = Math.round(sizeMin + Math.random() * (sizeMax - sizeMin));
+    const alpha = index === 0
+        ? 0.78 + Math.random() * 0.20
+        : 0.54 + Math.random() * 0.24;
+    const coreAlpha = index === 0
+        ? 0.88 + Math.random() * 0.12
+        : 0.70 + Math.random() * 0.18;
+    const haloAlpha = index === 0
+        ? 0.22 + Math.random() * 0.18
+        : 0.16 + Math.random() * 0.14;
+    const haloWidth = index === 0
+        ? 6.8 + Math.random() * 2.8
+        : 5.8 + Math.random() * 2.2;
+
+    runner.style.setProperty("--runner-size", size);
+    runner.style.setProperty("--runner-gap", 1000 - size);
+    runner.style.setProperty("--runner-alpha", alpha.toFixed(2));
+    runner.style.setProperty("--runner-core-alpha", coreAlpha.toFixed(2));
+    runner.style.setProperty("--runner-halo-alpha", haloAlpha.toFixed(2));
+    runner.style.setProperty("--runner-halo-width", `${haloWidth.toFixed(1)}px`);
+}
+
+function scheduleAiBorderRunnerVariation() {
+    if (!aiBorderGlowRunners.length || (particleMotionQuery && particleMotionQuery.matches)) return;
+
+    aiBorderGlowRunners.forEach((runner, index) => {
+        const run = () => {
+            updateAiBorderRunnerVariation(runner, index);
+            window.setTimeout(run, 1600 + Math.random() * 1800 + index * 420);
+        };
+
+        window.setTimeout(run, 240 + index * 860);
+    });
+}
+
+if (aiTutorShell && aiBorderGlow && aiBorderGlowPaths.length) {
+    updateAiBorderPath();
+    aiBorderGlowRunners.forEach(updateAiBorderRunnerVariation);
+    scheduleAiBorderRunnerVariation();
+
+    if (window.ResizeObserver) {
+        const borderPathObserver = new ResizeObserver(updateAiBorderPath);
+        borderPathObserver.observe(aiTutorShell);
+    } else {
+        window.addEventListener("resize", updateAiBorderPath);
+    }
+}
 
 if (composerLoading) {
     composerLoading.hidden = true;
