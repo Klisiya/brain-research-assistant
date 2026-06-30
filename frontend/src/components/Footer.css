@@ -1,0 +1,122 @@
+.site-footer {
+  position: relative;
+  z-index: 2;
+  margin-top: 0;
+  padding: 70px 5vw 28px;
+  overflow: hidden;
+  background:
+    linear-gradient(
+      180deg,
+      rgba(2, 6, 23, 0),
+      rgba(2, 6, 23, 0.72) 22%,
+      rgba(2, 6, 23, 0.96)
+    );
+  border-top: 1px solid rgba(125, 211, 252, 0.14);
+}
+
+.footer-glow {
+  position: absolute;
+  left: 50%;
+  top: 0;
+  width: 680px;
+  height: 220px;
+  transform: translateX(-50%);
+  background: radial-gradient(circle, rgba(56, 189, 248, 0.18), transparent 68%);
+  filter: blur(26px);
+  pointer-events: none;
+}
+
+.footer-content {
+  position: relative;
+  z-index: 2;
+  max-width: 1180px;
+  margin: 0 auto;
+  display: grid;
+  gap: 34px;
+}
+
+.simple-footer-content {
+  grid-template-columns: 1.4fr 1fr;
+  align-items: center;
+}
+
+.footer-brand h2 {
+  margin: 0 0 16px;
+  color: white;
+  font-size: 24px;
+  line-height: 1.25;
+  font-weight: 700;
+  letter-spacing: -0.5px;
+}
+
+.footer-brand p,
+.footer-note p {
+  margin: 0 0 12px;
+  color: #94a3b8;
+  font-size: 14px;
+  line-height: 1.7;
+}
+
+.footer-brand p {
+  max-width: 620px;
+}
+
+.footer-note {
+  padding: 20px 22px;
+  border-radius: 22px;
+  background:
+    linear-gradient(
+      135deg,
+      rgba(255, 255, 255, 0.06),
+      rgba(255, 255, 255, 0.015)
+    );
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(18px) saturate(160%);
+  -webkit-backdrop-filter: blur(18px) saturate(160%);
+}
+
+.footer-note p:last-child {
+  margin-bottom: 0;
+}
+
+.footer-bottom {
+  position: relative;
+  z-index: 2;
+  max-width: 1180px;
+  margin: 34px auto 0;
+  padding-top: 22px;
+  display: flex;
+  justify-content: center;
+  gap: 20px;
+  border-top: 1px solid rgba(148, 163, 184, 0.16);
+  color: #64748b;
+  font-size: 13px;
+  line-height: 1.6;
+  text-align: center;
+}
+
+@media (max-width: 900px) {
+  .simple-footer-content {
+    grid-template-columns: 1fr;
+  }
+
+  .footer-bottom {
+    flex-direction: column;
+  }
+}
+
+@media (max-width: 620px) {
+  .site-footer {
+    margin-top: 0;
+    padding: 58px 20px 26px;
+  }
+
+  .footer-brand h2 {
+    font-size: 21px;
+  }
+
+  .footer-note {
+    padding: 18px;
+    border-radius: 18px;
+  }
+}
