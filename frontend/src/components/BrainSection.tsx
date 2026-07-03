@@ -1,291 +1,354 @@
 import { useEffect, useRef, useState } from 'react'
-import * as THREE from 'three'
-import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js'
 import './BrainSection.css'
 
 const brainModelPath = '/models/brain.glb'
-const cameraPolarAngle = THREE.MathUtils.degToRad(72)
-const cameraDistance = 3
-const targetModelSize = 1.42
+const modelViewerScriptPath = '/vendor/model-viewer.min.js'
+const sideViewStartAzimuth = 82
+const sideViewEndAzimuth = 104
+const sideViewRestAzimuth = 94
+const sideViewDistance = 2.9
+const sideViewStartDistance = 3.05
+const sideViewEndDistance = 2.78
+const brainModelExposure = '0.74'
+const brainViewerRevision = 'section-progress-fit-v2'
+const brainParticleEmissiveColor = [0.784, 0.957, 1] as const
+const brainParticleBaseColor = [0, 0, 0, 1] as const
+const showcaseScrollStartDelay = 0.12
+const showcaseScrollEndOffset = 1
 
-function disposeMaterial(material: THREE.Material) {
-  Object.values(material).forEach((value) => {
-    if (value instanceof THREE.Texture) {
-      value.dispose()
-    }
-  })
+type ModelViewerRgbColor = readonly [number, number, number]
+type ModelViewerRgbaColor = readonly [number, number, number, number]
 
-  material.dispose()
+type ModelViewerMaterial = {
+  pbrMetallicRoughness?: {
+    setBaseColorFactor?: (color: ModelViewerRgbaColor) => void
+  }
+  setEmissiveFactor?: (color: ModelViewerRgbColor) => void
 }
 
-function disposeObject3D(object: THREE.Object3D) {
-  object.traverse((child) => {
-    const mesh = child as THREE.Mesh
-
-    if (mesh.geometry) {
-      mesh.geometry.dispose()
-    }
-
-    if (mesh.material) {
-      const materials = Array.isArray(mesh.material) ? mesh.material : [mesh.material]
-
-      materials.forEach(disposeMaterial)
-    }
-  })
+type BrainModelViewerElement = HTMLElement & {
+  loaded?: boolean
+  model?: {
+    materials?: ModelViewerMaterial[]
+  }
 }
 
-function resolveMaterialColor(material: THREE.Material | THREE.Material[] | undefined) {
-  const source = Array.isArray(material) ? material[0] : material
+function clamp(value: number, min: number, max: number) {
+  return Math.min(Math.max(value, min), max)
+}
 
-  if (
-    source &&
-    'emissive' in source &&
-    source.emissive instanceof THREE.Color &&
-    source.emissive.getHex() !== 0
-  ) {
-    return source.emissive.clone()
+function lerp(start: number, end: number, amount: number) {
+  return start + (end - start) * amount
+}
+
+function smoothstep(start: number, end: number, value: number) {
+  const amount = clamp((value - start) / (end - start), 0, 1)
+
+  return amount * amount * (3 - 2 * amount)
+}
+
+function getBaseModelSize() {
+  const cssBase = Math.min(450, window.innerWidth * 0.32)
+
+  return Math.max(cssBase, Math.min(340, window.innerWidth * 0.72))
+}
+
+function getExpandedModelSize(baseSize: number) {
+  const heightLimit = window.innerHeight * 0.78
+  const widthLimit = window.innerWidth * (window.innerWidth < 900 ? 0.86 : 0.72)
+
+  return Math.max(baseSize, Math.min(heightLimit, widthLimit, 860))
+}
+
+function getShowcaseProgress(section: HTMLElement) {
+  const sectionTop = section.getBoundingClientRect().top + window.scrollY
+  const scrollStart = sectionTop + window.innerHeight * showcaseScrollStartDelay
+  const scrollEnd = sectionTop + section.offsetHeight - window.innerHeight * showcaseScrollEndOffset
+  const scrollableDistance = Math.max(1, scrollEnd - scrollStart)
+
+  return clamp((window.scrollY - scrollStart) / scrollableDistance, 0, 1)
+}
+
+function ensureModelViewerScript() {
+  if (customElements.get('model-viewer')) {
+    return Promise.resolve()
   }
 
-  if (
-    source &&
-    'color' in source &&
-    source.color instanceof THREE.Color &&
-    source.color.getHex() !== 0
-  ) {
-    return source.color.clone()
+  const existingScript = document.querySelector<HTMLScriptElement>(
+    `script[src="${modelViewerScriptPath}"]`,
+  )
+
+  if (!existingScript) {
+    const script = document.createElement('script')
+    script.src = modelViewerScriptPath
+    script.type = 'module'
+    document.head.appendChild(script)
   }
 
-  return new THREE.Color(0x38bdf8)
+  return customElements.whenDefined('model-viewer')
+}
+
+function applyUnifiedBrainParticleColor(model: BrainModelViewerElement) {
+  model.model?.materials?.forEach((material) => {
+    material.pbrMetallicRoughness?.setBaseColorFactor?.(brainParticleBaseColor)
+    material.setEmissiveFactor?.(brainParticleEmissiveColor)
+  })
 }
 
 function BrainSection() {
-  const mountRef = useRef<HTMLDivElement>(null)
+  const brainViewerSignature = [
+    brainViewerRevision,
+    sideViewStartAzimuth,
+    sideViewEndAzimuth,
+    sideViewRestAzimuth,
+    sideViewDistance,
+    sideViewStartDistance,
+    sideViewEndDistance,
+    brainModelExposure,
+  ].join(':')
+  const modelMountRef = useRef<HTMLDivElement>(null)
+  const sectionRef = useRef<HTMLElement>(null)
   const [loadError, setLoadError] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
+  const [viewerReady, setViewerReady] = useState(() => customElements.get('model-viewer') !== undefined)
 
   useEffect(() => {
-    const mount = mountRef.current
-
-    if (!mount) {
-      return undefined
-    }
-
-    mount.querySelectorAll('canvas').forEach((canvas) => canvas.remove())
-
-    const scene = new THREE.Scene()
-    const camera = new THREE.PerspectiveCamera(28, 1, 0.01, 100)
-    const renderer = new THREE.WebGLRenderer({
-      alpha: true,
-      antialias: true,
-      powerPreference: 'high-performance',
-    })
-    const loader = new GLTFLoader()
-    const modelGroup = new THREE.Group()
-    const targetRotation = new THREE.Vector2(0, 0)
-    const currentRotation = new THREE.Vector2(0, 0)
-    const pointerState = {
-      dragging: false,
-      lastX: 0,
-      lastY: 0,
-    }
-
-    let animationFrame = 0
     let disposed = false
-    let loadedRoot: THREE.Object3D | null = null
 
-    renderer.setClearColor(0x000000, 0)
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2))
-    renderer.toneMapping = THREE.ACESFilmicToneMapping
-    renderer.toneMappingExposure = 1.25
-    mount.appendChild(renderer.domElement)
-
-    scene.add(modelGroup)
-
-    const ambientLight = new THREE.AmbientLight(0x7dd3fc, 0.55)
-    const keyLight = new THREE.DirectionalLight(0x93c5fd, 1.35)
-    const cyanLight = new THREE.PointLight(0x38bdf8, 2.1, 8)
-    const violetLight = new THREE.PointLight(0xa855f7, 1.15, 7)
-
-    keyLight.position.set(1.4, 2.6, 3.2)
-    cyanLight.position.set(-1.8, 0.8, 2.2)
-    violetLight.position.set(1.9, -0.8, -1.5)
-    scene.add(ambientLight, keyLight, cyanLight, violetLight)
-
-    const setCameraFromFlaskOrbit = () => {
-      camera.position.set(
-        Math.sin(cameraPolarAngle) * Math.sin(0) * cameraDistance,
-        Math.cos(cameraPolarAngle) * cameraDistance,
-        Math.sin(cameraPolarAngle) * Math.cos(0) * cameraDistance,
-      )
-      camera.lookAt(0, 0, 0)
-    }
-
-    const resizeRenderer = () => {
-      const { clientHeight, clientWidth } = mount
-      const width = Math.max(1, clientWidth)
-      const height = Math.max(1, clientHeight)
-
-      renderer.setSize(width, height, false)
-      camera.aspect = width / height
-      camera.updateProjectionMatrix()
-      setCameraFromFlaskOrbit()
-    }
-
-    const styleLoadedBrain = (root: THREE.Object3D) => {
-      root.traverse((child) => {
-        if (!(child instanceof THREE.Mesh)) {
-          return
-        }
-
-        const color = resolveMaterialColor(child.material)
-        const originalMaterials = Array.isArray(child.material) ? child.material : [child.material]
-        const pointMaterial = new THREE.PointsMaterial({
-          blending: THREE.AdditiveBlending,
-          color,
-          depthWrite: false,
-          opacity: 0.86,
-          size: 0.008,
-          sizeAttenuation: true,
-          transparent: true,
-        })
-        const wireMaterial = new THREE.MeshBasicMaterial({
-          blending: THREE.AdditiveBlending,
-          color,
-          depthWrite: false,
-          opacity: 0.12,
-          transparent: true,
-          wireframe: true,
-        })
-        const particleOverlay = new THREE.Points(child.geometry.clone(), pointMaterial)
-
-        child.material = wireMaterial
-        child.add(particleOverlay)
-        originalMaterials.forEach(disposeMaterial)
-      })
-
-      modelGroup.add(root)
-
-      const box = new THREE.Box3().setFromObject(modelGroup)
-      const size = box.getSize(new THREE.Vector3())
-      const center = box.getCenter(new THREE.Vector3())
-      const maxSize = Math.max(size.x, size.y, size.z, 0.001)
-
-      modelGroup.position.sub(center)
-      modelGroup.scale.setScalar(targetModelSize / maxSize)
-    }
-
-    const animate = () => {
-      currentRotation.x += (targetRotation.x - currentRotation.x) * 0.16
-      currentRotation.y += (targetRotation.y - currentRotation.y) * 0.16
-      modelGroup.rotation.x = currentRotation.x
-      modelGroup.rotation.y = currentRotation.y
-      renderer.render(scene, camera)
-      animationFrame = window.requestAnimationFrame(animate)
-    }
-
-    const handlePointerDown = (event: PointerEvent) => {
-      pointerState.dragging = true
-      pointerState.lastX = event.clientX
-      pointerState.lastY = event.clientY
-      renderer.domElement.classList.add('is-dragging')
-      renderer.domElement.setPointerCapture(event.pointerId)
-    }
-
-    const handlePointerMove = (event: PointerEvent) => {
-      if (!pointerState.dragging) {
-        return
-      }
-
-      const deltaX = event.clientX - pointerState.lastX
-      const deltaY = event.clientY - pointerState.lastY
-
-      pointerState.lastX = event.clientX
-      pointerState.lastY = event.clientY
-      targetRotation.y += deltaX * 0.004
-      targetRotation.x = THREE.MathUtils.clamp(targetRotation.x + deltaY * 0.003, -0.55, 0.55)
-    }
-
-    const handlePointerUp = (event: PointerEvent) => {
-      pointerState.dragging = false
-      renderer.domElement.classList.remove('is-dragging')
-
-      if (renderer.domElement.hasPointerCapture(event.pointerId)) {
-        renderer.domElement.releasePointerCapture(event.pointerId)
-      }
-    }
-
-    const handlePointerLeave = () => {
-      pointerState.dragging = false
-      renderer.domElement.classList.remove('is-dragging')
-    }
-
-    resizeRenderer()
-    animate()
-
-    window.addEventListener('resize', resizeRenderer)
-    renderer.domElement.addEventListener('pointerdown', handlePointerDown)
-    renderer.domElement.addEventListener('pointermove', handlePointerMove)
-    renderer.domElement.addEventListener('pointerup', handlePointerUp)
-    renderer.domElement.addEventListener('pointercancel', handlePointerUp)
-    renderer.domElement.addEventListener('pointerleave', handlePointerLeave)
-
-    loader.load(
-      brainModelPath,
-      (gltf) => {
-        if (disposed) {
-          disposeObject3D(gltf.scene)
-          return
-        }
-
-        loadedRoot = gltf.scene
-        styleLoadedBrain(gltf.scene)
-        setIsLoading(false)
-      },
-      undefined,
-      (error) => {
+    ensureModelViewerScript()
+      .then(() => {
         if (!disposed) {
-          console.error('Failed to load brain model:', error)
+          setViewerReady(true)
+        }
+      })
+      .catch((error: unknown) => {
+        if (!disposed) {
+          console.error('Failed to load model-viewer:', error)
           setLoadError(true)
           setIsLoading(false)
         }
-      },
-    )
+      })
 
     return () => {
       disposed = true
-      window.cancelAnimationFrame(animationFrame)
-      window.removeEventListener('resize', resizeRenderer)
-      renderer.domElement.removeEventListener('pointerdown', handlePointerDown)
-      renderer.domElement.removeEventListener('pointermove', handlePointerMove)
-      renderer.domElement.removeEventListener('pointerup', handlePointerUp)
-      renderer.domElement.removeEventListener('pointercancel', handlePointerUp)
-      renderer.domElement.removeEventListener('pointerleave', handlePointerLeave)
-
-      if (loadedRoot) {
-        modelGroup.remove(loadedRoot)
-      }
-
-      disposeObject3D(modelGroup)
-      renderer.dispose()
-      renderer.forceContextLoss()
-      renderer.domElement.remove()
     }
   }, [])
 
+  useEffect(() => {
+    const modelMount = modelMountRef.current
+    const section = sectionRef.current
+
+    if (!modelMount || !section || !viewerReady) {
+      return undefined
+    }
+
+    const model = document.createElement('model-viewer') as BrainModelViewerElement
+    const motionQuery = window.matchMedia('(prefers-reduced-motion: reduce)')
+    const scrollState = {
+      currentProgress: Number.NaN,
+      decorActive: false,
+      targetProgress: 0,
+      isCompact: false,
+      reduceMotion: false,
+    }
+    const renderedScrollState = {
+      cameraOrbit: '',
+      decorOpacity: '',
+      modelSize: '',
+      phase: '',
+      stageY: '',
+    }
+    const cameraOrbitTarget = {
+      azimuth: sideViewRestAzimuth,
+      distance: sideViewDistance,
+    }
+    const cameraOrbitCurrent = {
+      azimuth: sideViewRestAzimuth,
+      distance: sideViewDistance,
+    }
+
+    let animationFrame = 0
+    let userAdjustedCamera = false
+
+    const modelAttributes = {
+      alt: '3D brain model',
+      'camera-controls': '',
+      'camera-orbit': `${sideViewRestAzimuth}deg 72deg ${sideViewDistance}m`,
+      'camera-target': '0m 0m 0m',
+      crossorigin: 'anonymous',
+      'disable-zoom': '',
+      exposure: brainModelExposure,
+      'field-of-view': '28deg',
+      'interaction-prompt': 'none',
+      loading: 'eager',
+      'max-camera-orbit': 'auto auto 3.5m',
+      'min-camera-orbit': 'auto auto 2.35m',
+      'shadow-intensity': '0',
+      src: brainModelPath,
+    }
+
+    Object.entries(modelAttributes).forEach(([name, value]) => {
+      model.setAttribute(name, value)
+    })
+    modelMount.replaceChildren(model)
+
+    const setCameraOrbit = () => {
+      const nextCameraOrbit = `${cameraOrbitCurrent.azimuth.toFixed(2)}deg 72deg ${cameraOrbitCurrent.distance.toFixed(2)}m`
+
+      if (renderedScrollState.cameraOrbit !== nextCameraOrbit) {
+        renderedScrollState.cameraOrbit = nextCameraOrbit
+        model.setAttribute('camera-orbit', nextCameraOrbit)
+        model.setAttribute('camera-target', '0m 0m 0m')
+      }
+    }
+
+    const updateScrollTarget = () => {
+      const rect = section.getBoundingClientRect()
+      scrollState.isCompact = window.innerWidth < 760
+      scrollState.reduceMotion = motionQuery.matches
+      scrollState.decorActive =
+        scrollState.isCompact || (rect.top <= 0 && rect.bottom >= window.innerHeight)
+      scrollState.targetProgress = scrollState.isCompact ? 0.24 : getShowcaseProgress(section)
+    }
+
+    const applyScrollTransform = () => {
+      if (!Number.isFinite(scrollState.currentProgress)) {
+        scrollState.currentProgress = scrollState.targetProgress
+      } else {
+        const progressDelta = scrollState.targetProgress - scrollState.currentProgress
+        scrollState.currentProgress += progressDelta * 0.85
+
+        if (Math.abs(progressDelta) < 0.001) {
+          scrollState.currentProgress = scrollState.targetProgress
+        }
+      }
+
+      const { isCompact, reduceMotion } = scrollState
+      const progress = scrollState.currentProgress
+      const growProgress = smoothstep(0.25, 0.65, progress)
+      const exitProgress = smoothstep(0.9, 1, progress)
+      const baseModelSize = getBaseModelSize()
+      const expandedModelSize = getExpandedModelSize(baseModelSize)
+      const activeGrowProgress = reduceMotion ? growProgress * 0.55 : growProgress
+      const compactModelSize = Math.min(window.innerWidth * 0.92, 420)
+      const modelSize = isCompact
+        ? compactModelSize
+        : lerp(baseModelSize, expandedModelSize, activeGrowProgress) * (1 - exitProgress * 0.08)
+      const stageY = isCompact ? 0 : lerp(-40, 0, growProgress)
+      const phase =
+        progress < 0.25 ? 'layout' : progress < 0.65 ? 'expand' : progress < 0.9 ? 'explore' : 'exit'
+      const nextDecorOpacity = scrollState.decorActive ? 'visible' : 'hidden'
+      const nextModelSize = `${modelSize.toFixed(1)}px`
+      const nextStageY = `${stageY.toFixed(1)}px`
+
+      if (renderedScrollState.decorOpacity !== nextDecorOpacity) {
+        renderedScrollState.decorOpacity = nextDecorOpacity
+        section.style.setProperty('--brain-stage-glow-opacity', scrollState.decorActive ? '1' : '0')
+        section.style.setProperty('--brain-glow-opacity', scrollState.decorActive ? '0.78' : '0')
+        section.style.setProperty('--brain-orbit-opacity', scrollState.decorActive ? '0.62' : '0')
+      }
+
+      if (renderedScrollState.phase !== phase) {
+        renderedScrollState.phase = phase
+        section.dataset.showcasePhase = phase
+      }
+
+      if (renderedScrollState.modelSize !== nextModelSize) {
+        renderedScrollState.modelSize = nextModelSize
+        section.style.setProperty('--brain-model-size', nextModelSize)
+      }
+
+      if (renderedScrollState.stageY !== nextStageY) {
+        renderedScrollState.stageY = nextStageY
+        section.style.setProperty('--brain-stage-y', nextStageY)
+      }
+
+      if (!userAdjustedCamera && !reduceMotion && !isCompact) {
+        const cameraProgress = Math.min(progress, 0.65)
+        const cameraGrowProgress = smoothstep(0.25, 0.65, cameraProgress)
+
+        cameraOrbitTarget.azimuth = lerp(sideViewStartAzimuth, sideViewEndAzimuth, cameraGrowProgress)
+        cameraOrbitTarget.distance = lerp(sideViewStartDistance, sideViewEndDistance, cameraGrowProgress)
+      } else if (!userAdjustedCamera) {
+        cameraOrbitTarget.azimuth = sideViewRestAzimuth
+        cameraOrbitTarget.distance = sideViewDistance
+      }
+    }
+
+    const animate = () => {
+      applyScrollTransform()
+      cameraOrbitCurrent.azimuth += (cameraOrbitTarget.azimuth - cameraOrbitCurrent.azimuth) * 0.14
+      cameraOrbitCurrent.distance += (cameraOrbitTarget.distance - cameraOrbitCurrent.distance) * 0.14
+      setCameraOrbit()
+      animationFrame = window.requestAnimationFrame(animate)
+    }
+
+    const handlePointerDown = () => {
+      if (scrollState.currentProgress >= 0.6) {
+        userAdjustedCamera = true
+      }
+    }
+
+    const handleModelLoad = () => {
+      applyUnifiedBrainParticleColor(model)
+      setIsLoading(false)
+      setLoadError(false)
+    }
+
+    const handleModelError = (error: Event) => {
+      console.error('Failed to load brain model:', error)
+      setLoadError(true)
+      setIsLoading(false)
+    }
+
+    const handleResize = () => {
+      updateScrollTarget()
+    }
+
+    updateScrollTarget()
+    applyScrollTransform()
+    setCameraOrbit()
+    animate()
+
+    window.addEventListener('scroll', updateScrollTarget, { passive: true })
+    window.addEventListener('resize', handleResize)
+    motionQuery.addEventListener('change', updateScrollTarget)
+    model.addEventListener('load', handleModelLoad)
+    model.addEventListener('error', handleModelError)
+    model.addEventListener('pointerdown', handlePointerDown)
+
+    if ('loaded' in model && model.loaded) {
+      handleModelLoad()
+    }
+
+    return () => {
+      window.cancelAnimationFrame(animationFrame)
+      window.removeEventListener('scroll', updateScrollTarget)
+      window.removeEventListener('resize', handleResize)
+      motionQuery.removeEventListener('change', updateScrollTarget)
+      model.removeEventListener('load', handleModelLoad)
+      model.removeEventListener('error', handleModelError)
+      model.removeEventListener('pointerdown', handlePointerDown)
+      model.remove()
+    }
+  }, [viewerReady, brainViewerSignature])
+
   return (
-    <section className="brain-section" aria-label="Interactive 3D brain model">
+    <section ref={sectionRef} className="brain-section" aria-label="Interactive 3D brain model">
       <div className="brain-section-stage">
         <div className="brain-section-glow" aria-hidden="true" />
         <div className="brain-section-orbit brain-section-orbit-one" aria-hidden="true" />
         <div className="brain-section-orbit brain-section-orbit-two" aria-hidden="true" />
 
-        <div ref={mountRef} className="brain-scene" aria-label="3D brain model viewer" />
+        <div className="brain-section-model-layer">
+          <div ref={modelMountRef} className="brain-scene" aria-label="3D brain model viewer" />
 
-        {(isLoading || loadError) && (
-          <div className="brain-scene-status" role="status">
-            {loadError ? 'Unable to load brain model.' : 'Loading brain model...'}
-          </div>
-        )}
+          {(isLoading || loadError) && (
+            <div className="brain-scene-status" role="status">
+              {loadError ? 'Unable to load brain model.' : 'Loading brain model...'}
+            </div>
+          )}
+        </div>
       </div>
     </section>
   )
