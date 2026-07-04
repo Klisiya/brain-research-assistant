@@ -6,6 +6,7 @@
   --brain-glow-opacity: 0;
   --brain-orbit-opacity: 0;
   --brain-stage-glow-opacity: 0;
+  --brain-label-opacity: 0;
   --brain-copy-opacity: 1;
   --brain-copy-visibility: visible;
   --brain-copy-pointer-events: auto;

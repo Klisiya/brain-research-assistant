@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
+import BrainHotspots from './BrainHotspots'
 import './BrainSection.css'
+import { brainHotspots, type BrainHotspot } from '../data/brainHotspots'
 
 const brainModelPath = '/models/brain.glb'
 const modelViewerScriptPath = '/vendor/model-viewer.min.js'
@@ -31,6 +33,29 @@ type BrainModelViewerElement = HTMLElement & {
   model?: {
     materials?: ModelViewerMaterial[]
   }
+}
+
+type BrainRegionLabelState = {
+  region: BrainHotspot
+  hotspot: HTMLButtonElement
+  line: SVGPathElement
+  label: HTMLAnchorElement
+  x: number | null
+  y: number | null
+  opacity: number
+  hovered: boolean
+  side: number | null
+}
+
+type BrainRegionLabelCandidate = {
+  state: BrainRegionLabelState
+  side: number
+  dotX: number
+  dotY: number
+  targetLeft: number
+  targetTop: number
+  width: number
+  height: number
 }
 
 function clamp(value: number, min: number, max: number) {
@@ -95,6 +120,42 @@ function applyUnifiedBrainParticleColor(model: BrainModelViewerElement) {
   })
 }
 
+function hotspotIsVisible(hotspot: HTMLButtonElement) {
+  return hotspot.hasAttribute('visible') || hotspot.hasAttribute('data-visible')
+}
+
+function resolveLabelColumn(
+  items: BrainRegionLabelCandidate[],
+  minTop: number,
+  maxTop: number,
+) {
+  const minGap = window.innerWidth < 760 ? 8 : 12
+
+  items.sort((a, b) => a.targetTop - b.targetTop)
+
+  items.forEach((current, index) => {
+    const previous = items[index - 1]
+
+    if (previous) {
+      current.targetTop = Math.max(current.targetTop, previous.targetTop + previous.height + minGap)
+    }
+
+    current.targetTop = Math.max(current.targetTop, minTop)
+  })
+
+  for (let index = items.length - 1; index >= 0; index -= 1) {
+    const next = items[index + 1]
+    const current = items[index]
+
+    if (next) {
+      current.targetTop = Math.min(current.targetTop, next.targetTop - current.height - minGap)
+    }
+
+    current.targetTop = Math.min(current.targetTop, maxTop - current.height)
+    current.targetTop = Math.max(current.targetTop, minTop)
+  }
+}
+
 function BrainSection() {
   const brainViewerSignature = [
     brainViewerRevision,
@@ -107,6 +168,8 @@ function BrainSection() {
     brainModelExposure,
   ].join(':')
   const modelMountRef = useRef<HTMLDivElement>(null)
+  const regionLineLayerRef = useRef<SVGSVGElement>(null)
+  const regionLabelLayerRef = useRef<HTMLDivElement>(null)
   const sectionRef = useRef<HTMLElement>(null)
   const [loadError, setLoadError] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
@@ -136,9 +199,11 @@ function BrainSection() {
 
   useEffect(() => {
     const modelMount = modelMountRef.current
+    const regionLineLayer = regionLineLayerRef.current
+    const regionLabelLayer = regionLabelLayerRef.current
     const section = sectionRef.current
 
-    if (!modelMount || !section || !viewerReady) {
+    if (!modelMount || !regionLineLayer || !regionLabelLayer || !section || !viewerReady) {
       return undefined
     }
 
@@ -158,6 +223,7 @@ function BrainSection() {
       copyVisibility: '',
       copyY: '',
       decorOpacity: '',
+      labelOpacity: '',
       leftX: '',
       modelSize: '',
       phase: '',
@@ -172,8 +238,12 @@ function BrainSection() {
       azimuth: sideViewRestAzimuth,
       distance: sideViewDistance,
     }
+    const labelStates: BrainRegionLabelState[] = []
+    const siteNavbar = document.querySelector<HTMLElement>('.navbar')
+    const hotspotListenerCleanups: Array<() => void> = []
 
     let animationFrame = 0
+    let isBrainDragging = false
     let userAdjustedCamera = false
 
     const modelAttributes = {
@@ -197,6 +267,314 @@ function BrainSection() {
       model.setAttribute(name, value)
     })
     modelMount.replaceChildren(model)
+    regionLineLayer.replaceChildren()
+    regionLabelLayer.replaceChildren()
+
+    const applyHiddenRegionState = (state: BrainRegionLabelState, immediate = false) => {
+      const ease = motionQuery.matches || immediate ? 1 : 0.28
+
+      state.opacity = lerp(state.opacity, 0, ease)
+
+      if (state.opacity < 0.01) {
+        state.opacity = 0
+      }
+
+      const opacity = state.opacity.toFixed(3)
+      const visibility = state.opacity > 0.02 ? 'visible' : 'hidden'
+
+      state.label.style.opacity = opacity
+      state.label.style.pointerEvents = 'none'
+      state.label.style.visibility = visibility
+      state.label.tabIndex = -1
+      state.label.setAttribute('aria-hidden', 'true')
+      state.line.style.opacity = opacity
+      state.line.style.visibility = visibility
+      state.hotspot.style.visibility = visibility
+    }
+
+    const createBrainRegionHotspots = () => {
+      const svgNamespace = 'http://www.w3.org/2000/svg'
+
+      brainHotspots.forEach((region) => {
+        const hotspot = document.createElement('button')
+        hotspot.type = 'button'
+        hotspot.className = 'brain-hotspot'
+        hotspot.slot = `hotspot-${region.id}`
+        hotspot.dataset.regionId = region.id
+        hotspot.dataset.position = region.position
+        hotspot.dataset.normal = region.normal
+        hotspot.dataset.visibilityAttribute = 'visible'
+        hotspot.setAttribute('aria-hidden', 'true')
+        hotspot.tabIndex = -1
+
+        const dot = document.createElement('span')
+        dot.className = 'brain-hotspot-dot'
+        hotspot.appendChild(dot)
+
+        const line = document.createElementNS(svgNamespace, 'path')
+        line.classList.add('brain-region-line')
+        line.dataset.regionId = region.id
+        line.setAttribute('aria-hidden', 'true')
+        regionLineLayer.appendChild(line)
+
+        const label = document.createElement('a')
+        label.className = 'brain-region-label'
+        label.href = '#'
+        label.textContent = region.label
+        label.dataset.regionId = region.id
+        label.dataset.priority = String(region.priority)
+        label.dataset.url = region.url
+        label.dataset.side = region.side
+        label.tabIndex = -1
+        label.setAttribute('aria-hidden', 'true')
+        label.setAttribute('aria-label', `Open ${region.label} overview`)
+
+        regionLabelLayer.appendChild(label)
+        model.appendChild(hotspot)
+
+        const labelState: BrainRegionLabelState = {
+          region,
+          hotspot,
+          line,
+          label,
+          x: null,
+          y: null,
+          opacity: 0,
+          hovered: false,
+          side: null,
+        }
+
+        const handlePointerEnter = () => {
+          labelState.hovered = true
+        }
+        const handlePointerLeave = () => {
+          labelState.hovered = false
+        }
+        const handlePointerDown = (event: PointerEvent) => {
+          event.stopPropagation()
+        }
+        const handleClick = (event: MouseEvent) => {
+          event.preventDefault()
+        }
+
+        label.addEventListener('pointerenter', handlePointerEnter)
+        label.addEventListener('pointerleave', handlePointerLeave)
+        label.addEventListener('focus', handlePointerEnter)
+        label.addEventListener('blur', handlePointerLeave)
+        label.addEventListener('pointerdown', handlePointerDown)
+        label.addEventListener('click', handleClick)
+        hotspotListenerCleanups.push(() => {
+          label.removeEventListener('pointerenter', handlePointerEnter)
+          label.removeEventListener('pointerleave', handlePointerLeave)
+          label.removeEventListener('focus', handlePointerEnter)
+          label.removeEventListener('blur', handlePointerLeave)
+          label.removeEventListener('pointerdown', handlePointerDown)
+          label.removeEventListener('click', handleClick)
+        })
+
+        labelStates.push(labelState)
+      })
+    }
+
+    const updateRegionLabels = () => {
+      const labelOpacity = Number(section.style.getPropertyValue('--brain-label-opacity') || 0)
+      const sectionRect = section.getBoundingClientRect()
+      const sectionVisible = sectionRect.bottom > 0 && sectionRect.top < window.innerHeight
+      const labelsActive = sectionVisible && labelOpacity > 0.02
+
+      section.classList.toggle('brain-labels-enabled', labelsActive)
+
+      if (!labelsActive) {
+        labelStates.forEach((state) => applyHiddenRegionState(state))
+        return
+      }
+
+      const overlayRect = regionLabelLayer.getBoundingClientRect()
+      const modelRect = model.getBoundingClientRect()
+
+      if (overlayRect.width <= 0 || overlayRect.height <= 0 || modelRect.width <= 0) {
+        labelStates.forEach((state) => applyHiddenRegionState(state, true))
+        return
+      }
+
+      const navRect = siteNavbar ? siteNavbar.getBoundingClientRect() : null
+      const isPhone = window.innerWidth < 680
+      const connectorGap = window.innerWidth < 760 ? 24 : 42
+      const columnGap = window.innerWidth < 760 ? 34 : 56
+      const horizontalFollowLimit = window.innerWidth < 760 ? 10 : 18
+      const minLeft = window.innerWidth < 760 ? 10 : 18
+      const maxLeft = overlayRect.width - minLeft
+      const navSafeTop = navRect ? Math.max(18, navRect.bottom - overlayRect.top + 14) : 24
+      const minTop = Math.max(18, navSafeTop)
+      const maxTop = Math.max(minTop + 80, overlayRect.height - 24)
+      const modelLeft = modelRect.left - overlayRect.left
+      const modelTop = modelRect.top - overlayRect.top
+      const modelWidth = modelRect.width
+      const modelHeight = modelRect.height
+      const modelCenterX = modelLeft + modelWidth / 2
+      const modelInsetX = modelWidth * (isPhone ? 0.06 : 0.08)
+      const modelInsetY = modelHeight * (isPhone ? 0.08 : 0.1)
+      const brainBounds = {
+        bottom: modelTop + modelHeight - modelInsetY,
+        left: modelLeft + modelInsetX,
+        right: modelLeft + modelWidth - modelInsetX,
+        top: modelTop + modelInsetY,
+      }
+      const candidates: { left: BrainRegionLabelCandidate[]; right: BrainRegionLabelCandidate[] } =
+        {
+          left: [],
+          right: [],
+        }
+
+      regionLineLayer.setAttribute('viewBox', `0 0 ${overlayRect.width} ${overlayRect.height}`)
+      regionLineLayer.setAttribute('width', String(overlayRect.width))
+      regionLineLayer.setAttribute('height', String(overlayRect.height))
+
+      labelStates.forEach((state) => {
+        const { region, hotspot, label } = state
+        const hiddenOnPhone = window.innerWidth < 760 && region.priority > 4
+        const visible = !hiddenOnPhone && hotspotIsVisible(hotspot)
+
+        if (!visible) {
+          applyHiddenRegionState(state)
+          return
+        }
+
+        const hotspotRect = hotspot.getBoundingClientRect()
+        const labelWidth = label.offsetWidth || 148
+        const labelHeight = label.offsetHeight || 42
+        const dotX = hotspotRect.left + hotspotRect.width / 2 - overlayRect.left
+        const dotY = hotspotRect.top + hotspotRect.height / 2 - overlayRect.top
+        const dotInBounds =
+          Number.isFinite(dotX) &&
+          Number.isFinite(dotY) &&
+          dotX >= 0 &&
+          dotX <= overlayRect.width &&
+          dotY >= 0 &&
+          dotY <= overlayRect.height
+
+        if (!dotInBounds) {
+          applyHiddenRegionState(state)
+          return
+        }
+
+        const preferredSide = region.side === 'left' ? -1 : 1
+        const canFitRight = brainBounds.right + columnGap + labelWidth <= maxLeft
+        const canFitLeft = brainBounds.left - columnGap - labelWidth >= minLeft
+        let side = state.hovered && state.side ? state.side : preferredSide
+
+        if (side > 0 && !canFitRight && canFitLeft) {
+          side = -1
+        } else if (side < 0 && !canFitLeft && canFitRight) {
+          side = 1
+        }
+
+        const horizontalNudge = clamp(
+          (dotX - modelCenterX) * 0.1,
+          -horizontalFollowLimit,
+          horizontalFollowLimit,
+        )
+        let rawLeft =
+          side > 0
+            ? brainBounds.right + columnGap + Math.max(0, horizontalNudge)
+            : brainBounds.left - columnGap - labelWidth + Math.min(0, horizontalNudge)
+
+        rawLeft =
+          side > 0
+            ? Math.max(rawLeft, dotX + connectorGap)
+            : Math.min(rawLeft, dotX - connectorGap - labelWidth)
+
+        const targetLeft = clamp(rawLeft, minLeft, maxLeft - labelWidth)
+        const targetTop = clamp(
+          dotY - labelHeight / 2,
+          Math.max(minTop, brainBounds.top - labelHeight * 0.8),
+          Math.min(maxTop - labelHeight, brainBounds.bottom + labelHeight * 0.8),
+        )
+        const groupName = side < 0 ? 'left' : 'right'
+
+        candidates[groupName].push({
+          state,
+          side,
+          dotX,
+          dotY,
+          targetLeft,
+          targetTop,
+          width: labelWidth,
+          height: labelHeight,
+        })
+      })
+
+      resolveLabelColumn(candidates.left, minTop, maxTop)
+      resolveLabelColumn(candidates.right, minTop, maxTop)
+
+      ;[...candidates.left, ...candidates.right].forEach((item) => {
+        const { state, side, dotX, dotY, targetLeft, targetTop } = item
+        const ease = motionQuery.matches ? 1 : state.hovered ? 0.035 : 0.12
+        const deadzone = state.hovered ? 28 : 1.8
+        const targetOpacity = labelOpacity
+
+        if (state.x === null) {
+          state.x = targetLeft
+        } else if (Math.abs(targetLeft - state.x) > deadzone) {
+          state.x = lerp(state.x, targetLeft, ease)
+        }
+
+        if (state.y === null) {
+          state.y = targetTop
+        } else if (Math.abs(targetTop - state.y) > deadzone) {
+          state.y = lerp(state.y, targetTop, ease)
+        }
+
+        state.opacity = lerp(state.opacity, targetOpacity, ease)
+        state.side = side
+
+        state.label.style.left = `${state.x.toFixed(1)}px`
+        state.label.style.top = `${state.y.toFixed(1)}px`
+        state.label.style.transform = 'none'
+        state.label.style.opacity = state.opacity.toFixed(3)
+        state.label.style.pointerEvents = state.opacity > 0.35 && !isBrainDragging ? 'auto' : 'none'
+        state.label.style.visibility = state.opacity > 0.02 ? 'visible' : 'hidden'
+        state.label.tabIndex = state.opacity > 0.35 && !isBrainDragging ? 0 : -1
+        state.label.setAttribute('aria-hidden', state.opacity > 0.02 ? 'false' : 'true')
+        state.label.dataset.side = side > 0 ? 'right' : 'left'
+        state.hotspot.style.visibility = state.opacity > 0.02 ? 'visible' : 'hidden'
+
+        const labelRect = state.label.getBoundingClientRect()
+        const labelInset = window.innerWidth < 760 ? 5 : 8
+        const labelEdgeX =
+          side > 0
+            ? labelRect.left - overlayRect.left + labelInset
+            : labelRect.right - overlayRect.left - labelInset
+        const labelCenterY = labelRect.top + labelRect.height / 2 - overlayRect.top
+        const lineDeltaX = labelEdgeX - dotX
+        const lineDeltaY = labelCenterY - dotY
+        const lineDistance = Math.hypot(lineDeltaX, lineDeltaY) || 1
+        const dotRadius = window.innerWidth < 760 ? 5 : 6
+        const lineStartX = dotX + (lineDeltaX / lineDistance) * dotRadius
+        const lineStartY = dotY + (lineDeltaY / lineDistance) * dotRadius
+        const direction = side > 0 ? 1 : -1
+        const spanX = Math.abs(labelEdgeX - lineStartX)
+        const curveReach = clamp(spanX * 0.52, 24, window.innerWidth < 760 ? 58 : 118)
+        const naturalBend = (state.region.priority % 2 === 0 ? -1 : 1) * (window.innerWidth < 760 ? 7 : 14)
+        const curveLift = clamp((labelCenterY - lineStartY) * 0.18 + naturalBend, -34, 34)
+        const controlOneX = lineStartX + direction * curveReach * 0.52
+        const controlOneY = lineStartY + curveLift
+        const controlTwoX = labelEdgeX - direction * curveReach
+        const controlTwoY = labelCenterY + curveLift * 0.62
+        const connectorPath = [
+          `M ${lineStartX.toFixed(1)} ${lineStartY.toFixed(1)}`,
+          `C ${controlOneX.toFixed(1)} ${controlOneY.toFixed(1)}`,
+          `${controlTwoX.toFixed(1)} ${controlTwoY.toFixed(1)}`,
+          `${labelEdgeX.toFixed(1)} ${labelCenterY.toFixed(1)}`,
+        ].join(' ')
+
+        state.line.setAttribute('d', connectorPath)
+        state.line.style.opacity = state.opacity.toFixed(3)
+        state.line.style.visibility = state.opacity > 0.02 ? 'visible' : 'hidden'
+      })
+    }
+
+    createBrainRegionHotspots()
 
     const setCameraOrbit = () => {
       const nextCameraOrbit = `${cameraOrbitCurrent.azimuth.toFixed(2)}deg 72deg ${cameraOrbitCurrent.distance.toFixed(2)}m`
@@ -233,6 +611,7 @@ function BrainSection() {
       const progress = scrollState.currentProgress
       const growProgress = smoothstep(0.25, 0.65, progress)
       const exitProgress = smoothstep(0.9, 1, progress)
+      const labelProgress = smoothstep(0.62, 0.72, progress) * (1 - smoothstep(0.9, 0.98, progress))
       const textFadeProgress = reduceMotion ? 0 : smoothstep(0.25, 0.65, progress)
       const baseModelSize = getBaseModelSize()
       const expandedModelSize = getExpandedModelSize(baseModelSize)
@@ -256,6 +635,7 @@ function BrainSection() {
       const nextLeftX = `${leftX.toFixed(1)}px`
       const nextRightX = `${rightX.toFixed(1)}px`
       const nextCopyY = `${copyY}px`
+      const nextLabelOpacity = (isCompact ? 1 : clamp(labelProgress, 0, 1)).toFixed(3)
       const nextCopyVisibility = copyVisible ? 'visible' : 'hidden'
       const nextCopyPointerEvents = copyVisible ? 'auto' : 'none'
 
@@ -284,6 +664,11 @@ function BrainSection() {
       if (renderedScrollState.copyPointerEvents !== nextCopyPointerEvents) {
         renderedScrollState.copyPointerEvents = nextCopyPointerEvents
         section.style.setProperty('--brain-copy-pointer-events', nextCopyPointerEvents)
+      }
+
+      if (renderedScrollState.labelOpacity !== nextLabelOpacity) {
+        renderedScrollState.labelOpacity = nextLabelOpacity
+        section.style.setProperty('--brain-label-opacity', nextLabelOpacity)
       }
 
       if (renderedScrollState.leftX !== nextLeftX) {
@@ -327,13 +712,22 @@ function BrainSection() {
       cameraOrbitCurrent.azimuth += (cameraOrbitTarget.azimuth - cameraOrbitCurrent.azimuth) * 0.14
       cameraOrbitCurrent.distance += (cameraOrbitTarget.distance - cameraOrbitCurrent.distance) * 0.14
       setCameraOrbit()
+      updateRegionLabels()
       animationFrame = window.requestAnimationFrame(animate)
     }
 
     const handlePointerDown = () => {
+      isBrainDragging = true
+      section.classList.add('is-brain-dragging')
+
       if (scrollState.currentProgress >= 0.6) {
         userAdjustedCamera = true
       }
+    }
+
+    const handlePointerRelease = () => {
+      isBrainDragging = false
+      section.classList.remove('is-brain-dragging')
     }
 
     const handleModelLoad = () => {
@@ -359,6 +753,8 @@ function BrainSection() {
 
     window.addEventListener('scroll', updateScrollTarget, { passive: true })
     window.addEventListener('resize', handleResize)
+    window.addEventListener('pointerup', handlePointerRelease)
+    window.addEventListener('pointercancel', handlePointerRelease)
     motionQuery.addEventListener('change', updateScrollTarget)
     model.addEventListener('load', handleModelLoad)
     model.addEventListener('error', handleModelError)
@@ -372,10 +768,16 @@ function BrainSection() {
       window.cancelAnimationFrame(animationFrame)
       window.removeEventListener('scroll', updateScrollTarget)
       window.removeEventListener('resize', handleResize)
+      window.removeEventListener('pointerup', handlePointerRelease)
+      window.removeEventListener('pointercancel', handlePointerRelease)
       motionQuery.removeEventListener('change', updateScrollTarget)
       model.removeEventListener('load', handleModelLoad)
       model.removeEventListener('error', handleModelError)
       model.removeEventListener('pointerdown', handlePointerDown)
+      hotspotListenerCleanups.forEach((cleanup) => cleanup())
+      section.classList.remove('brain-labels-enabled', 'is-brain-dragging')
+      regionLineLayer.replaceChildren()
+      regionLabelLayer.replaceChildren()
       model.remove()
     }
   }, [viewerReady, brainViewerSignature])
@@ -387,6 +789,7 @@ function BrainSection() {
           <div className="brain-section-glow" aria-hidden="true" />
           <div className="brain-section-orbit brain-section-orbit-one" aria-hidden="true" />
           <div className="brain-section-orbit brain-section-orbit-two" aria-hidden="true" />
+          <BrainHotspots lineLayerRef={regionLineLayerRef} labelLayerRef={regionLabelLayerRef} />
 
           <div className="brain-section-model-layer">
             <div ref={modelMountRef} className="brain-scene" aria-label="3D brain model viewer" />
