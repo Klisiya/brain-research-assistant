@@ -4,3 +4,7 @@
   background: #020617;
   isolation: isolate;
 }
+
+.app-shell .brain-section {
+  background: transparent;
+}
