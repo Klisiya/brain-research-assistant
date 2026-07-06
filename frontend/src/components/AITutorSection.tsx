@@ -1,5 +1,6 @@
-import { useEffect, useRef, useState, type FormEvent, type KeyboardEvent } from 'react'
+import { useCallback, useEffect, useRef, useState, type FormEvent, type KeyboardEvent } from 'react'
 import BorderGlow from './BorderGlow'
+import TextType from './TextType'
 import './AITutorSection.css'
 
 type Prompt = {
@@ -39,6 +40,7 @@ function AITutorSection() {
   const [question, setQuestion] = useState('')
   const [isLoading, setIsLoading] = useState(false)
   const [exchange, setExchange] = useState<TutorExchange | null>(null)
+  const [isPlaceholderTyped, setIsPlaceholderTyped] = useState(false)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const chatLogRef = useRef<HTMLDivElement>(null)
   const timerRef = useRef<number | null>(null)
@@ -89,6 +91,7 @@ function AITutorSection() {
 
     clearMockTimer()
     setQuestion('')
+    setIsPlaceholderTyped(false)
     setIsLoading(true)
     setExchange({
       question: trimmedQuestion,
@@ -114,6 +117,9 @@ function AITutorSection() {
 
   const handleInput = (value: string) => {
     setQuestion(value)
+    if (value) {
+      setIsPlaceholderTyped(false)
+    }
     scheduleResizeQuestionInput()
   }
 
@@ -130,6 +136,7 @@ function AITutorSection() {
     }
 
     setQuestion(promptQuestion)
+    setIsPlaceholderTyped(false)
     if (resizeFrameRef.current !== null) {
       window.cancelAnimationFrame(resizeFrameRef.current)
     }
@@ -140,6 +147,10 @@ function AITutorSection() {
       textareaRef.current?.focus()
     })
   }
+
+  const handlePlaceholderComplete = useCallback(() => {
+    setIsPlaceholderTyped(true)
+  }, [])
 
   useEffect(() => {
     resizeQuestionInput()
@@ -166,6 +177,9 @@ function AITutorSection() {
 
   const canSend = Boolean(question.trim()) && !isLoading
   const hasChat = Boolean(exchange)
+  const composerClassName = ['ai-composer', isLoading ? 'is-submitting' : '', question ? 'has-value' : '']
+    .filter(Boolean)
+    .join(' ')
 
   return (
     <section className="ai-section" id="ai-section">
@@ -203,7 +217,7 @@ function AITutorSection() {
             </div>
           ) : null}
 
-          <form className={`ai-composer${isLoading ? ' is-submitting' : ''}`} aria-busy={isLoading} onSubmit={handleSubmit}>
+          <form className={composerClassName} aria-busy={isLoading} onSubmit={handleSubmit}>
             <label className="sr-only" htmlFor="questionInput">
               Ask a question
             </label>
@@ -212,7 +226,7 @@ function AITutorSection() {
               className="ai-composer-input ai-tutor-input"
               id="questionInput"
               name="question"
-              placeholder="Ask a question about brain science or brain-inspired intelligence..."
+              placeholder=""
               rows={1}
               required
               readOnly={isLoading}
@@ -220,6 +234,30 @@ function AITutorSection() {
               onChange={(event) => handleInput(event.target.value)}
               onKeyDown={handleKeyDown}
             />
+
+            {!question && !isLoading ? (
+              <div className="ai-typing-placeholder" aria-hidden="true">
+                <TextType
+                  as="span"
+                  className="ai-placeholder-text"
+                  cursorCharacter="_"
+                  cursorBlinkDuration={0.7}
+                  loop={false}
+                  onSentenceComplete={handlePlaceholderComplete}
+                  showCursor={!isPlaceholderTyped}
+                  startOnVisible
+                  text="Ask a question about brain science or brain-inspired intelligence"
+                  typingSpeed={150}
+                />
+                {isPlaceholderTyped ? (
+                  <span className="ai-placeholder-dots" aria-hidden="true">
+                    <span>.</span>
+                    <span>.</span>
+                    <span>.</span>
+                  </span>
+                ) : null}
+              </div>
+            ) : null}
 
             <div className="ai-composer-bar">
               <div className="ai-composer-meta">

@@ -379,6 +379,48 @@
   opacity: 0.76;
 }
 
+.ai-typing-placeholder {
+  position: absolute;
+  top: 30px;
+  right: 30px;
+  left: 30px;
+  z-index: 2;
+  color: rgb(203 213 225 / 46%);
+  font-size: 16px;
+  line-height: 1.65;
+  text-align: left;
+  pointer-events: none;
+  user-select: none;
+}
+
+.ai-typing-placeholder .text-type {
+  display: inline;
+  white-space: pre-wrap;
+}
+
+.ai-typing-placeholder .text-type__cursor {
+  margin-left: 0.1rem;
+  color: rgb(203 213 225 / 58%);
+}
+
+.ai-placeholder-dots {
+  display: inline-flex;
+  width: 1.1em;
+}
+
+.ai-placeholder-dots span {
+  opacity: 0.18;
+  animation: ai-placeholder-dot-cycle 1.25s ease-in-out infinite;
+}
+
+.ai-placeholder-dots span:nth-child(2) {
+  animation-delay: 0.18s;
+}
+
+.ai-placeholder-dots span:nth-child(3) {
+  animation-delay: 0.36s;
+}
+
 .ai-composer-bar {
   min-height: 68px;
   padding: 13px 16px 15px 22px;
@@ -594,6 +636,19 @@
   }
 }
 
+@keyframes ai-placeholder-dot-cycle {
+  0%,
+  72%,
+  100% {
+    opacity: 0.18;
+  }
+
+  28%,
+  48% {
+    opacity: 1;
+  }
+}
+
 @media (max-width: 760px) {
   .ai-section {
     padding: 62px 16px 82px;
@@ -628,6 +683,12 @@
   .ai-tutor-input {
     min-height: 96px;
     padding: 22px 20px 18px;
+  }
+
+  .ai-typing-placeholder {
+    top: 22px;
+    right: 20px;
+    left: 20px;
   }
 
   .ai-composer-bar {
@@ -684,8 +745,13 @@
   .ai-composer,
   .ai-send-button,
   .loading-dots i,
-  .button-spinner {
+  .button-spinner,
+  .ai-placeholder-dots span {
     animation: none !important;
     transition-duration: 0.01ms !important;
+  }
+
+  .ai-placeholder-dots span {
+    opacity: 0.6;
   }
 }
