@@ -1,4 +1,5 @@
 import BrainSection from './components/BrainSection'
+import AITutorSection from './components/AITutorSection'
 import Footer from './components/Footer'
 import Hero from './components/Hero'
 import ModulesSection from './components/ModulesSection'
@@ -12,6 +13,7 @@ function App() {
       <Hero />
       <BrainSection />
       <ModulesSection />
+      <AITutorSection />
       <Footer />
     </div>
   )
