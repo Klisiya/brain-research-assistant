@@ -621,7 +621,14 @@ body {
  overflow-x: clip;
 }
 .ai-tutor-shell {
- --border-glow-duration: 8.8s;
+ --edge-proximity: 56;
+ --cursor-angle: 0deg;
+ --edge-sensitivity: 34;
+ --color-sensitivity: 44;
+ --glow-opacity: clamp(0, calc((var(--edge-proximity) - var(--edge-sensitivity)) / (100 - var(--edge-sensitivity))), 1);
+ --color-opacity: clamp(0, calc((var(--edge-proximity) - var(--color-sensitivity)) / (100 - var(--color-sensitivity))), 1);
+ --glow-padding: 18px;
+ --glow-radius: 28px;
  position: relative;
  width: min(100%, 980px);
  margin: 0 auto;
@@ -641,6 +648,8 @@ body {
  -webkit-backdrop-filter: blur(32px) saturate(175%);
  box-shadow:
   0 28px 78px rgba(0, 0, 0, 0.24),
+  0 0 38px rgba(56, 189, 248, 0.09),
+  0 0 70px rgba(168, 85, 247, 0.055),
   inset 0 1px 0 rgba(255, 255, 255, 0.15),
   inset 0 -1px 0 rgba(125, 211, 252, 0.065);
  text-align: center;
@@ -661,7 +670,7 @@ body {
   linear-gradient(#000 0 0);
  -webkit-mask-composite: xor;
  mask-composite: exclude;
- opacity: 0.72;
+ opacity: 0.68;
 }
 .ai-tutor-shell::after {
  content: "";
@@ -675,74 +684,121 @@ body {
   inset 0 -1px 0 rgba(125, 211, 252, 0.08),
   inset 26px 0 46px rgba(96, 165, 250, 0.045),
   inset -26px 0 46px rgba(14, 165, 233, 0.035);
- opacity: 0.76;
+ opacity: 0.66;
 }
 .ai-tutor-shell > * {
  position: relative;
  z-index: 2;
 }
-.ai-tutor-shell > .ai-border-glow {
+.ai-tutor-shell > .ai-edge-glow {
  position: absolute;
- inset: -1px;
- width: calc(100% + 2px);
- height: calc(100% + 2px);
- z-index: 3;
- overflow: visible;
  pointer-events: none;
+ transition: opacity 0.36s ease-out;
+ will-change: opacity, filter;
+}
+.ai-edge-mesh {
+ inset: -1px;
+ z-index: 1;
+ padding: 1px;
+ border-radius: inherit;
+ background:
+  conic-gradient(
+   from calc(var(--cursor-angle) - 78deg),
+   transparent 0deg,
+   rgba(56, 189, 248, 0.08) 18deg,
+   rgba(56, 189, 248, 0.42) 44deg,
+   rgba(168, 85, 247, 0.58) 64deg,
+   rgba(255, 247, 214, 0.84) 86deg,
+   rgba(244, 114, 182, 0.56) 106deg,
+   rgba(37, 99, 235, 0.34) 134deg,
+   rgba(56, 189, 248, 0.07) 162deg,
+   transparent 188deg,
+   transparent 360deg
+  );
+ opacity: clamp(0.34, calc(var(--color-opacity) + 0.24), 0.82);
+ filter:
+  blur(0.35px)
+  drop-shadow(0 0 6px rgba(255, 247, 214, 0.24))
+  drop-shadow(0 0 14px rgba(56, 189, 248, 0.24));
  mix-blend-mode: screen;
+ -webkit-mask:
+  linear-gradient(#000 0 0) content-box,
+  linear-gradient(#000 0 0);
+ -webkit-mask-composite: xor;
+ mask:
+  linear-gradient(#000 0 0) content-box,
+  linear-gradient(#000 0 0);
+ mask-composite: exclude;
 }
-.ai-border-glow-path {
- fill: none;
- vector-effect: non-scaling-stroke;
+.ai-edge-fill {
+ inset: 1px;
+ z-index: 0;
+ border-radius: calc(var(--glow-radius) - 3px);
+ background:
+  conic-gradient(
+   from calc(var(--cursor-angle) - 88deg),
+   transparent 0deg,
+   rgba(56, 189, 248, 0.08) 26deg,
+   rgba(168, 85, 247, 0.16) 62deg,
+   rgba(255, 247, 214, 0.20) 88deg,
+   rgba(244, 114, 182, 0.14) 114deg,
+   rgba(56, 189, 248, 0.06) 152deg,
+   transparent 188deg,
+   transparent 360deg
+  );
+ opacity: clamp(0.08, var(--color-opacity), 0.30);
+ filter: blur(10px);
+ mix-blend-mode: soft-light;
+ -webkit-mask-image: radial-gradient(ellipse at center, transparent 54%, #000 82%);
+ mask-image: radial-gradient(ellipse at center, transparent 54%, #000 82%);
 }
-.ai-border-glow-base {
- stroke: rgba(125, 211, 252, 0.24);
- stroke-width: 1.05;
- opacity: 0.62;
+.ai-edge-light {
+ inset: calc(0px - var(--glow-padding));
+ z-index: 1;
+ border-radius: calc(var(--glow-radius) + var(--glow-padding));
+ opacity: clamp(0.20, var(--glow-opacity), 0.72);
+ mix-blend-mode: screen;
+ -webkit-mask-image:
+  conic-gradient(
+   from var(--cursor-angle) at center,
+   #000 0deg,
+   rgba(0, 0, 0, 0.82) 16deg,
+   transparent 62deg,
+   transparent 298deg,
+   rgba(0, 0, 0, 0.82) 344deg,
+   #000 360deg
+  );
+ mask-image:
+  conic-gradient(
+   from var(--cursor-angle) at center,
+   #000 0deg,
+   rgba(0, 0, 0, 0.82) 16deg,
+   transparent 62deg,
+   transparent 298deg,
+   rgba(0, 0, 0, 0.82) 344deg,
+   #000 360deg
+  );
 }
-.ai-border-glow-runner {
- --runner-size: 112;
- --runner-gap: 888;
- --runner-alpha: 0.88;
- --runner-core-alpha: 0.96;
- --runner-halo-alpha: 0.30;
- --runner-halo-width: 8px;
- opacity: var(--runner-alpha);
- transition:
-  opacity 1.2s ease,
-  stroke-dasharray 1.2s ease;
+.ai-edge-light::before,
+.ai-edge-light::after {
+ content: "";
+ position: absolute;
+ pointer-events: none;
 }
-.ai-border-glow-runner-two {
- --runner-size: 92;
- --runner-gap: 908;
- --runner-alpha: 0.68;
- --runner-core-alpha: 0.82;
- --runner-halo-alpha: 0.22;
- --runner-halo-width: 7px;
+.ai-edge-light::before {
+ inset: var(--glow-padding);
+ border-radius: var(--glow-radius);
+ box-shadow:
+  inset 0 0 0 1px rgba(255, 247, 214, 0.72),
+  inset 0 0 5px rgba(255, 247, 214, 0.42),
+  inset 0 0 14px rgba(56, 189, 248, 0.28),
+  inset 0 0 22px rgba(168, 85, 247, 0.16),
+  0 0 6px rgba(255, 247, 214, 0.44),
+  0 0 16px rgba(56, 189, 248, 0.30),
+  0 0 30px rgba(168, 85, 247, 0.18);
 }
-.ai-border-glow-trace {
- stroke-dasharray: var(--runner-size) var(--runner-gap);
- stroke-linecap: round;
- animation-duration: var(--border-glow-duration);
- animation-timing-function: linear;
- animation-iteration-count: infinite;
- will-change: stroke-dashoffset;
-}
-.ai-border-glow-runner-one .ai-border-glow-trace {
- animation-name: aiBorderGlowOrbitOne;
-}
-.ai-border-glow-runner-two .ai-border-glow-trace {
- animation-name: aiBorderGlowOrbitTwo;
-}
-.ai-border-glow-halo {
- stroke: rgba(56, 189, 248, 0.58);
- stroke-width: var(--runner-halo-width);
- opacity: var(--runner-halo-alpha);
-}
-.ai-border-glow-core {
- stroke: rgba(240, 249, 255, 0.96);
- stroke-width: 1.35;
- opacity: var(--runner-core-alpha);
+.ai-edge-light::after {
+ display: none;
 }
 .ai-tutor-heading {
  width: min(100%, 760px);
@@ -1077,27 +1133,6 @@ body {
  transform: translateY(-1px);
 }
 /* Animations */
-@keyframes aiBorderGlowOrbitOne {
- from {
-  stroke-dashoffset: 0;
- }
-
- to {
-  stroke-dashoffset: -1000;
- }
-}
-
-@keyframes aiBorderGlowOrbitTwo {
- from {
-  stroke-dashoffset: -500;
- }
-
- to {
-  stroke-dashoffset: -1500;
- }
-}
-
-
 @keyframes leftBrainFloat {
  0%, 100% { 
  transform: translateY(0px); 
@@ -3912,8 +3947,7 @@ body.brain-model-dragging .showcase-brain-stage model-viewer {
     .ai-tutor-shell .ai-chat-log,
     .ai-tutor-shell .ai-composer,
     .ai-tutor-shell .ai-quick-prompts,
-    .ai-tutor-shell .ai-border-glow-trace,
-    .ai-border-glow-runner,
+    .ai-tutor-shell .ai-edge-glow,
     .ai-quick-prompts button,
     .ai-composer,
     .ai-send-button {

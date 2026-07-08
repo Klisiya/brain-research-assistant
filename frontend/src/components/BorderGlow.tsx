@@ -438,7 +438,7 @@ function BorderGlow({
     '--edge-sensitivity': edgeSensitivity,
     '--border-radius': `${borderRadius}px`,
     '--glow-padding': `${glowRadius}px`,
-    '--cone-spread': coneSpread,
+    '--cone-spread': `${coneSpread}%`,
     '--fill-opacity': fillOpacity,
     ...glowVars,
     ...gradientVars,

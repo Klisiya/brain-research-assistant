@@ -1,11 +1,10 @@
 from datetime import datetime
 import os
 import re
-from urllib.parse import urljoin, urlparse
 
 import click
 from dotenv import load_dotenv
-from flask import Flask, abort, flash, redirect, render_template, request, send_file, url_for
+from flask import Flask, abort, jsonify, redirect, render_template, request, send_file, url_for
 from flask_login import (
     LoginManager,
     UserMixin,
@@ -47,6 +46,10 @@ login_manager.login_message = "Please sign in to access the AI Tutor."
 login_manager.login_message_category = "error"
 
 EMAIL_PATTERN = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
+MAX_CHAT_MESSAGE_LENGTH = 4000
+MAX_CHAT_HISTORY_ITEMS = 10
+ALLOWED_CHAT_HISTORY_ROLES = {"user", "assistant"}
+DEFAULT_FRONTEND_URL = "http://127.0.0.1:5173"
 
 instructions = """
 You are a Brain Research Learning Assistant
@@ -268,23 +271,20 @@ def load_user(user_id):
         return None
 
 
-def is_safe_url(target):
-    if not target:
-        return False
-
-    host_url = urlparse(request.host_url)
-    redirect_url = urlparse(urljoin(request.host_url, target))
-
-    return redirect_url.scheme in ("http", "https") and host_url.netloc == redirect_url.netloc
+def get_frontend_url():
+    return os.getenv("FRONTEND_URL", DEFAULT_FRONTEND_URL).rstrip("/")
 
 
-def get_safe_redirect(default_endpoint="ai_tutor"):
-    target = request.form.get("next") or request.args.get("next")
+def get_frontend_home_url():
+    return f"{get_frontend_url()}/"
 
-    if is_safe_url(target):
-        return target
 
-    return url_for(default_endpoint, _anchor="ai-section")
+def get_frontend_login_url():
+    return f"{get_frontend_url()}/login"
+
+
+def get_api_login_url():
+    return get_frontend_login_url()
 
 
 def normalize_email(email):
@@ -304,22 +304,158 @@ def get_openai_client():
     return OpenAI(api_key=api_key)
 
 
-def ask_ai_tutor(question):
+class AITutorConfigurationError(RuntimeError):
+    pass
+
+
+class AITutorServiceError(RuntimeError):
+    pass
+
+
+def build_ai_tutor_input(message, history=None):
+    if not history:
+        return message
+
+    return [*history, {"role": "user", "content": message}]
+
+
+def generate_tutor_reply(message, history=None):
     client = get_openai_client()
 
     if not client:
-        return "The AI tutor is unavailable because the OpenAI API key is not configured."
+        raise AITutorConfigurationError("OpenAI API key is not configured.")
 
     try:
         response = client.responses.create(
-            model="gpt-5.5",
+            model="gpt-5.4-mini",
             instructions=instructions,
-            input=question,
+            input=build_ai_tutor_input(message, history),
         )
-    except Exception:
-        return "The AI tutor could not generate a response right now. Please try again later."
+    except Exception as error:
+        app.logger.warning("AI Tutor request failed: %s", error.__class__.__name__)
+        raise AITutorServiceError("AI Tutor request failed.") from error
 
     return response.output_text
+
+
+def ask_ai_tutor(question):
+    try:
+        return generate_tutor_reply(question)
+    except AITutorConfigurationError:
+        return "The AI tutor is unavailable because the OpenAI API key is not configured."
+    except AITutorServiceError:
+        return "The AI tutor could not generate a response right now. Please try again later."
+
+
+def validate_chat_history(raw_history):
+    if raw_history is None:
+        return []
+
+    if not isinstance(raw_history, list):
+        raise ValueError("History must be an array.")
+
+    validated_history = []
+
+    for item in raw_history:
+        if not isinstance(item, dict):
+            raise ValueError("History items must be objects.")
+
+        if "role" not in item or "content" not in item:
+            raise ValueError("History items must include role and content.")
+
+        role = item["role"]
+        content = item["content"]
+
+        if not isinstance(role, str) or not isinstance(content, str):
+            raise ValueError("History role and content must be strings.")
+
+        if role not in ALLOWED_CHAT_HISTORY_ROLES:
+            raise ValueError("History role must be user or assistant.")
+
+        content = content.strip()
+
+        if not content:
+            raise ValueError("History content cannot be empty.")
+
+        if len(content) > MAX_CHAT_MESSAGE_LENGTH:
+            raise ValueError("History content is too long.")
+
+        validated_history.append({"role": role, "content": content})
+
+    return validated_history[-MAX_CHAT_HISTORY_ITEMS:]
+
+
+def validate_chat_payload():
+    if request.mimetype != "application/json":
+        raise ValueError("Request must be application/json.")
+
+    payload = request.get_json(silent=True)
+
+    if not isinstance(payload, dict):
+        raise ValueError("Request body must be a JSON object.")
+
+    if "message" not in payload:
+        raise ValueError("Message is required.")
+
+    message = payload["message"]
+
+    if not isinstance(message, str):
+        raise ValueError("Message must be a string.")
+
+    message = message.strip()
+
+    if not message:
+        raise ValueError("Message cannot be empty.")
+
+    if len(message) > MAX_CHAT_MESSAGE_LENGTH:
+        raise ValueError("Message is too long.")
+
+    history = validate_chat_history(payload.get("history"))
+
+    return message, history
+
+
+def serialize_user(user):
+    return {
+        "id": user.id,
+        "username": user.username,
+        "email": user.email,
+        "role": user.role,
+    }
+
+
+def validate_auth_login_payload():
+    if request.mimetype != "application/json":
+        raise ValueError("Request must be application/json.")
+
+    payload = request.get_json(silent=True)
+
+    if not isinstance(payload, dict):
+        raise ValueError("Request body must be a JSON object.")
+
+    email = payload.get("email")
+    password = payload.get("password")
+    remember = payload.get("remember", False)
+
+    if not isinstance(email, str) or not email.strip():
+        raise ValueError("Email is required.")
+
+    if not isinstance(password, str) or not password:
+        raise ValueError("Password is required.")
+
+    if not isinstance(remember, bool):
+        remember = False
+
+    return normalize_email(email), password, remember
+
+
+def authenticate_user(email, password):
+    user = User.query.filter_by(email=email).first()
+
+    if user and user.check_password(password):
+        return user
+
+    return None
 
 
 def cache_static_response(response):
@@ -377,6 +513,69 @@ def brain_model_asset():
     return cache_static_response(response)
 
 
+@app.route("/api/auth/login", methods=["POST"])
+def api_auth_login():
+    try:
+        email, password, remember = validate_auth_login_payload()
+    except ValueError as error:
+        return jsonify({"error": str(error)}), 400
+
+    user = authenticate_user(email, password)
+
+    if not user:
+        return jsonify({"error": "Invalid email or password.", "code": "INVALID_CREDENTIALS"}), 401
+
+    login_user(user, remember=remember)
+
+    return jsonify({"authenticated": True, "user": serialize_user(user)}), 200
+
+
+@app.route("/api/auth/me")
+def api_auth_me():
+    if not current_user.is_authenticated:
+        return jsonify({"authenticated": False, "user": None}), 200
+
+    return jsonify({"authenticated": True, "user": serialize_user(current_user)}), 200
+
+
+@app.route("/api/auth/logout", methods=["POST"])
+def api_auth_logout():
+    logout_user()
+    return jsonify({"authenticated": False}), 200
+
+
+@app.route("/api/chat", methods=["POST"])
+def api_chat():
+    if not current_user.is_authenticated:
+        return (
+            jsonify(
+                {
+                    "error": "Authentication required.",
+                    "code": "AUTH_REQUIRED",
+                    "login_url": get_api_login_url(),
+                }
+            ),
+            401,
+        )
+
+    try:
+        message, history = validate_chat_payload()
+    except ValueError as error:
+        return jsonify({"error": str(error)}), 400
+
+    try:
+        reply = generate_tutor_reply(message, history)
+    except AITutorConfigurationError:
+        return jsonify({"error": "AI service is not configured."}), 503
+    except AITutorServiceError:
+        return jsonify({"error": "The AI Tutor is temporarily unavailable."}), 503
+    except Exception:
+        app.logger.exception("Unexpected AI Tutor API error.")
+        return jsonify({"error": "The AI Tutor is temporarily unavailable."}), 500
+
+    return jsonify({"reply": reply}), 200
+
+
 @app.route("/ai-tutor", methods=["GET", "POST"])
 @login_required
 def ai_tutor():
@@ -404,90 +603,37 @@ def about():
 
 @app.route("/register", methods=["GET", "POST"])
 def register():
-    if current_user.is_authenticated:
-        return redirect(url_for("ai_tutor", _anchor="ai-section"))
-
-    status_message = ""
-    status_type = "error"
-    username = ""
-    email = ""
-
-    if request.method == "POST":
-        username = request.form.get("username", "").strip()
-        email = normalize_email(request.form.get("email", ""))
-        password = request.form.get("password", "")
-        confirm_password = request.form.get("confirm_password", "")
-
-        if not username or not email or not password or not confirm_password:
-            status_message = "Please complete all required fields."
-        elif not is_valid_email(email):
-            status_message = "Please enter a valid email address."
-        elif password != confirm_password:
-            status_message = "Passwords do not match."
-        elif User.query.filter_by(email=email).first():
-            status_message = "An account with this email already exists."
-        else:
-            user = User(username=username, email=email, role="user")
-            user.set_password(password)
-
-            db.session.add(user)
-            db.session.commit()
-
-            flash("Account created. Please sign in.", "success")
-            return redirect(url_for("login"))
-
-    return render_template(
-        "register.html",
-        status_message=status_message,
-        status_type=status_type,
-        username=username,
-        email=email,
-    )
+    abort(404)
 
 
 @app.route("/login", methods=["GET", "POST"])
 def login():
     if current_user.is_authenticated:
-        return redirect(url_for("ai_tutor", _anchor="ai-section"))
+        return redirect(get_frontend_home_url())
 
-    status_message = ""
-    status_type = "error"
-    email = ""
+    if request.method == "GET":
+        return redirect(get_frontend_login_url())
 
     if request.method == "POST":
         email = normalize_email(request.form.get("email", ""))
         password = request.form.get("password", "")
         remember = request.form.get("remember") == "on"
 
-        user = User.query.filter_by(email=email).first()
+        user = authenticate_user(email, password)
 
-        if user and user.check_password(password):
+        if user:
             login_user(user, remember=remember)
-            return redirect(get_safe_redirect())
+            return redirect(get_frontend_home_url())
 
-        status_message = "Invalid email or password."
-
-    return render_template(
-        "login.html",
-        status_message=status_message,
-        status_type=status_type,
-        email=email,
-        next_url=request.args.get("next", ""),
-    )
+    return redirect(get_frontend_login_url())
 
 
 @app.route("/forgot-password")
 def forgot_password():
     if current_user.is_authenticated:
-        return redirect(url_for("ai_tutor", _anchor="ai-section"))
+        return redirect(get_frontend_home_url())
 
-    return render_template(
-        "login.html",
-        status_message="Coming soon",
-        status_type="info",
-        email="",
-        next_url=request.args.get("next", ""),
-    )
+    return redirect(get_frontend_login_url())
 
 
 @app.route("/logout")

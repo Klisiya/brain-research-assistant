@@ -1,0 +1,434 @@
+.react-login-page {
+  position: relative;
+  min-height: 100vh;
+  overflow-x: hidden;
+  background: #020617;
+  color: #fff;
+}
+
+.login-screen {
+  position: relative;
+  display: grid;
+  min-height: 100vh;
+  min-height: 100svh;
+  min-height: 100dvh;
+  overflow: hidden;
+  background: #000;
+}
+
+.react-login-background {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  background:
+    radial-gradient(circle at 20% 22%, rgba(56, 189, 248, 0.12), transparent 30%),
+    radial-gradient(circle at 78% 78%, rgba(37, 99, 235, 0.14), transparent 34%),
+    linear-gradient(180deg, rgba(2, 6, 23, 0.12), rgba(2, 6, 23, 0.55)),
+    #000;
+  pointer-events: none;
+}
+
+.login-shader-canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  opacity: 0.86;
+}
+
+.react-login-background::before,
+.react-login-background::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.react-login-background::before {
+  background-image:
+    linear-gradient(120deg, rgba(56, 189, 248, 0.13) 1px, transparent 1px),
+    linear-gradient(20deg, rgba(96, 165, 250, 0.08) 1px, transparent 1px);
+  background-position:
+    14% 18%,
+    66% 62%;
+  background-size:
+    360px 260px,
+    420px 300px;
+  opacity: 0.32;
+  mask-image: radial-gradient(circle at 50% 50%, #000 0%, transparent 76%);
+}
+
+.react-login-background::after {
+  background:
+    radial-gradient(circle at 24% 78%, rgba(14, 165, 233, 0.12), transparent 28%),
+    radial-gradient(circle at 74% 18%, rgba(59, 130, 246, 0.1), transparent 30%),
+    linear-gradient(180deg, rgba(2, 6, 23, 0.08), rgba(2, 6, 23, 0.44));
+}
+
+.react-login-page .login-home-link {
+  position: absolute;
+  top: 24px;
+  right: 28px;
+  z-index: 3;
+  display: inline-flex;
+  min-height: 42px;
+  align-items: center;
+  justify-content: center;
+  padding: 0 20px;
+  border: 1px solid rgba(125, 211, 252, 0.3);
+  border-radius: 999px;
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.075), rgba(255, 255, 255, 0.018));
+  box-shadow:
+    0 18px 45px rgba(0, 0, 0, 0.24),
+    inset 0 1px 0 rgba(255, 255, 255, 0.16);
+  color: #dbeafe;
+  font-size: 14px;
+  font-weight: 800;
+  text-decoration: none;
+  transition:
+    border-color 0.25s ease,
+    box-shadow 0.25s ease,
+    color 0.25s ease,
+    transform 0.25s ease;
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+}
+
+.react-login-page .login-home-link:hover,
+.react-login-page .login-home-link:focus-visible {
+  border-color: rgba(125, 211, 252, 0.62);
+  box-shadow:
+    0 22px 52px rgba(56, 189, 248, 0.26),
+    inset 0 1px 0 rgba(255, 255, 255, 0.22);
+  color: #fff;
+  transform: translateY(-2px);
+}
+
+.react-login-page .login-home-link:focus-visible,
+.react-login-page .forgot-password-button:focus-visible,
+.react-login-page .login-submit:focus-visible {
+  outline: 2px solid rgba(125, 211, 252, 0.72);
+  outline-offset: 3px;
+}
+
+.react-login-page .login-shell {
+  position: relative;
+  z-index: 2;
+  display: grid;
+  min-height: 100vh;
+  min-height: 100svh;
+  min-height: 100dvh;
+  place-items: center;
+  padding: 96px 20px 48px;
+}
+
+.react-login-page .login-panel {
+  position: relative;
+  width: min(430px, 100%);
+  overflow: hidden;
+  padding: 34px;
+  border: 1px solid rgba(255, 255, 255, 0.13);
+  border-radius: 28px;
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.09), rgba(255, 255, 255, 0.022));
+  box-shadow:
+    0 28px 80px rgba(0, 0, 0, 0.45),
+    0 0 70px rgba(37, 99, 235, 0.22),
+    inset 0 1px 0 rgba(255, 255, 255, 0.16);
+  backdrop-filter: blur(26px) saturate(180%);
+  -webkit-backdrop-filter: blur(26px) saturate(180%);
+}
+
+.react-login-page .login-panel::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(circle at 22% 0%, rgba(125, 211, 252, 0.22), transparent 34%),
+    linear-gradient(120deg, rgba(255, 255, 255, 0.1), transparent 42%, rgba(255, 255, 255, 0.04));
+}
+
+.react-login-page .login-panel > * {
+  position: relative;
+  z-index: 1;
+}
+
+.react-login-page .login-label {
+  display: inline-flex;
+  margin-bottom: 18px;
+  padding: 7px 14px;
+  border: 1px solid rgba(96, 165, 250, 0.3);
+  border-radius: 999px;
+  background: rgba(37, 99, 235, 0.18);
+  color: #93c5fd;
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0;
+}
+
+.react-login-page .login-panel h1 {
+  margin: 0;
+  color: #fff;
+  font-size: 36px;
+  font-weight: 800;
+  line-height: 1.12;
+  letter-spacing: 0;
+  text-shadow:
+    0 0 24px rgba(96, 165, 250, 0.34),
+    0 0 52px rgba(14, 165, 233, 0.16);
+}
+
+.react-login-page .login-panel p {
+  margin: 16px 0 0;
+  color: rgba(226, 232, 240, 0.84);
+  font-size: 15px;
+  line-height: 1.7;
+}
+
+.react-login-page .login-form {
+  display: grid;
+  gap: 16px;
+  margin-top: 26px;
+}
+
+.react-login-page .login-field {
+  display: grid;
+  gap: 9px;
+}
+
+.react-login-page .login-field span,
+.react-login-page .login-field > label,
+.react-login-page .remember-option span {
+  color: #cbd5e1;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.react-login-page .login-field input {
+  width: 100%;
+  height: 52px;
+  padding: 0 16px;
+  border: 1px solid rgba(148, 163, 184, 0.24);
+  border-radius: 16px;
+  background: rgba(2, 6, 23, 0.72);
+  color: #fff;
+  font-size: 15px;
+  outline: none;
+  transition:
+    border-color 0.25s ease,
+    box-shadow 0.25s ease;
+}
+
+.react-login-page .login-field input::placeholder {
+  color: #64748b;
+}
+
+.react-login-page .login-field input:focus {
+  border-color: rgba(125, 211, 252, 0.68);
+  box-shadow:
+    0 0 0 3px rgba(56, 189, 248, 0.12),
+    0 16px 34px rgba(37, 99, 235, 0.18);
+}
+
+.react-login-page .login-field input:disabled,
+.react-login-page .remember-option input:disabled {
+  cursor: not-allowed;
+  opacity: 0.72;
+}
+
+.react-login-page .password-input-shell {
+  position: relative;
+}
+
+.react-login-page .password-input-shell input {
+  padding-right: 52px;
+}
+
+.react-login-page .password-input-shell input::-ms-clear,
+.react-login-page .password-input-shell input::-ms-reveal {
+  display: none;
+}
+
+.react-login-page .password-visibility-button {
+  position: absolute;
+  top: 50%;
+  right: 12px;
+  display: inline-flex;
+  width: 34px;
+  height: 34px;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.04);
+  color: rgba(255, 255, 255, 0.94);
+  cursor: pointer;
+  transform: translateY(-50%);
+  transition:
+    background-color 0.2s ease,
+    border-color 0.2s ease,
+    color 0.2s ease,
+    opacity 0.2s ease;
+}
+
+.react-login-page .password-visibility-button svg {
+  width: 18px;
+  height: 18px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.9;
+}
+
+.react-login-page .password-visibility-button:hover:not(:disabled),
+.react-login-page .password-visibility-button:focus-visible {
+  border-color: rgba(125, 211, 252, 0.34);
+  background: rgba(125, 211, 252, 0.12);
+  color: #fff;
+}
+
+.react-login-page .password-visibility-button:focus-visible {
+  outline: 2px solid rgba(125, 211, 252, 0.72);
+  outline-offset: 2px;
+}
+
+.react-login-page .password-visibility-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.react-login-page .login-options {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.react-login-page .remember-option {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+}
+
+.react-login-page .remember-option input {
+  width: 16px;
+  height: 16px;
+  accent-color: #38bdf8;
+}
+
+.react-login-page .forgot-password-button {
+  border: 0;
+  background: transparent;
+  color: #7dd3fc;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 800;
+  text-decoration: none;
+}
+
+.react-login-page .forgot-password-button:hover {
+  color: #fff;
+}
+
+.react-login-page .forgot-password-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.65;
+}
+
+.react-login-page .login-submit {
+  height: 54px;
+  margin-top: 4px;
+  border: 0;
+  border-radius: 18px;
+  background: linear-gradient(135deg, rgba(37, 99, 235, 0.96), rgba(56, 189, 248, 0.86));
+  box-shadow:
+    0 18px 42px rgba(37, 99, 235, 0.34),
+    inset 0 1px 0 rgba(255, 255, 255, 0.22);
+  color: #fff;
+  cursor: pointer;
+  font-size: 16px;
+  font-weight: 900;
+  transition:
+    box-shadow 0.25s ease,
+    opacity 0.25s ease,
+    transform 0.25s ease;
+}
+
+.react-login-page .login-submit:hover:not(:disabled) {
+  box-shadow:
+    0 24px 54px rgba(56, 189, 248, 0.4),
+    inset 0 1px 0 rgba(255, 255, 255, 0.28);
+  transform: translateY(-2px);
+}
+
+.react-login-page .login-submit:disabled {
+  cursor: not-allowed;
+  opacity: 0.7;
+}
+
+.react-login-page .login-status {
+  margin: 2px 0 0;
+  padding: 12px 14px;
+  border: 1px solid rgba(16, 185, 129, 0.24);
+  border-radius: 14px;
+  background: rgba(16, 185, 129, 0.12);
+  color: #86efac;
+  font-size: 14px;
+}
+
+.react-login-page .login-status.error {
+  border-color: rgba(248, 113, 113, 0.32);
+  background: rgba(127, 29, 29, 0.28);
+  color: #fecaca;
+}
+
+.react-login-page .login-status.info {
+  border-color: rgba(125, 211, 252, 0.3);
+  background: rgba(14, 165, 233, 0.12);
+  color: #bae6fd;
+}
+
+.login-footer-screen {
+  position: relative;
+  z-index: 2;
+  background: #020617;
+}
+
+.login-footer-screen .site-footer {
+  margin-top: 0;
+}
+
+@media (max-width: 560px) {
+  .react-login-page .login-home-link {
+    right: 18px;
+  }
+
+  .react-login-page .login-shell {
+    padding: 92px 16px 32px;
+  }
+
+  .react-login-page .login-panel {
+    padding: 26px;
+    border-radius: 24px;
+  }
+
+  .react-login-page .login-panel h1 {
+    font-size: 30px;
+  }
+
+  .react-login-page .login-options {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .react-login-page .login-home-link,
+  .react-login-page .login-field input,
+  .react-login-page .password-visibility-button,
+  .react-login-page .login-submit {
+    transition: none;
+  }
+}
