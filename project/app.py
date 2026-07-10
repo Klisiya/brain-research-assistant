@@ -458,6 +458,67 @@ def authenticate_user(email, password):
     return None
 
 
+def build_brain_region_summary(region):
+    overview = region.get("overview", "")
+    key_functions = region.get("main_functions", [])
+
+    if not key_functions:
+        return overview
+
+    highlighted_functions = ", ".join(key_functions[:2])
+
+    return f"Key functions include {highlighted_functions}."
+
+
+def serialize_brain_region(slug, region, include_detail=False):
+    overview = region.get("overview", "")
+    main_functions = region.get("main_functions", [])
+    related_processes = region.get("related_cognitive_processes", [])
+    clinical_relevance = region.get("clinical_relevance", "")
+    research_topics = region.get("key_research_topics", [])
+
+    if not include_detail:
+        return {
+            "slug": slug,
+            "name": region.get("name", ""),
+            "shortDescription": overview,
+            "summary": build_brain_region_summary(region),
+        }
+
+    return {
+        "slug": slug,
+        "name": region.get("name", ""),
+        "subtitle": "Brain Region",
+        "overview": overview,
+        "keyFunctions": main_functions,
+        "relatedCognitiveProcesses": related_processes,
+        "clinicalRelevance": clinical_relevance,
+        "researchHighlights": research_topics,
+        "sections": [
+            {
+                "id": "main-functions",
+                "title": "Main functions",
+                "items": main_functions,
+            },
+            {
+                "id": "related-cognitive-processes",
+                "title": "Related cognitive processes",
+                "items": related_processes,
+            },
+            {
+                "id": "clinical-relevance",
+                "title": "Clinical relevance",
+                "content": clinical_relevance,
+            },
+            {
+                "id": "research-highlights",
+                "title": "Research highlights",
+                "items": research_topics,
+            },
+        ],
+    }
+
+
 def cache_static_response(response):
     response.headers["Cache-Control"] = "public, max-age=31536000, immutable"
     return response
@@ -482,6 +543,26 @@ def brain_region(slug):
         abort(404)
 
     return render_template("brain_region.html", region=region, slug=slug)
+
+
+@app.route("/api/brain-regions")
+def api_brain_regions():
+    regions = [
+        serialize_brain_region(slug, region)
+        for slug, region in BRAIN_REGIONS.items()
+    ]
+
+    return jsonify({"regions": regions}), 200
+
+
+@app.route("/api/brain-regions/<slug>")
+def api_brain_region(slug):
+    region = BRAIN_REGIONS.get(slug)
+
+    if not region:
+        return jsonify({"error": "Brain region not found.", "code": "BRAIN_REGION_NOT_FOUND"}), 404
+
+    return jsonify({"region": serialize_brain_region(slug, region, include_detail=True)}), 200
 
 
 @app.route("/assets/models/brain.glb")

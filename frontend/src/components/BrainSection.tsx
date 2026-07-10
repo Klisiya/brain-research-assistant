@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import BrainHotspots from './BrainHotspots'
 import './BrainSection.css'
 import { brainHotspots, type BrainHotspot } from '../data/brainHotspots'
@@ -157,6 +158,7 @@ function resolveLabelColumn(
 }
 
 function BrainSection() {
+  const navigate = useNavigate()
   const brainViewerSignature = [
     brainViewerRevision,
     sideViewStartAzimuth,
@@ -319,7 +321,7 @@ function BrainSection() {
 
         const label = document.createElement('a')
         label.className = 'brain-region-label'
-        label.href = '#'
+        label.href = region.url
         label.textContent = region.label
         label.dataset.regionId = region.id
         label.dataset.priority = String(region.priority)
@@ -355,6 +357,8 @@ function BrainSection() {
         }
         const handleClick = (event: MouseEvent) => {
           event.preventDefault()
+          event.stopPropagation()
+          navigate(region.url)
         }
 
         label.addEventListener('pointerenter', handlePointerEnter)
@@ -780,7 +784,7 @@ function BrainSection() {
       regionLabelLayer.replaceChildren()
       model.remove()
     }
-  }, [viewerReady, brainViewerSignature])
+  }, [viewerReady, brainViewerSignature, navigate])
 
   return (
     <section ref={sectionRef} className="brain-section" aria-label="Interactive 3D brain model">

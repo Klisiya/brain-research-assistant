@@ -5,6 +5,7 @@ import Footer from './components/Footer'
 import Hero from './components/Hero'
 import ModulesSection from './components/ModulesSection'
 import Navbar from './components/Navbar'
+import BrainRegionPage from './pages/BrainRegionPage'
 import LoginPage from './pages/LoginPage'
 import './App.css'
 
@@ -26,6 +27,7 @@ function App() {
     <Routes>
       <Route element={<HomePage />} path="/" />
       <Route element={<LoginPage />} path="/login" />
+      <Route element={<BrainRegionPage />} path="/brain-region/:slug" />
     </Routes>
   )
 }
