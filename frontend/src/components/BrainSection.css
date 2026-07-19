@@ -15,6 +15,7 @@
   --brain-right-x: 0px;
 
   position: relative;
+  scroll-margin-top: 78px;
   z-index: 2;
   min-height: 260vh;
   padding: 35px 0 0;

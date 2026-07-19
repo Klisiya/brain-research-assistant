@@ -787,7 +787,12 @@ function BrainSection() {
   }, [viewerReady, brainViewerSignature, navigate])
 
   return (
-    <section ref={sectionRef} className="brain-section" aria-label="Interactive 3D brain model">
+    <section
+      ref={sectionRef}
+      className="brain-section"
+      id="brain-section"
+      aria-label="Interactive 3D brain model"
+    >
       <div className="brain-section-stage">
         <div className="brain-section-visual">
           <div className="brain-section-glow" aria-hidden="true" />

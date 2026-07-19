@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type FocusEvent, type FormEvent } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, useLocation, useNavigate } from 'react-router-dom'
 import './Navbar.css'
 
 type DropdownItem = {
@@ -36,7 +36,7 @@ const navItems: NavItem[] = [
     id: 'home',
     label: 'Home',
     icon: '\u2302',
-    href: '#',
+    href: '/',
   },
   {
     id: 'learning',
@@ -70,7 +70,7 @@ const navItems: NavItem[] = [
       { label: 'Research Recommendations', href: '#' },
       { label: 'Learning Resources', href: '#' },
       { label: 'Latest News', href: '#' },
-      { label: 'About This Project', href: '#' },
+      { label: 'About This Project', href: '/about' },
     ],
   },
   {
@@ -79,8 +79,8 @@ const navItems: NavItem[] = [
     icon: '\u25A6',
     dropdown: [
       { label: 'Learning Evaluation', href: '#' },
-      { label: 'About & Disclaimer', href: '#' },
-      { label: 'Contact', href: '#' },
+      { label: 'About & Disclaimer', href: '/about' },
+      { label: 'Contact', href: '/contact' },
     ],
   },
 ]
@@ -115,6 +115,7 @@ async function readJsonPayload(response: Response): Promise<unknown> {
 }
 
 function Navbar() {
+  const location = useLocation()
   const navigate = useNavigate()
   const [openMenu, setOpenMenu] = useState<string | null>(null)
   const [searchTerm, setSearchTerm] = useState('')
@@ -248,9 +249,15 @@ function Navbar() {
           const isOpen = openMenu === item.id
 
           if (!isDropdown) {
+            const isActive = location.pathname === item.href
+
             return (
-              <li className="active" key={item.id}>
-                <a className="nav-link" href={item.href} aria-current="page">
+              <li className={isActive ? 'active' : undefined} key={item.id}>
+                <Link
+                  aria-current={isActive ? 'page' : undefined}
+                  className="nav-link"
+                  to={item.href ?? '/'}
+                >
                   <span
                     aria-hidden="true"
                     className="nav-link-icon"
@@ -258,7 +265,7 @@ function Navbar() {
                     {item.icon}
                   </span>
                   {item.label}
-                </a>
+                </Link>
               </li>
             )
           }
@@ -292,11 +299,21 @@ function Navbar() {
               </button>
 
               <div className="dropdown-menu">
-                {item.dropdown?.map((dropdownItem) => (
-                  <a href={dropdownItem.href} key={dropdownItem.label}>
-                    {dropdownItem.label}
-                  </a>
-                ))}
+                {item.dropdown?.map((dropdownItem) =>
+                  dropdownItem.href.startsWith('/') ? (
+                    <Link
+                      key={dropdownItem.label}
+                      to={dropdownItem.href}
+                      onClick={() => setOpenMenu(null)}
+                    >
+                      {dropdownItem.label}
+                    </Link>
+                  ) : (
+                    <a href={dropdownItem.href} key={dropdownItem.label}>
+                      {dropdownItem.label}
+                    </a>
+                  ),
+                )}
               </div>
             </li>
           )

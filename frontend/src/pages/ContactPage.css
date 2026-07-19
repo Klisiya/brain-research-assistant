@@ -1,0 +1,243 @@
+.contact-react-page {
+  position: relative;
+  min-height: 100vh;
+  overflow-x: clip;
+  color: #e5e7eb;
+  background: #020617;
+}
+
+.contact-react-main {
+  position: relative;
+  z-index: 2;
+  width: min(1100px, calc(100% - 40px));
+  min-height: 100vh;
+  margin: 0 auto;
+  padding: 150px 0 100px;
+}
+
+.contact-react-hero {
+  max-width: 900px;
+  margin: 0 auto 48px;
+  text-align: center;
+}
+
+.contact-react-label {
+  display: table;
+  margin: 0 auto 18px;
+  padding: 8px 16px;
+  border: 1px solid rgba(96, 165, 250, 0.28);
+  border-radius: 999px;
+  background: rgba(37, 99, 235, 0.18);
+  color: #93c5fd;
+  font-size: 14px;
+  font-weight: 750;
+  letter-spacing: 1px;
+}
+
+.contact-react-hero h1 {
+  margin: 0;
+  color: #f8fafc;
+  font-size: 52px;
+  line-height: 1.15;
+  font-weight: 850;
+  letter-spacing: 0;
+  text-shadow: 0 0 28px rgba(96, 165, 250, 0.38), 0 0 55px rgba(14, 165, 233, 0.16);
+}
+
+.contact-react-hero p {
+  max-width: 760px;
+  margin: 22px auto 0;
+  color: rgba(226, 232, 240, 0.86);
+  font-size: 17px;
+  line-height: 1.8;
+}
+
+.contact-react-card {
+  position: relative;
+  max-width: 760px;
+  margin: 0 auto;
+  overflow: hidden;
+  padding: 42px;
+  border: 1px solid rgba(255, 255, 255, 0.11);
+  border-radius: 28px;
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.075), rgba(255, 255, 255, 0.018));
+  box-shadow: 0 22px 60px rgba(0, 0, 0, 0.22), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(22px) saturate(180%);
+  -webkit-backdrop-filter: blur(22px) saturate(180%);
+}
+
+.contact-react-card::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(circle at 0 0, rgba(56, 189, 248, 0.14), transparent 36%),
+    radial-gradient(circle at 100% 100%, rgba(99, 102, 241, 0.1), transparent 40%);
+}
+
+.contact-react-kicker,
+.contact-react-card h2,
+.contact-react-profile,
+.contact-react-list,
+.contact-react-note {
+  position: relative;
+  z-index: 1;
+}
+
+.contact-react-kicker {
+  display: block;
+  color: #38bdf8;
+  font-size: 12px;
+  font-weight: 900;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.contact-react-card h2 {
+  margin: 8px 0 28px;
+  color: #fff;
+  font-size: 28px;
+  line-height: 1.25;
+  letter-spacing: 0;
+}
+
+.contact-react-profile {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  margin-bottom: 10px;
+  padding-bottom: 24px;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.16);
+}
+
+.contact-react-profile-icon {
+  width: 64px;
+  height: 64px;
+  display: grid;
+  flex: 0 0 auto;
+  place-items: center;
+  border: 1px solid rgba(125, 211, 252, 0.28);
+  border-radius: 20px;
+  background: linear-gradient(135deg, rgba(37, 99, 235, 0.55), rgba(56, 189, 248, 0.35));
+  box-shadow: 0 18px 45px rgba(37, 99, 235, 0.22), inset 0 1px 0 rgba(255, 255, 255, 0.18);
+  color: #fff;
+  font-size: 20px;
+  font-weight: 800;
+}
+
+.contact-react-profile h3,
+.contact-react-item h3 {
+  margin: 0;
+  color: #fff;
+  letter-spacing: 0;
+}
+
+.contact-react-profile h3 {
+  font-size: 26px;
+}
+
+.contact-react-profile p {
+  margin: 8px 0 0;
+  color: #93c5fd;
+  font-size: 16px;
+}
+
+.contact-react-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+  padding: 20px 0;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.16);
+}
+
+.contact-react-item:last-child {
+  border-bottom: 0;
+}
+
+.contact-react-marker {
+  width: 42px;
+  height: 42px;
+  display: grid;
+  flex: 0 0 auto;
+  place-items: center;
+  border: 1px solid rgba(96, 165, 250, 0.22);
+  border-radius: 14px;
+  background: rgba(37, 99, 235, 0.16);
+  color: #7dd3fc;
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.contact-react-item h3 {
+  font-size: 18px;
+}
+
+.contact-react-item p {
+  margin: 8px 0 0;
+  color: #94a3b8;
+  line-height: 1.6;
+}
+
+.contact-react-item a {
+  color: #93c5fd;
+  text-decoration: none;
+}
+
+.contact-react-item a:hover,
+.contact-react-item a:focus-visible {
+  color: #fff;
+  text-decoration: underline;
+  outline: none;
+}
+
+.contact-react-note {
+  margin: 14px 0 0;
+  padding-top: 22px;
+  border-top: 1px solid rgba(148, 163, 184, 0.16);
+  color: #7f93ad;
+  font-size: 13px;
+  line-height: 1.7;
+}
+
+.contact-react-page .site-footer {
+  background: linear-gradient(180deg, rgba(2, 6, 23, 0), rgba(2, 6, 23, 0.96) 34%);
+}
+
+@media (max-width: 900px) {
+  .contact-react-main {
+    padding-top: 124px;
+  }
+
+  .contact-react-hero h1 {
+    font-size: 38px;
+  }
+}
+
+@media (max-width: 620px) {
+  .contact-react-main {
+    width: min(100% - 28px, 560px);
+    padding: 88px 0 64px;
+  }
+
+  .contact-react-hero {
+    margin-bottom: 34px;
+  }
+
+  .contact-react-card {
+    padding: 24px;
+    border-radius: 22px;
+  }
+
+  .contact-react-profile {
+    align-items: flex-start;
+  }
+
+  .contact-react-profile h3 {
+    font-size: 23px;
+  }
+
+  .contact-react-item {
+    gap: 12px;
+  }
+}

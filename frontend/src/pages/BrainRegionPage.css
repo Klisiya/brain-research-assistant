@@ -3,11 +3,7 @@
   min-height: 100vh;
   overflow-x: hidden;
   color: #e5e7eb;
-  background:
-    radial-gradient(circle at 50% 8%, rgba(56, 189, 248, 0.18), transparent 30%),
-    radial-gradient(circle at 12% 32%, rgba(37, 99, 235, 0.18), transparent 34%),
-    radial-gradient(circle at 84% 18%, rgba(124, 58, 237, 0.12), transparent 32%),
-    #020617;
+  background: transparent;
   isolation: isolate;
 }
 
@@ -15,7 +11,7 @@
   content: "";
   position: fixed;
   inset: 0;
-  z-index: -1;
+  z-index: 1;
   pointer-events: none;
   background:
     linear-gradient(rgba(56, 189, 248, 0.035) 1px, transparent 1px),
@@ -27,6 +23,8 @@
 }
 
 .brain-region-main {
+  position: relative;
+  z-index: 2;
   width: min(1180px, calc(100% - 48px));
   min-height: 72vh;
   margin: 0 auto;

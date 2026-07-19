@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import Footer from '../components/Footer'
 import Navbar from '../components/Navbar'
+import PageParticleBackground from '../components/PageParticleBackground'
 import './BrainRegionPage.css'
 
 type BrainRegionSection = {
@@ -118,8 +119,8 @@ function RegionStatus({ message }: { message: string }) {
   return (
     <main className="brain-region-main brain-region-main-status">
       <section className="brain-region-hero brain-region-status-card">
-        <Link className="brain-region-back-link" to="/">
-          Back to Home
+        <Link className="brain-region-back-link" to="/#brain-section">
+          Back to Brain Model
         </Link>
         <p>{message}</p>
       </section>
@@ -260,6 +261,7 @@ function BrainRegionPage() {
 
   return (
     <div className="brain-region-page">
+      <PageParticleBackground />
       <Navbar />
 
       {displayedState.status === 'loading' ? <RegionStatus message="Loading brain region..." /> : null}
@@ -273,8 +275,8 @@ function BrainRegionPage() {
       {displayedState.status === 'success' ? (
         <main className="brain-region-main">
           <section className="brain-region-hero">
-            <Link className="brain-region-back-link" to="/">
-              Back to Home
+            <Link className="brain-region-back-link" to="/#brain-section">
+              Back to Brain Model
             </Link>
             <span className="brain-region-kicker">{displayedState.region.subtitle}</span>
             <h1>{displayedState.region.name}</h1>
