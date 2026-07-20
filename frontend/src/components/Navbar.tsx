@@ -256,6 +256,13 @@ function Navbar() {
                 <Link
                   aria-current={isActive ? 'page' : undefined}
                   className="nav-link"
+                  onClick={() => {
+                    setOpenMenu(null)
+
+                    if (location.pathname === '/') {
+                      window.scrollTo({ left: 0, top: 0 })
+                    }
+                  }}
                   to={item.href ?? '/'}
                 >
                   <span

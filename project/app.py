@@ -4,7 +4,7 @@ import re
 
 import click
 from dotenv import load_dotenv
-from flask import Flask, abort, jsonify, redirect, render_template, request, send_file, url_for
+from flask import Flask, abort, jsonify, redirect, request, send_file
 from flask_login import (
     LoginManager,
     UserMixin,
@@ -338,15 +338,6 @@ def generate_tutor_reply(message, history=None):
     return response.output_text
 
 
-def ask_ai_tutor(question):
-    try:
-        return generate_tutor_reply(question)
-    except AITutorConfigurationError:
-        return "The AI tutor is unavailable because the OpenAI API key is not configured."
-    except AITutorServiceError:
-        return "The AI tutor could not generate a response right now. Please try again later."
-
-
 def validate_chat_history(raw_history):
     if raw_history is None:
         return []
@@ -532,17 +523,15 @@ def init_db_command():
 
 @app.route("/")
 def home():
-    return render_template("index.html", answer="", question="")
+    return redirect(get_frontend_home_url())
 
 
 @app.route("/brain-region/<slug>")
 def brain_region(slug):
-    region = BRAIN_REGIONS.get(slug)
+    if slug not in BRAIN_REGIONS:
+        return jsonify({"error": "Brain region not found.", "code": "BRAIN_REGION_NOT_FOUND"}), 404
 
-    if not region:
-        abort(404)
-
-    return render_template("brain_region.html", region=region, slug=slug)
+    return redirect(f"{get_frontend_url()}/brain-region/{slug}")
 
 
 @app.route("/api/brain-regions")
@@ -658,28 +647,18 @@ def api_chat():
 
 
 @app.route("/ai-tutor", methods=["GET", "POST"])
-@login_required
 def ai_tutor():
-    answer = ""
-    question = ""
-
-    if request.method == "POST":
-        question = request.form.get("question", "").strip()
-
-        if question:
-            answer = ask_ai_tutor(question)
-
-    return render_template("index.html", answer=answer, question=question)
+    return redirect(f"{get_frontend_url()}/#ai-section")
 
 
 @app.route("/contact")
 def contact():
-    return render_template("contact.html")
+    return redirect(f"{get_frontend_url()}/contact")
 
 
 @app.route("/about")
 def about():
-    return render_template("about.html")
+    return redirect(f"{get_frontend_url()}/about")
 
 
 @app.route("/register", methods=["GET", "POST"])
@@ -721,7 +700,7 @@ def forgot_password():
 @login_required
 def logout():
     logout_user()
-    return redirect(url_for("login"))
+    return redirect(get_frontend_home_url())
 
 
 if __name__ == "__main__":
