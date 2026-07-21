@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from 'react'
+import { useEffect, useState, type FormEvent, type MouseEvent } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import Footer from '../components/Footer'
 import LoginShaderBackground from './LoginShaderBackground'
@@ -156,6 +156,20 @@ function LoginPage() {
     }
   }
 
+  const handleCardMouseMove = (event: MouseEvent<HTMLElement>) => {
+    const bounds = event.currentTarget.getBoundingClientRect()
+    const rotateY = ((event.clientX - bounds.left) / bounds.width - 0.5) * 18
+    const rotateX = ((event.clientY - bounds.top) / bounds.height - 0.5) * -18
+
+    event.currentTarget.style.setProperty('--card-rotate-x', `${rotateX}deg`)
+    event.currentTarget.style.setProperty('--card-rotate-y', `${rotateY}deg`)
+  }
+
+  const handleCardMouseLeave = (event: MouseEvent<HTMLElement>) => {
+    event.currentTarget.style.setProperty('--card-rotate-x', '0deg')
+    event.currentTarget.style.setProperty('--card-rotate-y', '0deg')
+  }
+
   const shouldShowTutorNotice = isAuthRequiredLocationState(location.state) && !status
 
   return (
@@ -168,7 +182,12 @@ function LoginPage() {
         </Link>
 
         <main className="login-shell">
-          <section className="login-panel" aria-labelledby="login-title">
+          <section
+            className="login-panel"
+            aria-labelledby="login-title"
+            onMouseLeave={handleCardMouseLeave}
+            onMouseMove={handleCardMouseMove}
+          >
             <span className="login-label">Brain Research Tutor</span>
 
             <h1 id="login-title">Welcome Back</h1>
@@ -248,13 +267,13 @@ function LoginPage() {
                 </button>
               </div>
 
-            <button className="login-submit" disabled={isSubmitting} type="submit">
-              {isSubmitting ? 'Signing In...' : 'Sign In'}
-            </button>
+              <button className="login-submit" disabled={isSubmitting} type="submit">
+                {isSubmitting ? 'Signing In...' : 'Sign In'}
+              </button>
 
-            {shouldShowTutorNotice ? <p className="login-status error">Please sign in to use the AI Tutor.</p> : null}
-            {status ? <p className={`login-status ${status.type}`}>{status.message}</p> : null}
-          </form>
+              {shouldShowTutorNotice ? <p className="login-status error">Please sign in to use the AI Tutor.</p> : null}
+              {status ? <p className={`login-status ${status.type}`}>{status.message}</p> : null}
+            </form>
           </section>
         </main>
       </section>

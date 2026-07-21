@@ -6,7 +6,7 @@ function Hero() {
     <>
       <PageParticleBackground />
 
-      <header className="hero hero-intro">
+      <header className="hero hero-intro" id="overview">
         <span className="hero-kicker">Interactive Brain Research Platform</span>
 
         <h1>

@@ -9,7 +9,9 @@ import Navbar from './components/Navbar'
 import AboutPage from './pages/AboutPage'
 import BrainRegionPage from './pages/BrainRegionPage'
 import ContactPage from './pages/ContactPage'
+import InnovationHubPage from './pages/InnovationHubPage'
 import LoginPage from './pages/LoginPage'
+import PapersPage from './pages/PapersPage'
 import './App.css'
 
 function HomePage() {
@@ -48,6 +50,9 @@ function App() {
       <Route element={<AboutPage />} path="/about" />
       <Route element={<ContactPage />} path="/contact" />
       <Route element={<LoginPage />} path="/login" />
+      <Route element={<PapersPage />} path="/papers" />
+      <Route element={<PapersPage />} path="/papers/:slug" />
+      <Route element={<InnovationHubPage />} path="/innovation-hub" />
       <Route element={<BrainRegionPage />} path="/brain-region/:slug" />
     </Routes>
   )

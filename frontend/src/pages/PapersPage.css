@@ -1,0 +1,112 @@
+.papers-placeholder-page {
+  position: relative;
+  min-height: 100vh;
+  overflow-x: clip;
+  color: #e5e7eb;
+  background: #020617;
+  isolation: isolate;
+}
+
+.papers-placeholder-main {
+  position: relative;
+  z-index: 2;
+  display: grid;
+  width: min(980px, calc(100% - 40px));
+  min-height: 76vh;
+  margin: 0 auto;
+  padding: 150px 0 90px;
+  place-items: center;
+}
+
+.papers-placeholder-card {
+  position: relative;
+  width: min(760px, 100%);
+  overflow: hidden;
+  padding: 52px;
+  border: 1px solid rgba(125, 211, 252, 0.18);
+  border-radius: 30px;
+  background:
+    radial-gradient(circle at 18% 0%, rgba(56, 189, 248, 0.16), transparent 42%),
+    linear-gradient(135deg, rgba(15, 23, 42, 0.8), rgba(2, 6, 23, 0.56));
+  box-shadow:
+    0 28px 80px rgba(0, 0, 0, 0.38),
+    inset 0 1px 0 rgba(255, 255, 255, 0.11);
+  text-align: center;
+  backdrop-filter: blur(24px) saturate(170%);
+  -webkit-backdrop-filter: blur(24px) saturate(170%);
+}
+
+.papers-placeholder-eyebrow {
+  display: inline-block;
+  color: #7dd3fc;
+  font-size: 12px;
+  font-weight: 900;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+}
+
+.papers-placeholder-card h1 {
+  margin: 14px 0 18px;
+  color: #f8fafc;
+  font-size: clamp(40px, 7vw, 68px);
+  line-height: 1.06;
+  letter-spacing: -0.035em;
+  text-shadow: 0 0 36px rgba(56, 189, 248, 0.2);
+}
+
+.papers-placeholder-card p {
+  max-width: 620px;
+  margin: 0 auto;
+  color: #b6c6da;
+  font-size: 17px;
+  line-height: 1.75;
+}
+
+.papers-placeholder-link {
+  display: inline-flex;
+  min-height: 44px;
+  align-items: center;
+  justify-content: center;
+  margin-top: 30px;
+  padding: 0 20px;
+  border: 1px solid rgba(125, 211, 252, 0.32);
+  border-radius: 999px;
+  background: rgba(14, 116, 144, 0.18);
+  color: #bae6fd;
+  font-size: 14px;
+  font-weight: 800;
+  text-decoration: none;
+  transition: border-color 0.2s ease, background-color 0.2s ease, color 0.2s ease, transform 0.2s ease;
+}
+
+.papers-placeholder-link:hover,
+.papers-placeholder-link:focus-visible {
+  border-color: rgba(125, 211, 252, 0.62);
+  background: rgba(14, 116, 144, 0.3);
+  color: #fff;
+  outline: 2px solid rgba(125, 211, 252, 0.68);
+  outline-offset: 3px;
+  transform: translateY(-2px);
+}
+
+@media (max-width: 620px) {
+  .papers-placeholder-main {
+    width: min(100% - 28px, 560px);
+    padding: 96px 0 64px;
+  }
+
+  .papers-placeholder-card {
+    padding: 36px 24px;
+    border-radius: 24px;
+  }
+
+  .papers-placeholder-card p {
+    font-size: 15px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .papers-placeholder-link {
+    transition: none;
+  }
+}

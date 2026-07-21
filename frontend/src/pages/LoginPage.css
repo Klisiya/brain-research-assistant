@@ -432,3 +432,24 @@
     transition: none;
   }
 }
+
+/* Interactive tilt; original card visuals stay intact. */
+.react-login-page .login-shell {
+  perspective: 1500px;
+}
+
+.react-login-page .login-panel {
+  --card-rotate-x: 0deg;
+  --card-rotate-y: 0deg;
+  transform: rotateX(var(--card-rotate-x)) rotateY(var(--card-rotate-y));
+  transform-style: preserve-3d;
+  transition: transform 0.18s ease-out;
+  will-change: transform;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .react-login-page .login-panel {
+    transform: none;
+    transition: none;
+  }
+}
