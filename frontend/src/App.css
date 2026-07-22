@@ -1,6 +1,7 @@
 .app-shell {
   position: relative;
   min-height: 100vh;
+  overflow-x: clip;
   background: #020617;
   isolation: isolate;
 }

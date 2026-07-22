@@ -1,0 +1,399 @@
+.morph-module-positioner {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: var(--module-card-width);
+  height: var(--module-card-height);
+  pointer-events: auto;
+  transform-origin: center;
+  will-change: transform, opacity;
+}
+
+.morph-module-positioner:hover,
+.morph-module-positioner:focus-within,
+.morph-module-positioner.is-active {
+  z-index: 500 !important;
+}
+
+.morph-module-card {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 100%;
+  height: 100%;
+  border-radius: 15px;
+  outline: none;
+  perspective: 1000px;
+  cursor: pointer;
+  touch-action: pan-y;
+  transform: translate(-50%, -50%) scale(1);
+  transition: transform 1100ms cubic-bezier(0.4, 0, 0.2, 1);
+  -webkit-tap-highlight-color: transparent;
+}
+
+.morph-module-card:focus-visible {
+  box-shadow:
+    0 0 0 2px rgba(125, 211, 252, 0.78),
+    0 0 0 5px rgba(15, 23, 42, 0.8),
+    0 0 28px rgba(56, 189, 248, 0.28);
+}
+
+.morph-module-flipper {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  transform-style: preserve-3d;
+  transition: transform 1300ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.morph-module-card.is-flipped .morph-module-flipper {
+  transform: rotateY(180deg);
+}
+
+.morph-module-card.is-flipped {
+  transform: translate(-50%, -50%) scale(1.24);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .morph-module-card:hover,
+  .morph-module-card:focus-visible {
+    transform: translate(-50%, -50%) scale(1.24);
+  }
+
+  .morph-module-card:hover .morph-module-flipper,
+  .morph-module-card:focus-visible .morph-module-flipper {
+    transform: rotateY(180deg);
+  }
+}
+
+.morph-module-face {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  border: 1px solid rgba(125, 211, 252, 0.23);
+  border-radius: 15px;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+  background:
+    radial-gradient(circle at 18% 0%, rgba(56, 189, 248, 0.15), transparent 42%),
+    linear-gradient(145deg, rgba(18, 39, 78, 0.96), rgba(3, 11, 29, 0.98));
+  box-shadow:
+    0 16px 34px rgba(0, 0, 0, 0.34),
+    0 0 24px rgba(37, 99, 235, 0.08),
+    inset 0 1px 0 rgba(255, 255, 255, 0.12);
+}
+
+.morph-module-front {
+  display: flex;
+  flex-direction: column;
+}
+
+.morph-module-visual {
+  position: relative;
+  height: 55%;
+  flex: 0 0 auto;
+  overflow: hidden;
+  border-bottom: 1px solid rgba(125, 211, 252, 0.13);
+  background-color: #06111f;
+}
+
+.morph-module-visual::before,
+.morph-module-visual::after {
+  content: "";
+  position: absolute;
+  pointer-events: none;
+}
+
+.morph-module-visual::before {
+  inset: 12% 14%;
+  border: 1px solid rgba(125, 211, 252, 0.28);
+  border-radius: 50%;
+  box-shadow:
+    14px 8px 0 -12px rgba(103, 232, 249, 0.9),
+    -12px 16px 0 -12px rgba(167, 139, 250, 0.88),
+    4px -14px 0 -12px rgba(96, 165, 250, 0.84);
+}
+
+.morph-module-visual::after {
+  inset: 0;
+  background:
+    linear-gradient(180deg, transparent 48%, rgba(2, 6, 23, 0.68)),
+    radial-gradient(circle at 75% 18%, rgba(168, 85, 247, 0.17), transparent 34%);
+}
+
+.morph-module-visual.overview {
+  background:
+    radial-gradient(ellipse at 48% 52%, rgba(56, 189, 248, 0.42), transparent 34%),
+    repeating-radial-gradient(circle at 50% 50%, transparent 0 8px, rgba(125, 211, 252, 0.12) 9px 10px),
+    #06111f;
+}
+
+.morph-module-visual.microstructure {
+  background:
+    radial-gradient(circle at 24% 30%, #67e8f9 0 3px, transparent 4px),
+    radial-gradient(circle at 72% 68%, #a78bfa 0 4px, transparent 5px),
+    linear-gradient(35deg, transparent 46%, rgba(56, 189, 248, 0.58) 48%, transparent 51%),
+    linear-gradient(118deg, transparent 45%, rgba(167, 139, 250, 0.48) 48%, transparent 50%),
+    #06111f;
+}
+
+.morph-module-visual.connectome {
+  background:
+    radial-gradient(circle at 20% 74%, #38bdf8 0 3px, transparent 4px),
+    radial-gradient(circle at 74% 24%, #c084fc 0 3px, transparent 4px),
+    radial-gradient(circle at 62% 72%, #60a5fa 0 2px, transparent 3px),
+    repeating-linear-gradient(32deg, transparent 0 11px, rgba(56, 189, 248, 0.14) 12px 13px),
+    #06111f;
+}
+
+.morph-module-visual.neurodegeneration {
+  background:
+    radial-gradient(circle at 38% 44%, rgba(244, 114, 182, 0.72) 0 3px, transparent 5px),
+    radial-gradient(circle at 62% 58%, rgba(56, 189, 248, 0.48) 0 2px, transparent 8px),
+    radial-gradient(circle at 50% 50%, rgba(96, 165, 250, 0.3), transparent 43%),
+    repeating-radial-gradient(circle, transparent 0 9px, rgba(148, 163, 184, 0.08) 10px 11px),
+    #07101d;
+}
+
+.morph-module-visual.vascular {
+  background:
+    linear-gradient(28deg, transparent 40%, rgba(244, 63, 94, 0.64) 43%, transparent 47%),
+    linear-gradient(112deg, transparent 42%, rgba(56, 189, 248, 0.68) 45%, transparent 49%),
+    linear-gradient(156deg, transparent 48%, rgba(251, 113, 133, 0.44) 50%, transparent 53%),
+    radial-gradient(circle at 50% 50%, rgba(37, 99, 235, 0.38), transparent 48%),
+    #06111f;
+}
+
+.morph-module-visual.neuroimmune {
+  background:
+    radial-gradient(circle at 28% 38%, rgba(103, 232, 249, 0.78) 0 4px, transparent 5px),
+    radial-gradient(circle at 68% 60%, rgba(192, 132, 252, 0.72) 0 5px, transparent 6px),
+    radial-gradient(circle at 55% 26%, rgba(96, 165, 250, 0.55) 0 3px, transparent 4px),
+    repeating-radial-gradient(circle at 52% 52%, transparent 0 8px, rgba(56, 189, 248, 0.11) 9px 10px),
+    #06111f;
+}
+
+.morph-module-visual.neurooncology {
+  background:
+    radial-gradient(circle at 62% 48%, rgba(244, 114, 182, 0.74) 0 8px, rgba(168, 85, 247, 0.25) 9px 17px, transparent 19px),
+    repeating-linear-gradient(90deg, transparent 0 10px, rgba(125, 211, 252, 0.09) 11px 12px),
+    repeating-linear-gradient(0deg, transparent 0 10px, rgba(125, 211, 252, 0.07) 11px 12px),
+    #06111f;
+}
+
+.morph-module-visual.brain-ai {
+  background:
+    radial-gradient(circle at 34% 52%, rgba(56, 189, 248, 0.72), transparent 28%),
+    linear-gradient(90deg, transparent 48%, rgba(167, 139, 250, 0.66) 49%, transparent 52%),
+    repeating-linear-gradient(0deg, transparent 0 8px, rgba(96, 165, 250, 0.1) 9px 10px),
+    repeating-linear-gradient(90deg, transparent 0 8px, rgba(96, 165, 250, 0.1) 9px 10px),
+    #06111f;
+}
+
+.morph-module-visual.literature-one {
+  background:
+    linear-gradient(110deg, transparent 18%, rgba(226, 232, 240, 0.16) 19% 48%, transparent 49%),
+    linear-gradient(72deg, transparent 38%, rgba(56, 189, 248, 0.38) 40%, transparent 43%),
+    radial-gradient(circle at 72% 28%, #7dd3fc 0 3px, transparent 4px),
+    radial-gradient(circle at 28% 72%, #a78bfa 0 3px, transparent 4px),
+    #06111f;
+}
+
+.morph-module-visual.literature-two {
+  background:
+    repeating-linear-gradient(0deg, transparent 0 8px, rgba(226, 232, 240, 0.16) 9px 10px),
+    linear-gradient(24deg, transparent 38%, rgba(244, 114, 182, 0.48) 41%, transparent 45%),
+    linear-gradient(152deg, transparent 40%, rgba(56, 189, 248, 0.5) 43%, transparent 47%),
+    #06111f;
+}
+
+.morph-module-visual.workshop-one {
+  background:
+    radial-gradient(circle at 22% 50%, #38bdf8 0 4px, transparent 5px),
+    radial-gradient(circle at 78% 50%, #c084fc 0 4px, transparent 5px),
+    linear-gradient(90deg, transparent 20%, rgba(125, 211, 252, 0.68) 24% 46%, rgba(192, 132, 252, 0.68) 54% 76%, transparent 80%),
+    repeating-linear-gradient(0deg, transparent 0 10px, rgba(96, 165, 250, 0.08) 11px 12px),
+    #06111f;
+}
+
+.morph-module-visual.workshop-two {
+  background:
+    radial-gradient(circle at 34% 50%, rgba(56, 189, 248, 0.65), transparent 22%),
+    radial-gradient(circle at 66% 50%, rgba(168, 85, 247, 0.62), transparent 22%),
+    linear-gradient(90deg, transparent 48%, rgba(226, 232, 240, 0.48) 49%, transparent 52%),
+    repeating-linear-gradient(0deg, transparent 0 9px, rgba(125, 211, 252, 0.09) 10px 11px),
+    #06111f;
+}
+
+.morph-module-front-copy {
+  min-height: 0;
+  padding: 7px 8px 8px;
+}
+
+.morph-module-front-copy > span,
+.morph-module-back-heading > span {
+  display: block;
+  margin-bottom: 3px;
+  color: #7dd3fc;
+  font-size: 7px;
+  font-weight: 850;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.morph-module-front h3,
+.morph-module-back h3 {
+  display: -webkit-box;
+  margin: 0;
+  overflow: hidden;
+  color: #f8fafc;
+  line-height: 1.16;
+  letter-spacing: -0.012em;
+  -webkit-box-orient: vertical;
+}
+
+.morph-module-front h3 {
+  font-size: 9px;
+  -webkit-line-clamp: 3;
+}
+
+.morph-module-back {
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  transform: rotateY(180deg);
+  background:
+    radial-gradient(circle at 18% 0%, rgba(168, 85, 247, 0.17), transparent 42%),
+    linear-gradient(145deg, rgba(20, 35, 74, 0.99), rgba(3, 10, 27, 0.99));
+}
+
+.morph-module-back h3 {
+  font-size: 10px;
+  -webkit-line-clamp: 2;
+}
+
+.morph-module-back-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 4px;
+  margin-top: 5px;
+  padding: 4px 0;
+  border-top: 1px solid rgba(148, 163, 184, 0.14);
+  border-bottom: 1px solid rgba(148, 163, 184, 0.14);
+  color: #8fcde8;
+  font-size: 7px;
+  font-weight: 750;
+  line-height: 1.15;
+}
+
+.morph-module-back-meta span:last-child {
+  overflow: hidden;
+  color: #9caec2;
+  text-align: right;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.morph-module-back p {
+  display: -webkit-box;
+  margin: 5px 0 0;
+  overflow: hidden;
+  color: #c1cedd;
+  font-size: 11px;
+  line-height: 1.24;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 4;
+}
+
+@media (max-width: 1000px) {
+  .morph-module-back {
+    padding: 7px;
+  }
+
+  .morph-module-back h3 {
+    font-size: 9px;
+  }
+
+  .morph-module-back-meta {
+    font-size: 6.5px;
+  }
+
+  .morph-module-back p {
+    font-size: 10px;
+    line-height: 1.2;
+    -webkit-line-clamp: 3;
+  }
+}
+
+@media (max-width: 767px) {
+  .morph-module-card,
+  .morph-module-face {
+    border-radius: 11px;
+  }
+
+  .morph-module-card.is-flipped {
+    width: 96px;
+    height: 142px;
+    transform: translate(-50%, -50%);
+  }
+
+  .morph-module-front-copy {
+    padding: 5px 6px 6px;
+  }
+
+  .morph-module-front-copy > span {
+    font-size: 5.8px;
+  }
+
+  .morph-module-front h3 {
+    font-size: 7.4px;
+  }
+
+  .morph-module-card.is-flipped .morph-module-back h3 {
+    font-size: 10px;
+  }
+
+  .morph-module-card.is-flipped .morph-module-back-meta {
+    font-size: 7px;
+  }
+
+  .morph-module-card.is-flipped .morph-module-back p {
+    font-size: 9.5px;
+    line-height: 1.2;
+    -webkit-line-clamp: 5;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .morph-module-positioner {
+    will-change: auto;
+  }
+
+  .morph-module-card {
+    transition-duration: 0.01ms;
+  }
+
+  .morph-module-flipper {
+    transform: none !important;
+    transition: none;
+  }
+
+  .morph-module-front,
+  .morph-module-back {
+    transition: opacity 0.01ms linear;
+  }
+
+  .morph-module-back {
+    opacity: 0;
+    transform: none;
+  }
+
+  .morph-module-card.is-flipped .morph-module-front {
+    opacity: 0;
+  }
+
+  .morph-module-card.is-flipped .morph-module-back {
+    opacity: 1;
+  }
+}

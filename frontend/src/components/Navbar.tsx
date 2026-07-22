@@ -79,6 +79,14 @@ async function readJsonPayload(response: Response): Promise<unknown> {
   try { return await response.json() } catch { return null }
 }
 
+function readHalfContentRects(
+  leftContent: HTMLDivElement | null,
+  rightContent: HTMLDivElement | null,
+): readonly [DOMRect, DOMRect] | null {
+  if (!leftContent || !rightContent) return null
+  return [leftContent.getBoundingClientRect(), rightContent.getBoundingClientRect()]
+}
+
 function Navbar() {
   const location = useLocation()
   const navigate = useNavigate()
@@ -99,8 +107,8 @@ function Navbar() {
   const rightHalfRef = useRef<HTMLDivElement>(null)
   const leftHalfContentRef = useRef<HTMLDivElement>(null)
   const rightHalfContentRef = useRef<HTMLDivElement>(null)
-  const previousHalfContentRectsRef = useRef<readonly [DOMRect, DOMRect] | null>(null)
-  const previousShouldSeparateRef = useRef(shouldSeparate)
+  const pendingHalfContentRectsRef = useRef<readonly [DOMRect, DOMRect] | null>(null)
+  const halfAnimationsRef = useRef<Animation[]>([])
   const searchRef = useRef<HTMLDivElement>(null)
   const searchInputRef = useRef<HTMLInputElement>(null)
   const searchButtonRef = useRef<HTMLButtonElement>(null)
@@ -109,40 +117,43 @@ function Navbar() {
 
   useLayoutEffect(() => {
     const halves = [leftHalfRef.current, rightHalfRef.current] as const
-    const halfContents = [leftHalfContentRef.current, rightHalfContentRef.current] as const
 
-    if (!halves[0] || !halves[1] || !halfContents[0] || !halfContents[1]) return undefined
+    if (!halves[0] || !halves[1]) return
 
-    const nextRects = [
-      halfContents[0].getBoundingClientRect(),
-      halfContents[1].getBoundingClientRect(),
-    ] as const
-    const previousRects = previousHalfContentRectsRef.current
-    const didSeparationStateChange = previousShouldSeparateRef.current !== shouldSeparate
+    const previousRects = pendingHalfContentRectsRef.current
+    pendingHalfContentRectsRef.current = null
+    halfAnimationsRef.current.forEach((animation) => animation.cancel())
+    halfAnimationsRef.current = []
 
-    previousHalfContentRectsRef.current = nextRects
-    previousShouldSeparateRef.current = shouldSeparate
+    const nextRects = readHalfContentRects(leftHalfContentRef.current, rightHalfContentRef.current)
 
     if (
       !previousRects ||
-      !didSeparationStateChange ||
+      !nextRects ||
       !isDesktop ||
       window.matchMedia('(prefers-reduced-motion: reduce)').matches
-    ) return undefined
+    ) return
 
-    const animations = halves.map((half, index) => {
-      if (!half) return null
+    halfAnimationsRef.current = halves.flatMap((half, index) => {
+      if (!half) return []
       const deltaX = previousRects[index].left - nextRects[index].left
-      if (Math.abs(deltaX) < 1) return null
+      const deltaY = previousRects[index].top - nextRects[index].top
+      if (Math.abs(deltaX) < 1 && Math.abs(deltaY) < 1) return []
 
-      return half.animate(
-        [{ transform: 'translateX(' + deltaX + 'px)' }, { transform: 'translateX(0)' }],
-        { duration: 1200, easing: 'cubic-bezier(0.16, 1, 0.3, 1)' },
-      )
+      return [half.animate(
+        [
+          { transform: 'translate(' + deltaX + 'px, ' + deltaY + 'px)' },
+          { transform: 'translate(0, 0)' },
+        ],
+        { duration: 1600, easing: 'cubic-bezier(0.16, 1, 0.3, 1)' },
+      )]
     })
-
-    return () => animations.forEach((animation) => animation?.cancel())
   }, [isDesktop, shouldSeparate])
+
+  useEffect(() => () => {
+    halfAnimationsRef.current.forEach((animation) => animation.cancel())
+    halfAnimationsRef.current = []
+  }, [])
 
   useEffect(() => {
     const controller = new AbortController()
@@ -185,6 +196,10 @@ function Navbar() {
         ? window.scrollY >= NAVBAR_MERGE_THRESHOLD
         : window.scrollY > NAVBAR_SEPARATE_THRESHOLD
       if (next !== isSeparatedRef.current) {
+        pendingHalfContentRectsRef.current = readHalfContentRects(
+          leftHalfContentRef.current,
+          rightHalfContentRef.current,
+        )
         isSeparatedRef.current = next
         setIsSeparated(next)
         if (!next) setSearchExpansionKey(null)

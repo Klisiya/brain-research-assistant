@@ -11,6 +11,7 @@ import BrainRegionPage from './pages/BrainRegionPage'
 import ContactPage from './pages/ContactPage'
 import InnovationHubPage from './pages/InnovationHubPage'
 import LoginPage from './pages/LoginPage'
+import PaperDetailPage from './pages/PaperDetailPage'
 import PapersPage from './pages/PapersPage'
 import './App.css'
 
@@ -51,7 +52,7 @@ function App() {
       <Route element={<ContactPage />} path="/contact" />
       <Route element={<LoginPage />} path="/login" />
       <Route element={<PapersPage />} path="/papers" />
-      <Route element={<PapersPage />} path="/papers/:slug" />
+      <Route element={<PaperDetailPage />} path="/papers/:slug" />
       <Route element={<InnovationHubPage />} path="/innovation-hub" />
       <Route element={<BrainRegionPage />} path="/brain-region/:slug" />
     </Routes>
