@@ -1,6 +1,10 @@
 from datetime import datetime
+from functools import wraps
+from math import ceil
 import os
 import re
+import unicodedata
+from urllib.parse import urlparse
 
 import click
 from dotenv import load_dotenv
@@ -16,6 +20,7 @@ from flask_login import (
 from flask_migrate import Migrate
 from flask_sqlalchemy import SQLAlchemy
 from openai import OpenAI
+from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from werkzeug.security import check_password_hash, generate_password_hash
 
 load_dotenv()
@@ -50,6 +55,17 @@ MAX_CHAT_MESSAGE_LENGTH = 4000
 MAX_CHAT_HISTORY_ITEMS = 10
 ALLOWED_CHAT_HISTORY_ROLES = {"user", "assistant"}
 DEFAULT_FRONTEND_URL = "http://127.0.0.1:5173"
+USER_ROLE = "user"
+TEACHER_ROLE = "teacher"
+ADMIN_ROLE = "admin"
+USER_ROLES = {USER_ROLE, TEACHER_ROLE, ADMIN_ROLE}
+PAPER_EDITOR_ROLES = {TEACHER_ROLE, ADMIN_ROLE}
+PAPER_PUBLICATION_TYPES = {"Research Article", "Review", "Book Chapter", "Learning Resource"}
+PAPER_DIFFICULTIES = {"Beginner", "Intermediate", "Advanced"}
+PAPER_RESOURCE_CATEGORIES = {"Foundational", "Recommended", "Course Resource", "Emerging Research"}
+PAPER_STATUSES = {"draft", "published", "archived"}
+PAPER_PUBLIC_SORTS = {"recommended", "newest", "oldest", "readingTime", "title"}
+PAPER_MANAGEMENT_SORTS = PAPER_PUBLIC_SORTS
 
 instructions = """
 You are a Brain Research Learning Assistant
@@ -253,7 +269,7 @@ class User(UserMixin, db.Model):
     username = db.Column(db.String(80), nullable=False)
     email = db.Column(db.String(255), nullable=False, unique=True, index=True)
     password_hash = db.Column(db.String(255), nullable=False)
-    role = db.Column(db.String(50), nullable=False, default="user")
+    role = db.Column(db.String(50), nullable=False, default=USER_ROLE)
     created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
 
     def set_password(self, password):
@@ -263,12 +279,96 @@ class User(UserMixin, db.Model):
         return check_password_hash(self.password_hash, password)
 
 
+class Paper(db.Model):
+    __tablename__ = "papers"
+
+    id = db.Column(db.Integer, primary_key=True)
+    slug = db.Column(db.String(220), nullable=False, unique=True, index=True)
+    title = db.Column(db.String(500), nullable=False)
+    authors = db.Column(db.JSON, nullable=False, default=list)
+    year = db.Column(db.Integer, nullable=True)
+    journal = db.Column(db.String(300), nullable=True)
+    publication_type = db.Column(db.String(50), nullable=False)
+    topics = db.Column(db.JSON, nullable=False, default=list)
+    difficulty = db.Column(db.String(30), nullable=False)
+    estimated_reading_minutes = db.Column(db.Integer, nullable=False)
+    abstract = db.Column(db.Text, nullable=False)
+    learning_objectives = db.Column(db.JSON, nullable=False, default=list)
+    keywords = db.Column(db.JSON, nullable=False, default=list)
+    featured = db.Column(db.Boolean, nullable=False, default=False)
+    open_access = db.Column(db.Boolean, nullable=False, default=False)
+    external_url = db.Column(db.String(1000), nullable=True)
+    resource_category = db.Column(db.String(60), nullable=False)
+    status = db.Column(db.String(20), nullable=False, default="draft", index=True)
+    created_by_id = db.Column(
+        db.Integer,
+        db.ForeignKey("user.id"),
+        nullable=False,
+        index=True,
+    )
+    updated_by_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=True)
+    created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+    updated_at = db.Column(
+        db.DateTime,
+        nullable=False,
+        default=datetime.utcnow,
+        onupdate=datetime.utcnow,
+    )
+    published_at = db.Column(db.DateTime, nullable=True)
+
+    created_by = db.relationship(
+        "User",
+        foreign_keys=[created_by_id],
+        backref=db.backref("created_papers", lazy="dynamic"),
+    )
+    updated_by = db.relationship(
+        "User",
+        foreign_keys=[updated_by_id],
+        backref=db.backref("updated_papers", lazy="dynamic"),
+    )
+
+
 @login_manager.user_loader
 def load_user(user_id):
     try:
         return db.session.get(User, int(user_id))
     except (TypeError, ValueError):
         return None
+
+
+def roles_required(*allowed_roles):
+    allowed_role_set = set(allowed_roles)
+
+    def decorator(view_function):
+        @wraps(view_function)
+        def wrapped_view(*args, **kwargs):
+            if not current_user.is_authenticated:
+                return (
+                    jsonify(
+                        {
+                            "error": "Authentication required.",
+                            "code": "AUTH_REQUIRED",
+                        }
+                    ),
+                    401,
+                )
+
+            if current_user.role not in allowed_role_set:
+                return (
+                    jsonify(
+                        {
+                            "error": "You do not have permission to perform this action.",
+                            "code": "FORBIDDEN",
+                        }
+                    ),
+                    403,
+                )
+
+            return view_function(*args, **kwargs)
+
+        return wrapped_view
+
+    return decorator
 
 
 def get_frontend_url():
@@ -415,6 +515,672 @@ def serialize_user(user):
     }
 
 
+class PaperValidationError(ValueError):
+    def __init__(self, message, field):
+        super().__init__(message)
+        self.field = field
+
+
+def paper_validation_error_response(error):
+    return (
+        jsonify(
+            {
+                "error": str(error),
+                "code": "VALIDATION_ERROR",
+                "field": error.field,
+            }
+        ),
+        400,
+    )
+
+
+def serialize_paper(paper, include_management_fields=False):
+    serialized = {
+        "id": paper.id,
+        "slug": paper.slug,
+        "title": paper.title,
+        "authors": paper.authors,
+        "year": paper.year,
+        "journal": paper.journal,
+        "publicationType": paper.publication_type,
+        "topics": paper.topics,
+        "difficulty": paper.difficulty,
+        "estimatedReadingMinutes": paper.estimated_reading_minutes,
+        "abstract": paper.abstract,
+        "learningObjectives": paper.learning_objectives,
+        "keywords": paper.keywords,
+        "featured": paper.featured,
+        "openAccess": paper.open_access,
+        "externalUrl": paper.external_url,
+        "resourceCategory": paper.resource_category,
+        "createdAt": paper.created_at.isoformat() if paper.created_at else None,
+        "updatedAt": paper.updated_at.isoformat() if paper.updated_at else None,
+        "publishedAt": paper.published_at.isoformat() if paper.published_at else None,
+    }
+
+    if include_management_fields:
+        creator = paper.created_by
+        serialized.update(
+            {
+                "status": paper.status,
+                "createdBy": (
+                    {
+                        "id": creator.id,
+                        "username": creator.username,
+                        "role": creator.role,
+                    }
+                    if creator
+                    else None
+                ),
+                "updatedById": paper.updated_by_id,
+            }
+        )
+
+    return serialized
+
+
+def normalize_paper_slug(value, *, fallback_to_paper=False):
+    if not isinstance(value, str):
+        raise PaperValidationError("Slug must be a string.", "slug")
+
+    normalized = unicodedata.normalize("NFKD", value.strip().lower())
+    ascii_value = normalized.encode("ascii", "ignore").decode("ascii")
+    slug = re.sub(r"[^a-z0-9]+", "-", ascii_value).strip("-")
+
+    if not slug and fallback_to_paper:
+        slug = "paper"
+
+    if not slug:
+        raise PaperValidationError("Slug must contain URL-safe letters or numbers.", "slug")
+
+    return slug[:220].rstrip("-")
+
+
+def generate_unique_paper_slug(value, *, exclude_paper_id=None, fallback_to_paper=False):
+    base_slug = normalize_paper_slug(value, fallback_to_paper=fallback_to_paper)
+    candidate = base_slug
+    suffix_number = 2
+
+    while True:
+        query = Paper.query.filter_by(slug=candidate)
+
+        if exclude_paper_id is not None:
+            query = query.filter(Paper.id != exclude_paper_id)
+
+        if query.first() is None:
+            return candidate
+
+        suffix = f"-{suffix_number}"
+        candidate = f"{base_slug[: 220 - len(suffix)].rstrip('-')}{suffix}"
+        suffix_number += 1
+
+
+PAPER_WRITABLE_FIELDS = {
+    "slug",
+    "title",
+    "authors",
+    "year",
+    "journal",
+    "publicationType",
+    "topics",
+    "difficulty",
+    "estimatedReadingMinutes",
+    "abstract",
+    "learningObjectives",
+    "keywords",
+    "featured",
+    "openAccess",
+    "externalUrl",
+    "resourceCategory",
+    "status",
+}
+PAPER_REQUIRED_CREATE_FIELDS = {
+    "title",
+    "authors",
+    "publicationType",
+    "topics",
+    "difficulty",
+    "estimatedReadingMinutes",
+    "abstract",
+    "learningObjectives",
+    "keywords",
+    "resourceCategory",
+}
+
+
+def validate_paper_string(value, field, *, maximum_length, allow_empty=False):
+    if not isinstance(value, str):
+        raise PaperValidationError(f"{field} must be a string.", field)
+
+    normalized = value.strip()
+
+    if not normalized and not allow_empty:
+        raise PaperValidationError(f"{field} cannot be empty.", field)
+
+    if len(normalized) > maximum_length:
+        raise PaperValidationError(
+            f"{field} must be at most {maximum_length} characters.",
+            field,
+        )
+
+    return normalized
+
+
+def validate_optional_paper_string(value, field, *, maximum_length):
+    if value is None:
+        return None
+
+    normalized = validate_paper_string(
+        value,
+        field,
+        maximum_length=maximum_length,
+        allow_empty=True,
+    )
+    return normalized or None
+
+
+def validate_paper_string_list(value, field, *, minimum_items, item_maximum_length):
+    if not isinstance(value, list):
+        raise PaperValidationError(f"{field} must be an array of strings.", field)
+
+    normalized_items = []
+    seen_items = set()
+
+    for item in value:
+        if not isinstance(item, str):
+            raise PaperValidationError(f"Every {field} item must be a string.", field)
+
+        normalized_item = item.strip()
+
+        if not normalized_item:
+            continue
+
+        if len(normalized_item) > item_maximum_length:
+            raise PaperValidationError(
+                f"Every {field} item must be at most {item_maximum_length} characters.",
+                field,
+            )
+
+        deduplication_key = normalized_item.casefold()
+
+        if deduplication_key in seen_items:
+            continue
+
+        seen_items.add(deduplication_key)
+        normalized_items.append(normalized_item)
+
+    if len(normalized_items) < minimum_items:
+        raise PaperValidationError(
+            f"{field} must contain at least {minimum_items} non-empty item.",
+            field,
+        )
+
+    return normalized_items
+
+
+def validate_paper_enum(value, field, allowed_values):
+    if not isinstance(value, str) or value not in allowed_values:
+        allowed = ", ".join(sorted(allowed_values))
+        raise PaperValidationError(f"{field} must be one of: {allowed}.", field)
+
+    return value
+
+
+def validate_paper_boolean(value, field):
+    if not isinstance(value, bool):
+        raise PaperValidationError(f"{field} must be a boolean.", field)
+
+    return value
+
+
+def validate_paper_integer(value, field, *, minimum, maximum):
+    if isinstance(value, bool) or not isinstance(value, int):
+        raise PaperValidationError(f"{field} must be an integer.", field)
+
+    if value < minimum or value > maximum:
+        raise PaperValidationError(
+            f"{field} must be between {minimum} and {maximum}.",
+            field,
+        )
+
+    return value
+
+
+def validate_paper_year(value):
+    if value is None:
+        return None
+
+    return validate_paper_integer(
+        value,
+        "year",
+        minimum=1800,
+        maximum=datetime.utcnow().year + 1,
+    )
+
+
+def validate_paper_external_url(value):
+    normalized = validate_optional_paper_string(value, "externalUrl", maximum_length=1000)
+
+    if normalized is None:
+        return None
+
+    parsed_url = urlparse(normalized)
+
+    if parsed_url.scheme.lower() not in {"http", "https"} or not parsed_url.netloc:
+        raise PaperValidationError(
+            "externalUrl must be an http or https URL.",
+            "externalUrl",
+        )
+
+    return normalized
+
+
+def read_paper_request_payload():
+    if request.mimetype != "application/json":
+        raise PaperValidationError(
+            "Request Content-Type must be application/json.",
+            "contentType",
+        )
+
+    payload = request.get_json(silent=True)
+
+    if not isinstance(payload, dict):
+        raise PaperValidationError("Request body must be a JSON object.", "body")
+
+    return payload
+
+
+def validate_paper_payload(payload, *, partial=False):
+    unknown_fields = sorted(set(payload) - PAPER_WRITABLE_FIELDS)
+
+    if unknown_fields:
+        field = unknown_fields[0]
+        raise PaperValidationError(f"Unsupported field: {field}.", field)
+
+    if partial and not payload:
+        raise PaperValidationError("At least one field must be provided.", "body")
+
+    if not partial:
+        missing_fields = sorted(PAPER_REQUIRED_CREATE_FIELDS - set(payload))
+
+        if missing_fields:
+            field = missing_fields[0]
+            raise PaperValidationError(f"{field} is required.", field)
+
+    validated = {}
+
+    if "slug" in payload:
+        validated["slug"] = normalize_paper_slug(payload["slug"])
+
+    if "title" in payload:
+        validated["title"] = validate_paper_string(
+            payload["title"],
+            "title",
+            maximum_length=500,
+        )
+
+    if "authors" in payload:
+        validated["authors"] = validate_paper_string_list(
+            payload["authors"],
+            "authors",
+            minimum_items=1,
+            item_maximum_length=300,
+        )
+
+    if "year" in payload:
+        validated["year"] = validate_paper_year(payload["year"])
+
+    if "journal" in payload:
+        validated["journal"] = validate_optional_paper_string(
+            payload["journal"],
+            "journal",
+            maximum_length=300,
+        )
+
+    if "publicationType" in payload:
+        validated["publication_type"] = validate_paper_enum(
+            payload["publicationType"],
+            "publicationType",
+            PAPER_PUBLICATION_TYPES,
+        )
+
+    if "topics" in payload:
+        validated["topics"] = validate_paper_string_list(
+            payload["topics"],
+            "topics",
+            minimum_items=1,
+            item_maximum_length=100,
+        )
+
+    if "difficulty" in payload:
+        validated["difficulty"] = validate_paper_enum(
+            payload["difficulty"],
+            "difficulty",
+            PAPER_DIFFICULTIES,
+        )
+
+    if "estimatedReadingMinutes" in payload:
+        validated["estimated_reading_minutes"] = validate_paper_integer(
+            payload["estimatedReadingMinutes"],
+            "estimatedReadingMinutes",
+            minimum=1,
+            maximum=600,
+        )
+
+    if "abstract" in payload:
+        validated["abstract"] = validate_paper_string(
+            payload["abstract"],
+            "abstract",
+            maximum_length=20000,
+        )
+
+    if "learningObjectives" in payload:
+        validated["learning_objectives"] = validate_paper_string_list(
+            payload["learningObjectives"],
+            "learningObjectives",
+            minimum_items=1,
+            item_maximum_length=1000,
+        )
+
+    if "keywords" in payload:
+        validated["keywords"] = validate_paper_string_list(
+            payload["keywords"],
+            "keywords",
+            minimum_items=0,
+            item_maximum_length=100,
+        )
+
+    if "featured" in payload:
+        validated["featured"] = validate_paper_boolean(payload["featured"], "featured")
+
+    if "openAccess" in payload:
+        validated["open_access"] = validate_paper_boolean(
+            payload["openAccess"],
+            "openAccess",
+        )
+
+    if "externalUrl" in payload:
+        validated["external_url"] = validate_paper_external_url(payload["externalUrl"])
+
+    if "resourceCategory" in payload:
+        validated["resource_category"] = validate_paper_enum(
+            payload["resourceCategory"],
+            "resourceCategory",
+            PAPER_RESOURCE_CATEGORIES,
+        )
+
+    if "status" in payload:
+        validated["status"] = validate_paper_enum(
+            payload["status"],
+            "status",
+            PAPER_STATUSES,
+        )
+
+    if not partial:
+        validated.setdefault("status", "draft")
+        validated.setdefault("featured", False)
+        validated.setdefault("open_access", False)
+        validated.setdefault("external_url", None)
+        validated.setdefault("year", None)
+        validated.setdefault("journal", None)
+
+    return validated
+
+
+def parse_paper_integer_query(field, default, *, maximum=None):
+    raw_value = request.args.get(field)
+
+    if raw_value is None or raw_value == "":
+        return default
+
+    try:
+        value = int(raw_value)
+    except ValueError as error:
+        raise PaperValidationError(f"{field} must be an integer.", field) from error
+
+    if value < 1:
+        raise PaperValidationError(f"{field} must be at least 1.", field)
+
+    if maximum is not None and value > maximum:
+        raise PaperValidationError(f"{field} must be at most {maximum}.", field)
+
+    return value
+
+
+def parse_paper_list_filters(*, management=False):
+    query_text = request.args.get("q", "").strip()
+
+    if len(query_text) > 500:
+        raise PaperValidationError("q must be at most 500 characters.", "q")
+
+    page = parse_paper_integer_query("page", 1)
+    per_page = parse_paper_integer_query("perPage", 12, maximum=50)
+    sort = request.args.get("sort", "recommended")
+    allowed_sorts = PAPER_MANAGEMENT_SORTS if management else PAPER_PUBLIC_SORTS
+
+    if sort not in allowed_sorts:
+        raise PaperValidationError(
+            f"sort must be one of: {', '.join(sorted(allowed_sorts))}.",
+            "sort",
+        )
+
+    filters = {
+        "q": query_text,
+        "page": page,
+        "perPage": per_page,
+        "sort": sort,
+    }
+
+    if management:
+        status = request.args.get("status") or None
+
+        if status is not None:
+            status = validate_paper_enum(status, "status", PAPER_STATUSES)
+
+        filters["status"] = status
+        return filters
+
+    topic = request.args.get("topic") or None
+
+    if topic is not None:
+        topic = validate_paper_string(topic, "topic", maximum_length=100)
+
+    difficulty = request.args.get("difficulty") or None
+    publication_type = request.args.get("publicationType") or None
+    resource_category = request.args.get("resourceCategory") or None
+    featured_raw = request.args.get("featured")
+    featured = None
+
+    if difficulty is not None:
+        difficulty = validate_paper_enum(difficulty, "difficulty", PAPER_DIFFICULTIES)
+
+    if publication_type is not None:
+        publication_type = validate_paper_enum(
+            publication_type,
+            "publicationType",
+            PAPER_PUBLICATION_TYPES,
+        )
+
+    if resource_category is not None:
+        resource_category = validate_paper_enum(
+            resource_category,
+            "resourceCategory",
+            PAPER_RESOURCE_CATEGORIES,
+        )
+
+    if featured_raw is not None:
+        if featured_raw.lower() not in {"true", "false"}:
+            raise PaperValidationError("featured must be true or false.", "featured")
+
+        featured = featured_raw.lower() == "true"
+
+    filters.update(
+        {
+            "topic": topic,
+            "difficulty": difficulty,
+            "publicationType": publication_type,
+            "resourceCategory": resource_category,
+            "featured": featured,
+        }
+    )
+    return filters
+
+
+def paper_matches_search(paper, query_text):
+    if not query_text:
+        return True
+
+    searchable_values = [
+        paper.title,
+        paper.journal or "",
+        paper.abstract,
+        *(paper.authors or []),
+        *(paper.topics or []),
+        *(paper.keywords or []),
+    ]
+    normalized_query = query_text.casefold()
+    return any(normalized_query in str(value).casefold() for value in searchable_values)
+
+
+def apply_paper_python_filters(papers, filters, *, management=False):
+    # JSON-array search and topic matching stay in Python so this small content
+    # library behaves consistently on both SQLite and PostgreSQL.
+    filtered = [paper for paper in papers if paper_matches_search(paper, filters["q"])]
+
+    if not management and filters["topic"] is not None:
+        normalized_topic = filters["topic"].casefold()
+        filtered = [
+            paper
+            for paper in filtered
+            if any(topic.casefold() == normalized_topic for topic in (paper.topics or []))
+        ]
+
+    return filtered
+
+
+def get_paper_sort_timestamp(paper):
+    timestamp = paper.published_at or paper.created_at
+    return timestamp.timestamp() if timestamp else 0
+
+
+def sort_papers(papers, sort):
+    if sort == "newest":
+        return sorted(
+            papers,
+            key=lambda paper: (
+                paper.year is None,
+                -(paper.year or 0),
+                -get_paper_sort_timestamp(paper),
+            ),
+        )
+
+    if sort == "oldest":
+        return sorted(
+            papers,
+            key=lambda paper: (
+                paper.year is None,
+                paper.year or 0,
+                paper.title.casefold(),
+            ),
+        )
+
+    if sort == "readingTime":
+        return sorted(
+            papers,
+            key=lambda paper: (paper.estimated_reading_minutes, paper.title.casefold()),
+        )
+
+    if sort == "title":
+        return sorted(papers, key=lambda paper: paper.title.casefold())
+
+    return sorted(
+        papers,
+        key=lambda paper: (not paper.featured, -get_paper_sort_timestamp(paper)),
+    )
+
+
+def paginate_papers(papers, page, per_page):
+    total = len(papers)
+    start = (page - 1) * per_page
+    return papers[start : start + per_page], {
+        "page": page,
+        "perPage": per_page,
+        "total": total,
+        "totalPages": ceil(total / per_page) if total else 0,
+    }
+
+
+def paper_not_found_response():
+    return jsonify({"error": "Paper not found.", "code": "PAPER_NOT_FOUND"}), 404
+
+
+def paper_edit_forbidden_response():
+    return (
+        jsonify(
+            {
+                "error": "You do not have permission to edit this paper.",
+                "code": "PAPER_EDIT_FORBIDDEN",
+            }
+        ),
+        403,
+    )
+
+
+def can_manage_paper(paper):
+    return current_user.role == ADMIN_ROLE or paper.created_by_id == current_user.id
+
+
+def commit_paper_database_changes():
+    try:
+        db.session.commit()
+    except IntegrityError as error:
+        db.session.rollback()
+        app.logger.warning("Paper database integrity error: %s", error.__class__.__name__)
+        return (
+            jsonify(
+                {
+                    "error": "The paper conflicts with an existing record.",
+                    "code": "PAPER_CONFLICT",
+                }
+            ),
+            409,
+        )
+    except SQLAlchemyError as error:
+        db.session.rollback()
+        app.logger.exception("Paper database operation failed: %s", error.__class__.__name__)
+        return (
+            jsonify(
+                {
+                    "error": "The paper operation could not be completed.",
+                    "code": "PAPER_DATABASE_ERROR",
+                }
+            ),
+            500,
+        )
+
+    return None
+
+
+def public_paper_filter_response(filters):
+    return {
+        "q": filters["q"],
+        "topic": filters["topic"],
+        "difficulty": filters["difficulty"],
+        "publicationType": filters["publicationType"],
+        "resourceCategory": filters["resourceCategory"],
+        "featured": filters["featured"],
+        "sort": filters["sort"],
+    }
+
+
+def management_paper_filter_response(filters):
+    return {
+        "q": filters["q"],
+        "status": filters["status"],
+        "sort": filters["sort"],
+    }
+
+
 def validate_auth_login_payload():
     if request.mimetype != "application/json":
         raise ValueError("Request must be application/json.")
@@ -515,6 +1281,187 @@ def cache_static_response(response):
     return response
 
 
+DEMO_PAPERS = [
+    {
+        "slug": "demo-foundations-of-neural-communication",
+        "title": "Demo Resource: Foundations of Neural Communication",
+        "authors": ["Brain Research Tutor Education Team"],
+        "year": 2024,
+        "journal": "Demo Brain Science Learning Series",
+        "publicationType": "Learning Resource",
+        "topics": ["Neuroscience", "Neural Communication"],
+        "difficulty": "Beginner",
+        "estimatedReadingMinutes": 18,
+        "abstract": "A demonstration learning summary about neural signaling, prepared for local development and interface testing.",
+        "learningObjectives": [
+            "Describe the basic roles of electrical and chemical signaling.",
+            "Identify key terms used when discussing synaptic communication.",
+        ],
+        "keywords": ["demo", "neurons", "synapses"],
+        "featured": True,
+        "openAccess": True,
+        "externalUrl": None,
+        "resourceCategory": "Foundational",
+        "status": "published",
+    },
+    {
+        "slug": "demo-memory-systems-review",
+        "title": "Demo Resource: Memory Systems Review",
+        "authors": ["Brain Research Tutor Education Team"],
+        "year": 2023,
+        "journal": "Demo Cognitive Science Reviews",
+        "publicationType": "Review",
+        "topics": ["Memory", "Cognition"],
+        "difficulty": "Intermediate",
+        "estimatedReadingMinutes": 27,
+        "abstract": "A demonstration review outline for testing structured paper metadata without reproducing a paid or copyrighted article.",
+        "learningObjectives": [
+            "Compare working, episodic, and semantic memory at a high level.",
+            "Recognize common evidence limits in memory research.",
+        ],
+        "keywords": ["demo", "memory", "cognition"],
+        "featured": False,
+        "openAccess": True,
+        "externalUrl": None,
+        "resourceCategory": "Recommended",
+        "status": "published",
+    },
+    {
+        "slug": "demo-brain-computer-interface-draft",
+        "title": "Demo Draft: Brain-Computer Interface Concepts",
+        "authors": ["Brain Research Tutor Education Team"],
+        "year": 2026,
+        "journal": "Demo Emerging Research Notes",
+        "publicationType": "Research Article",
+        "topics": ["Brain-Computer Interfaces", "Neuroscience"],
+        "difficulty": "Advanced",
+        "estimatedReadingMinutes": 32,
+        "abstract": "A draft demonstration record used to verify that unpublished content remains unavailable through public endpoints.",
+        "learningObjectives": [
+            "Outline a basic signal acquisition and decoding workflow.",
+            "Distinguish educational examples from validated clinical systems.",
+        ],
+        "keywords": ["demo", "BCI", "neural signals"],
+        "featured": False,
+        "openAccess": False,
+        "externalUrl": None,
+        "resourceCategory": "Emerging Research",
+        "status": "draft",
+    },
+    {
+        "slug": "demo-archived-neuroplasticity-guide",
+        "title": "Demo Archived Resource: Neuroplasticity Guide",
+        "authors": ["Brain Research Tutor Education Team"],
+        "year": 2022,
+        "journal": "Demo Course Resource Archive",
+        "publicationType": "Book Chapter",
+        "topics": ["Neuroplasticity", "Learning"],
+        "difficulty": "Intermediate",
+        "estimatedReadingMinutes": 24,
+        "abstract": "An archived demonstration record used to test management filters and public visibility boundaries.",
+        "learningObjectives": [
+            "Define experience-dependent plasticity in a learning context.",
+            "Explain why archived resources should not appear publicly.",
+        ],
+        "keywords": ["demo", "neuroplasticity", "learning"],
+        "featured": False,
+        "openAccess": True,
+        "externalUrl": None,
+        "resourceCategory": "Course Resource",
+        "status": "archived",
+    },
+]
+
+
+@app.cli.command("set-user-role")
+@click.argument("email")
+@click.argument("role")
+def set_user_role_command(email, role):
+    normalized_email = normalize_email(email)
+    normalized_role = role.strip().lower()
+
+    if normalized_role not in USER_ROLES:
+        allowed_roles = ", ".join(sorted(USER_ROLES))
+        raise click.ClickException(f"ROLE must be one of: {allowed_roles}.")
+
+    user = User.query.filter_by(email=normalized_email).first()
+
+    if user is None:
+        raise click.ClickException("User not found for the supplied email address.")
+
+    user.role = normalized_role
+
+    try:
+        db.session.commit()
+    except SQLAlchemyError as error:
+        db.session.rollback()
+        app.logger.exception("Unable to update user role: %s", error.__class__.__name__)
+        raise click.ClickException("Unable to update the user role.") from error
+
+    click.echo(f"Updated {user.username} ({user.email}) to role {user.role}.")
+
+
+@app.cli.command("seed-papers")
+@click.option("--owner-email", help="Email of an existing teacher or admin owner.")
+def seed_papers_command(owner_email):
+    if owner_email:
+        owner = User.query.filter_by(email=normalize_email(owner_email)).first()
+
+        if owner is None:
+            raise click.ClickException("No existing user matches the supplied owner email.")
+
+        if owner.role not in PAPER_EDITOR_ROLES:
+            raise click.ClickException("The seed owner must have the teacher or admin role.")
+    else:
+        owner = (
+            User.query.filter(User.role.in_(PAPER_EDITOR_ROLES))
+            .order_by(User.id.asc())
+            .first()
+        )
+
+        if owner is None:
+            raise click.ClickException(
+                "No teacher or admin user exists. Use flask set-user-role first."
+            )
+
+    added_count = 0
+    skipped_count = 0
+    now = datetime.utcnow()
+
+    for demo_payload in DEMO_PAPERS:
+        if Paper.query.filter_by(slug=demo_payload["slug"]).first() is not None:
+            skipped_count += 1
+            continue
+
+        try:
+            validated = validate_paper_payload(demo_payload)
+        except PaperValidationError as error:
+            raise click.ClickException(
+                f"Invalid demo paper field {error.field}: {error}"
+            ) from error
+
+        if validated["status"] == "published":
+            validated["published_at"] = now
+
+        db.session.add(
+            Paper(
+                **validated,
+                created_by_id=owner.id,
+                updated_by_id=owner.id,
+            )
+        )
+        added_count += 1
+
+    try:
+        db.session.commit()
+    except SQLAlchemyError as error:
+        db.session.rollback()
+        app.logger.exception("Unable to seed demo papers: %s", error.__class__.__name__)
+        raise click.ClickException("Unable to seed demo papers.") from error
+
+    click.echo(f"Demo papers added: {added_count}; skipped: {skipped_count}.")
+
+
 @app.cli.command("init-db")
 def init_db_command():
     db.create_all()
@@ -552,6 +1499,227 @@ def api_brain_region(slug):
         return jsonify({"error": "Brain region not found.", "code": "BRAIN_REGION_NOT_FOUND"}), 404
 
     return jsonify({"region": serialize_brain_region(slug, region, include_detail=True)}), 200
+
+
+@app.route("/api/papers", methods=["GET"])
+def api_papers():
+    try:
+        filters = parse_paper_list_filters()
+    except PaperValidationError as error:
+        return paper_validation_error_response(error)
+
+    query = Paper.query.filter_by(status="published")
+
+    if filters["difficulty"] is not None:
+        query = query.filter_by(difficulty=filters["difficulty"])
+
+    if filters["publicationType"] is not None:
+        query = query.filter_by(publication_type=filters["publicationType"])
+
+    if filters["resourceCategory"] is not None:
+        query = query.filter_by(resource_category=filters["resourceCategory"])
+
+    if filters["featured"] is not None:
+        query = query.filter_by(featured=filters["featured"])
+
+    papers = apply_paper_python_filters(query.all(), filters)
+    papers = sort_papers(papers, filters["sort"])
+    page_items, pagination = paginate_papers(
+        papers,
+        filters["page"],
+        filters["perPage"],
+    )
+
+    return (
+        jsonify(
+            {
+                "papers": [serialize_paper(paper) for paper in page_items],
+                "pagination": pagination,
+                "filters": public_paper_filter_response(filters),
+            }
+        ),
+        200,
+    )
+
+
+@app.route("/api/papers/manage", methods=["GET"])
+@roles_required(*PAPER_EDITOR_ROLES)
+def api_manage_papers():
+    try:
+        filters = parse_paper_list_filters(management=True)
+    except PaperValidationError as error:
+        return paper_validation_error_response(error)
+
+    query = Paper.query
+
+    if current_user.role == TEACHER_ROLE:
+        query = query.filter_by(created_by_id=current_user.id)
+
+    if filters["status"] is not None:
+        query = query.filter_by(status=filters["status"])
+
+    papers = apply_paper_python_filters(query.all(), filters, management=True)
+    papers = sort_papers(papers, filters["sort"])
+    page_items, pagination = paginate_papers(
+        papers,
+        filters["page"],
+        filters["perPage"],
+    )
+
+    return (
+        jsonify(
+            {
+                "papers": [
+                    serialize_paper(paper, include_management_fields=True)
+                    for paper in page_items
+                ],
+                "pagination": pagination,
+                "filters": management_paper_filter_response(filters),
+            }
+        ),
+        200,
+    )
+
+
+@app.route("/api/papers/manage/<int:paper_id>", methods=["GET"])
+@roles_required(*PAPER_EDITOR_ROLES)
+def api_manage_paper(paper_id):
+    paper = db.session.get(Paper, paper_id)
+
+    if paper is None:
+        return paper_not_found_response()
+
+    if not can_manage_paper(paper):
+        return paper_edit_forbidden_response()
+
+    return jsonify({"paper": serialize_paper(paper, include_management_fields=True)}), 200
+
+
+@app.route("/api/papers/<string:slug>", methods=["GET"])
+def api_paper(slug):
+    paper = Paper.query.filter_by(slug=slug, status="published").first()
+
+    if paper is None:
+        return paper_not_found_response()
+
+    return jsonify({"paper": serialize_paper(paper)}), 200
+
+
+@app.route("/api/papers", methods=["POST"])
+@roles_required(*PAPER_EDITOR_ROLES)
+def api_create_paper():
+    try:
+        payload = read_paper_request_payload()
+        validated = validate_paper_payload(payload)
+        requested_slug = validated.pop("slug", None)
+        validated["slug"] = generate_unique_paper_slug(
+            requested_slug or validated["title"],
+            fallback_to_paper=requested_slug is None,
+        )
+    except PaperValidationError as error:
+        return paper_validation_error_response(error)
+
+    if validated["status"] == "published":
+        validated["published_at"] = datetime.utcnow()
+
+    paper = Paper(
+        **validated,
+        created_by_id=current_user.id,
+        updated_by_id=current_user.id,
+    )
+    db.session.add(paper)
+    database_error = commit_paper_database_changes()
+
+    if database_error is not None:
+        return database_error
+
+    return (
+        jsonify({"paper": serialize_paper(paper, include_management_fields=True)}),
+        201,
+    )
+
+
+@app.route("/api/papers/<int:paper_id>", methods=["PATCH"])
+@roles_required(*PAPER_EDITOR_ROLES)
+def api_update_paper(paper_id):
+    paper = db.session.get(Paper, paper_id)
+
+    if paper is None:
+        return paper_not_found_response()
+
+    if not can_manage_paper(paper):
+        return paper_edit_forbidden_response()
+
+    try:
+        payload = read_paper_request_payload()
+        validated = validate_paper_payload(payload, partial=True)
+
+        if "slug" in validated:
+            validated["slug"] = generate_unique_paper_slug(
+                validated["slug"],
+                exclude_paper_id=paper.id,
+            )
+    except PaperValidationError as error:
+        return paper_validation_error_response(error)
+
+    previous_status = paper.status
+
+    for field, value in validated.items():
+        setattr(paper, field, value)
+
+    if (
+        validated.get("status") == "published"
+        and previous_status != "published"
+        and paper.published_at is None
+    ):
+        paper.published_at = datetime.utcnow()
+
+    paper.updated_by_id = current_user.id
+    database_error = commit_paper_database_changes()
+
+    if database_error is not None:
+        return database_error
+
+    return jsonify({"paper": serialize_paper(paper, include_management_fields=True)}), 200
+
+
+@app.route("/api/papers/<int:paper_id>/archive", methods=["POST"])
+@roles_required(*PAPER_EDITOR_ROLES)
+def api_archive_paper(paper_id):
+    paper = db.session.get(Paper, paper_id)
+
+    if paper is None:
+        return paper_not_found_response()
+
+    if not can_manage_paper(paper):
+        return paper_edit_forbidden_response()
+
+    if paper.status != "archived":
+        paper.status = "archived"
+        paper.updated_by_id = current_user.id
+        database_error = commit_paper_database_changes()
+
+        if database_error is not None:
+            return database_error
+
+    return jsonify({"paper": serialize_paper(paper, include_management_fields=True)}), 200
+
+
+@app.route("/api/papers/<int:paper_id>", methods=["DELETE"])
+@roles_required(ADMIN_ROLE)
+def api_delete_paper(paper_id):
+    paper = db.session.get(Paper, paper_id)
+
+    if paper is None:
+        return paper_not_found_response()
+
+    db.session.delete(paper)
+    database_error = commit_paper_database_changes()
+
+    if database_error is not None:
+        return database_error
+
+    return jsonify({"deleted": True, "paperId": paper_id}), 200
 
 
 @app.route("/assets/models/brain.glb")

@@ -50,6 +50,8 @@ Open `http://127.0.0.1:5173`. Vite proxies relative `/api` requests to Flask at 
 
 ## Backend Endpoints
 
+Authentication and learning APIs:
+
 - `POST /api/auth/login`
 - `GET /api/auth/me`
 - `POST /api/auth/logout`
@@ -57,6 +59,31 @@ Open `http://127.0.0.1:5173`. Vite proxies relative `/api` requests to Flask at 
 - `GET /api/brain-regions`
 - `GET /api/brain-regions/<slug>`
 - `GET /assets/models/brain.glb`
+
+Public Papers APIs:
+
+- `GET /api/papers`
+- `GET /api/papers/<slug>`
+
+Teacher and administrator Papers APIs:
+
+- `GET /api/papers/manage`
+- `GET /api/papers/manage/<id>`
+- `POST /api/papers`
+- `PATCH /api/papers/<id>`
+- `POST /api/papers/<id>/archive`
+
+Administrator-only Papers API:
+
+- `DELETE /api/papers/<id>`
+
+Local administration CLI commands:
+
+```powershell
+cd project
+flask set-user-role EMAIL ROLE
+flask seed-papers --owner-email EMAIL
+```
 
 Database schema changes can continue to use the configured Flask-Migrate integration. The `flask init-db` CLI command remains available for initial database setup.
 
