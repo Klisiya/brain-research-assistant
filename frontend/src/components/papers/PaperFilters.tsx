@@ -2,7 +2,6 @@ import {
   PAPER_DIFFICULTIES,
   PAPER_PUBLICATION_TYPES,
   PAPER_SORT_OPTIONS,
-  PAPER_TOPICS,
 } from '../../data/papers'
 import type {
   PaperDifficulty,
@@ -12,6 +11,7 @@ import type {
 } from '../../types/paper'
 
 type PaperFiltersProps = {
+  availableTopics: readonly string[]
   difficulty: PaperDifficulty | 'all'
   hasActiveFilters: boolean
   onClear: () => void
@@ -28,6 +28,7 @@ type PaperFiltersProps = {
 }
 
 function PaperFilters({
+  availableTopics,
   difficulty,
   hasActiveFilters,
   onClear,
@@ -62,7 +63,7 @@ function PaperFilters({
             value={topic}
           >
             <option value="all">All Topics</option>
-            {PAPER_TOPICS.map((option) => (
+            {availableTopics.map((option) => (
               <option key={option} value={option}>{option}</option>
             ))}
           </select>

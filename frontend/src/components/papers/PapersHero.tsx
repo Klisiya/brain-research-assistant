@@ -1,22 +1,31 @@
+import type { Paper } from '../../types/paper'
+import PaperMarqueeWall from './PaperMarqueeWall'
+
 type PapersHeroProps = {
   difficultyLevelCount: number
+  loading?: boolean
+  papers: readonly Paper[]
   resourceCount: number
   topicCount: number
 }
 
 function PapersHero({
   difficultyLevelCount,
+  loading = false,
+  papers,
   resourceCount,
   topicCount,
 }: PapersHeroProps) {
   return (
     <section className="papers-hero">
-      <span className="papers-eyebrow">Research Library</span>
-      <h1>Explore Brain Research Papers</h1>
-      <p className="papers-hero-description">
-        Discover foundational studies, review articles, and guided learning resources
-        selected for structured brain science study.
-      </p>
+      <div className="papers-hero-showcase">
+        <div className="papers-hero-copy">
+          <span className="papers-eyebrow">Research Library</span>
+          <h1>Explore Brain Research Papers</h1>
+        </div>
+
+        <PaperMarqueeWall loading={loading} papers={papers} />
+      </div>
 
       <dl className="papers-hero-stats">
         <div>
@@ -34,8 +43,7 @@ function PapersHero({
       </dl>
 
       <p className="papers-demo-note">
-        Demo metadata is used for this front-end preview and does not represent
-        instructor approval or a connected publication database.
+        Browse published learning materials from the Brain Research Tutor library.
       </p>
     </section>
   )

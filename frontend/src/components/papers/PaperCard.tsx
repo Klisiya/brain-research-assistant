@@ -10,6 +10,9 @@ function PaperCard({ paper, returnPath }: PaperCardProps) {
   const visibleTopics = paper.topics.slice(0, 3)
   const remainingTopicCount = paper.topics.length - visibleTopics.length
   const isRecommended = paper.featured || paper.resourceCategory === 'Recommended'
+  const publicationDetails = [paper.journal?.trim(), paper.year?.toString()]
+    .filter(Boolean)
+    .join(' · ') || 'Publication details unavailable'
 
   return (
     <article className="paper-card">
@@ -22,7 +25,7 @@ function PaperCard({ paper, returnPath }: PaperCardProps) {
       <div className="paper-card-heading">
         <h2>{paper.title}</h2>
         <p>{paper.authors.join(', ')}</p>
-        <span>{paper.journal} · {paper.year}</span>
+        <span>{publicationDetails}</span>
       </div>
 
       <p className="paper-card-abstract">{paper.abstract}</p>
@@ -42,8 +45,8 @@ function PaperCard({ paper, returnPath }: PaperCardProps) {
           <dd>{paper.openAccess ? 'Open Access' : 'Guided Access'}</dd>
         </div>
         <div>
-          <dt>Progress</dt>
-          <dd>{paper.readingStatus}</dd>
+          <dt>Resource</dt>
+          <dd>{paper.resourceCategory}</dd>
         </div>
       </dl>
 

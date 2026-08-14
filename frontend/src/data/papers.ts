@@ -1,23 +1,10 @@
 import type {
-  Paper,
+  LegacyDemoPaper,
   PaperDifficulty,
   PaperPublicationType,
-  PaperReadingStatus,
   PaperSort,
-  PaperTopic,
   PaperView,
 } from '../types/paper'
-
-export const PAPER_TOPICS: readonly PaperTopic[] = [
-  'Neuroscience',
-  'Memory',
-  'Neuroplasticity',
-  'Cognition',
-  'Brain Imaging',
-  'Brain-Computer Interfaces',
-  'Brain Disorders',
-  'AI & Brain Science',
-]
 
 export const PAPER_DIFFICULTIES: readonly PaperDifficulty[] = [
   'Beginner',
@@ -30,12 +17,6 @@ export const PAPER_PUBLICATION_TYPES: readonly PaperPublicationType[] = [
   'Review',
   'Book Chapter',
   'Learning Resource',
-]
-
-export const PAPER_READING_STATUSES: readonly PaperReadingStatus[] = [
-  'Not Started',
-  'In Progress',
-  'Completed',
 ]
 
 export const PAPER_VIEW_OPTIONS: readonly {
@@ -58,8 +39,9 @@ export const PAPER_SORT_OPTIONS: readonly {
   { label: 'Reading Time', value: 'reading-time' },
 ]
 
-// Front-end demo metadata only. Replace this collection with Flask API data in a later stage.
-export const papers: Paper[] = [
+// Legacy detail-page demo data. Remove during Stage 1B when PaperDetailPage
+// connects to /api/papers/<slug>.
+export const papers: LegacyDemoPaper[] = [
   {
     id: 'paper-001',
     slug: 'foundations-of-synaptic-plasticity',

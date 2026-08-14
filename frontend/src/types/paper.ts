@@ -14,29 +14,21 @@ export type PaperResourceCategory =
 
 export type PaperReadingStatus = 'Not Started' | 'In Progress' | 'Completed'
 
-export type PaperTopic =
-  | 'Neuroscience'
-  | 'Memory'
-  | 'Neuroplasticity'
-  | 'Cognition'
-  | 'Brain Imaging'
-  | 'Brain-Computer Interfaces'
-  | 'Brain Disorders'
-  | 'AI & Brain Science'
+export type PaperTopic = string
 
 export type PaperView = 'all' | 'recommended' | 'resources' | 'progress'
 
 export type PaperSort = 'recommended' | 'newest' | 'oldest' | 'reading-time'
 
 export type Paper = {
-  id: string
+  id: number
   slug: string
   title: string
   authors: string[]
-  year: number
-  journal: string
+  year: number | null
+  journal: string | null
   publicationType: PaperPublicationType
-  topics: PaperTopic[]
+  topics: string[]
   difficulty: PaperDifficulty
   estimatedReadingMinutes: number
   abstract: string
@@ -44,7 +36,20 @@ export type Paper = {
   keywords: string[]
   featured: boolean
   openAccess: boolean
-  externalUrl: string
+  externalUrl: string | null
   resourceCategory: PaperResourceCategory
+  createdAt: string
+  updatedAt: string
+  publishedAt: string | null
+}
+
+export type LegacyDemoPaper = Omit<
+  Paper,
+  'createdAt' | 'externalUrl' | 'id' | 'journal' | 'publishedAt' | 'updatedAt' | 'year'
+> & {
+  id: string
+  year: number
+  journal: string
+  externalUrl: string
   readingStatus: PaperReadingStatus
 }
