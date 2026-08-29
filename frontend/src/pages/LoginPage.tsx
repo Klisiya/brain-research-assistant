@@ -1,15 +1,10 @@
 import { useEffect, useState, type FormEvent, type MouseEvent } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
+import { isAuthUser } from '../api/auth'
 import Footer from '../components/Footer'
+import type { AuthUser } from '../types/auth'
 import LoginShaderBackground from './LoginShaderBackground'
 import './LoginPage.css'
-
-type AuthUser = {
-  id: number
-  username: string
-  email: string
-  role: string
-}
 
 type LoginStatus = {
   type: 'error' | 'info'
@@ -23,22 +18,29 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null
 }
 
-function isAuthUser(value: unknown): value is AuthUser {
-  return (
-    isRecord(value) &&
-    typeof value.id === 'number' &&
-    typeof value.username === 'string' &&
-    typeof value.email === 'string' &&
-    typeof value.role === 'string'
-  )
-}
-
 function isAuthenticatedPayload(payload: unknown): payload is { authenticated: true; user: AuthUser } {
   return isRecord(payload) && payload.authenticated === true && isAuthUser(payload.user)
 }
 
 function isAuthRequiredLocationState(value: unknown): value is { authRequired: true } {
   return isRecord(value) && value.authRequired === true
+}
+
+function isManagementRequiredLocationState(value: unknown): value is { managementRequired: true } {
+  return isRecord(value) && value.managementRequired === true
+}
+
+function getLoginReturnPath(value: unknown) {
+  if (
+    isRecord(value)
+    && typeof value.from === 'string'
+    && value.from.startsWith('/')
+    && !value.from.startsWith('//')
+  ) {
+    return value.from
+  }
+
+  return '/'
 }
 
 function getPayloadError(payload: unknown) {
@@ -66,6 +68,7 @@ function LoginPage() {
   const [remember, setRemember] = useState(false)
   const [status, setStatus] = useState<LoginStatus | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const returnPath = getLoginReturnPath(location.state)
 
   useEffect(() => {
     const controller = new AbortController()
@@ -79,7 +82,7 @@ function LoginPage() {
         const payload = await readJsonPayload(response)
 
         if (!controller.signal.aborted && response.ok && isAuthenticatedPayload(payload)) {
-          navigate('/', { replace: true })
+          navigate(returnPath, { replace: true })
         }
       } catch (error) {
         if (error instanceof DOMException && error.name === 'AbortError') {
@@ -93,7 +96,7 @@ function LoginPage() {
     return () => {
       controller.abort()
     }
-  }, [navigate])
+  }, [navigate, returnPath])
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
@@ -136,7 +139,7 @@ function LoginPage() {
         return
       }
 
-      navigate('/', { replace: true })
+      navigate(returnPath, { replace: true })
     } catch {
       setStatus({ type: 'error', message: UNEXPECTED_LOGIN_ERROR })
     } finally {
@@ -171,6 +174,7 @@ function LoginPage() {
   }
 
   const shouldShowTutorNotice = isAuthRequiredLocationState(location.state) && !status
+  const shouldShowManagementNotice = isManagementRequiredLocationState(location.state) && !status
 
   return (
     <div className="react-login-page">
@@ -272,6 +276,9 @@ function LoginPage() {
               </button>
 
               {shouldShowTutorNotice ? <p className="login-status error">Please sign in to use the AI Tutor.</p> : null}
+              {shouldShowManagementNotice ? (
+                <p className="login-status error">Please sign in to access Papers Management.</p>
+              ) : null}
               {status ? <p className={`login-status ${status.type}`}>{status.message}</p> : null}
             </form>
           </section>

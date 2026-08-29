@@ -6,12 +6,15 @@ import Footer from './components/Footer'
 import Hero from './components/Hero'
 import ModulesSection from './components/ModulesSection'
 import Navbar from './components/Navbar'
+import PapersManagementGuard from './components/auth/PapersManagementGuard'
 import AboutPage from './pages/AboutPage'
 import BrainRegionPage from './pages/BrainRegionPage'
 import ContactPage from './pages/ContactPage'
 import InnovationHubPage from './pages/InnovationHubPage'
 import LoginPage from './pages/LoginPage'
 import PaperDetailPage from './pages/PaperDetailPage'
+import PaperEditorPage from './pages/PaperEditorPage'
+import PaperManagementPage from './pages/PaperManagementPage'
 import PapersPage from './pages/PapersPage'
 import './App.css'
 
@@ -53,6 +56,30 @@ function App() {
       <Route element={<LoginPage />} path="/login" />
       <Route element={<PapersPage />} path="/papers" />
       <Route element={<PaperDetailPage />} path="/papers/:slug" />
+      <Route
+        element={(
+          <PapersManagementGuard>
+            {(user) => <PaperManagementPage currentUser={user} />}
+          </PapersManagementGuard>
+        )}
+        path="/manage/papers"
+      />
+      <Route
+        element={(
+          <PapersManagementGuard>
+            {(user) => <PaperEditorPage currentUser={user} />}
+          </PapersManagementGuard>
+        )}
+        path="/manage/papers/new"
+      />
+      <Route
+        element={(
+          <PapersManagementGuard>
+            {(user) => <PaperEditorPage currentUser={user} />}
+          </PapersManagementGuard>
+        )}
+        path="/manage/papers/:id/edit"
+      />
       <Route element={<InnovationHubPage />} path="/innovation-hub" />
       <Route element={<BrainRegionPage />} path="/brain-region/:slug" />
     </Routes>

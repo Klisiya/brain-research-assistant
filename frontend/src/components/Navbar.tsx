@@ -1,18 +1,16 @@
 import { useEffect, useLayoutEffect, useRef, useState, type FocusEvent, type FormEvent } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
+import { fetchAuthMe } from '../api/auth'
+import type { AuthUser } from '../types/auth'
 import './Navbar.css'
 
 type DropdownItem = { label: string; href?: string }
 type NavId = 'home' | 'learning' | 'research' | 'innovation' | 'more'
 type NavItem = { id: NavId; label: string; icon?: string; href?: string; dropdown?: DropdownItem[] }
-type AuthUser = { id: number; username: string; email: string; role: string }
 type AuthState =
   | { status: 'loading'; user: null }
   | { status: 'anonymous'; user: null }
   | { status: 'authenticated'; user: AuthUser }
-type AuthMePayload =
-  | { authenticated: false; user: null }
-  | { authenticated: true; user: AuthUser }
 
 const NAVBAR_SEPARATE_THRESHOLD = 72
 const NAVBAR_MERGE_THRESHOLD = 40
@@ -54,18 +52,6 @@ const navItems: NavItem[] = [
 const leftNavItems = navItems.slice(0, 3)
 const rightNavItems = navItems.slice(3)
 
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null
-}
-function isAuthUser(value: unknown): value is AuthUser {
-  return isRecord(value) && typeof value.id === 'number' &&
-    typeof value.username === 'string' && typeof value.email === 'string' &&
-    typeof value.role === 'string'
-}
-function isAuthMePayload(value: unknown): value is AuthMePayload {
-  return (isRecord(value) && value.authenticated === false && value.user === null) ||
-    (isRecord(value) && value.authenticated === true && isAuthUser(value.user))
-}
 function isNavItemActive(itemId: NavId, pathname: string) {
   switch (itemId) {
     case 'home': return pathname === '/'
@@ -75,10 +61,6 @@ function isNavItemActive(itemId: NavId, pathname: string) {
     case 'more': return pathname === '/about' || pathname === '/contact'
   }
 }
-async function readJsonPayload(response: Response): Promise<unknown> {
-  try { return await response.json() } catch { return null }
-}
-
 function readHalfContentRects(
   leftContent: HTMLDivElement | null,
   rightContent: HTMLDivElement | null,
@@ -159,13 +141,8 @@ function Navbar() {
     const controller = new AbortController()
     const loadAuthState = async () => {
       try {
-        const response = await fetch('/api/auth/me', { credentials: 'include', signal: controller.signal })
-        const payload = await readJsonPayload(response)
+        const payload = await fetchAuthMe({ signal: controller.signal })
         if (controller.signal.aborted) return
-        if (!response.ok || !isAuthMePayload(payload)) {
-          setAuthState({ status: 'anonymous', user: null })
-          return
-        }
         setAuthState(payload.authenticated
           ? { status: 'authenticated', user: payload.user }
           : { status: 'anonymous', user: null })
@@ -363,6 +340,16 @@ function Navbar() {
               <div aria-label="Account menu" className={`account-menu${isAccountMenuOpen ? ' is-open' : ''}`}
                 id="account-menu" role="menu">
                 <div className="account-email" role="presentation">{authState.user.email}</div>
+                {(authState.user.role === 'teacher' || authState.user.role === 'admin') ? (
+                  <Link
+                    className="account-menu-action"
+                    onClick={() => setIsAccountMenuOpen(false)}
+                    role="menuitem"
+                    to="/manage/papers"
+                  >
+                    Manage Papers
+                  </Link>
+                ) : null}
                 <button className="account-menu-action" disabled={isSigningOut}
                   onClick={handleSignOut} role="menuitem" type="button">
                   {isSigningOut ? 'Signing Out...' : 'Sign Out'}

@@ -1,0 +1,355 @@
+.paper-management-shell {
+  position: relative;
+  min-height: 100vh;
+  overflow-x: clip;
+  color: #dbe7f4;
+  background: transparent;
+  isolation: isolate;
+}
+
+.paper-management-shell::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  background:
+    linear-gradient(rgba(56, 189, 248, 0.022) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(56, 189, 248, 0.02) 1px, transparent 1px);
+  background-size: 92px 92px;
+  mask-image: radial-gradient(circle at 50% 24%, black, transparent 76%);
+  -webkit-mask-image: radial-gradient(circle at 50% 24%, black, transparent 76%);
+}
+
+.paper-management-main {
+  position: relative;
+  z-index: 2;
+  width: min(1320px, calc(100% - 48px));
+  min-height: 76vh;
+  margin: 0 auto;
+  padding: 140px 0 96px;
+}
+
+.paper-management-header,
+.paper-management-filters,
+.paper-management-results,
+.management-state-panel,
+.paper-management-table-shell,
+.paper-management-card,
+.paper-editor-loading {
+  border: 1px solid rgba(125, 211, 252, 0.16);
+  background:
+    radial-gradient(circle at 12% 0%, rgba(56, 189, 248, 0.08), transparent 34%),
+    linear-gradient(135deg, rgba(15, 23, 42, 0.82), rgba(2, 6, 23, 0.62));
+  box-shadow: 0 24px 68px rgba(0, 0, 0, 0.28), inset 0 1px 0 rgba(255, 255, 255, 0.07);
+  backdrop-filter: blur(20px) saturate(150%);
+  -webkit-backdrop-filter: blur(20px) saturate(150%);
+}
+
+.paper-management-header {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 28px;
+  padding: 38px 42px;
+  border-radius: 28px;
+}
+
+.paper-management-header > div > span,
+.management-state-panel > span,
+.paper-editor-header > div > span,
+.paper-editor-resource-actions > div:first-child > span {
+  color: #7dd3fc;
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.paper-management-header h1 {
+  margin: 9px 0 10px;
+  color: #f8fafc;
+  font-size: clamp(42px, 6vw, 68px);
+  line-height: 1;
+  letter-spacing: -0.04em;
+}
+
+.paper-management-header p,
+.management-state-panel p {
+  margin: 0;
+  color: #9eb0c5;
+  font-size: 14px;
+  line-height: 1.65;
+}
+
+.management-primary-action,
+.management-state-panel a,
+.management-state-panel button,
+.paper-management-pagination button {
+  display: inline-flex;
+  min-height: 42px;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  padding: 0 17px;
+  border: 1px solid rgba(125, 211, 252, 0.3);
+  border-radius: 999px;
+  color: #e0f2fe;
+  background: rgba(14, 116, 144, 0.2);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 800;
+  text-decoration: none;
+  cursor: pointer;
+  transition: border-color 0.2s ease, background 0.2s ease, transform 0.2s ease;
+}
+
+.management-primary-action:hover,
+.management-state-panel a:hover,
+.management-state-panel button:hover,
+.paper-management-pagination button:hover:not(:disabled) {
+  border-color: rgba(125, 211, 252, 0.52);
+  background: rgba(14, 116, 144, 0.32);
+  transform: translateY(-1px);
+}
+
+.paper-management-filters {
+  display: grid;
+  grid-template-columns: minmax(280px, 1fr) minmax(170px, 0.25fr) minmax(180px, 0.25fr);
+  gap: 16px;
+  margin-top: 22px;
+  padding: 22px;
+  border-radius: 20px;
+}
+
+.paper-management-filters label,
+.paper-management-filters form > label {
+  display: block;
+  margin-bottom: 8px;
+  color: #91a5bc;
+  font-size: 11px;
+  font-weight: 850;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.paper-management-filters form > div { display: flex; gap: 8px; }
+.paper-management-filters input,
+.paper-management-filters select {
+  width: 100%;
+  min-width: 0;
+  height: 44px;
+  padding: 0 13px;
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  border-radius: 12px;
+  outline: none;
+  color: #e5eef8;
+  background: rgba(2, 8, 23, 0.52);
+  font: inherit;
+  font-size: 13px;
+}
+
+.paper-management-filters input:focus,
+.paper-management-filters select:focus {
+  border-color: rgba(125, 211, 252, 0.55);
+  box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.09);
+}
+
+.paper-management-filters option { color: #e5eef8; background: #071426; }
+.paper-management-filters form button {
+  min-width: 88px;
+  border: 1px solid rgba(125, 211, 252, 0.23);
+  border-radius: 12px;
+  color: #d9f3ff;
+  background: rgba(14, 116, 144, 0.19);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.paper-management-results { margin-top: 22px; padding: 24px; border-radius: 24px; }
+.paper-management-results-heading { display: flex; align-items: center; justify-content: space-between; gap: 18px; margin-bottom: 16px; }
+.paper-management-results-heading p { margin: 0; color: #dbeafe; font-size: 14px; font-weight: 800; }
+.paper-management-results-heading span { color: #73869c; font-size: 12px; }
+.paper-management-table-shell { overflow: hidden; border-radius: 17px; box-shadow: none; backdrop-filter: none; }
+.paper-management-table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+.paper-management-table th {
+  padding: 13px 14px;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.15);
+  color: #71869d;
+  background: rgba(2, 8, 23, 0.45);
+  font-size: 10px;
+  font-weight: 850;
+  letter-spacing: 0.07em;
+  text-align: left;
+  text-transform: uppercase;
+}
+
+.paper-management-table th:first-child { width: 31%; }
+.paper-management-table th:nth-child(2) { width: 12%; }
+.paper-management-table th:nth-child(3) { width: 16%; }
+.paper-management-table th:nth-child(4) { width: 13%; }
+.paper-management-table th:nth-child(5) { width: 13%; }
+.paper-management-table th:last-child { width: 15%; }
+.paper-management-table td {
+  padding: 17px 14px;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.1);
+  color: #9db0c5;
+  font-size: 12px;
+  line-height: 1.45;
+  vertical-align: middle;
+  overflow-wrap: anywhere;
+}
+
+.paper-management-table tr:last-child td { border-bottom: 0; }
+.paper-management-table tbody tr { transition: background 0.18s ease; }
+.paper-management-table tbody tr:hover { background: rgba(14, 116, 144, 0.075); }
+.paper-management-table td:first-child strong { display: block; color: #edf6ff; font-size: 13px; }
+.paper-management-table td:first-child span { display: block; margin-top: 4px; color: #60748b; font-size: 10px; }
+.paper-status-badge {
+  display: inline-flex;
+  min-height: 25px;
+  align-items: center;
+  padding: 0 9px;
+  border: 1px solid rgba(148, 163, 184, 0.16);
+  border-radius: 999px;
+  color: #a9b9ca;
+  background: rgba(30, 41, 59, 0.48);
+  font-size: 9px;
+  font-weight: 900;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.paper-status-badge.is-published { border-color: rgba(45, 212, 191, 0.24); color: #99f6e4; background: rgba(13, 148, 136, 0.12); }
+.paper-status-badge.is-draft { border-color: rgba(125, 211, 252, 0.2); color: #bae6fd; background: rgba(14, 116, 144, 0.12); }
+.paper-status-badge.is-archived { color: #8293a7; background: rgba(15, 23, 42, 0.62); }
+.management-row-actions { display: flex; flex-wrap: wrap; gap: 6px; }
+.management-row-actions a {
+  display: inline-flex;
+  min-height: 30px;
+  align-items: center;
+  padding: 0 9px;
+  border: 1px solid rgba(125, 211, 252, 0.16);
+  border-radius: 9px;
+  color: #a5def8;
+  background: rgba(14, 116, 144, 0.1);
+  font-size: 10px;
+  font-weight: 800;
+  text-decoration: none;
+}
+
+.paper-management-cards { display: none; }
+.paper-management-pagination { display: flex; align-items: center; justify-content: center; gap: 14px; margin-top: 20px; }
+.paper-management-pagination span { color: #8295aa; font-size: 12px; }
+.paper-management-pagination button:disabled { cursor: not-allowed; opacity: 0.42; }
+
+.management-state-panel {
+  max-width: 780px;
+  margin: 38px auto;
+  padding: 54px 38px;
+  border-radius: 26px;
+  text-align: center;
+}
+
+.management-state-panel.is-embedded { margin-top: 22px; }
+.management-state-panel h1,
+.management-state-panel h2 { margin: 10px 0 13px; color: #f8fafc; font-size: clamp(32px, 5vw, 52px); letter-spacing: -0.035em; }
+.management-state-panel a,
+.management-state-panel button { margin-top: 24px; }
+.management-guard-skeleton { width: min(460px, 82%); height: 12px; margin: 27px auto 0; border-radius: 999px; background: rgba(125, 211, 252, 0.12); }
+.paper-management-loading { margin-top: 22px; }
+.management-table-skeleton { display: grid; gap: 1px; overflow: hidden; padding: 1px; border: 1px solid rgba(125, 211, 252, 0.13); border-radius: 20px; background: rgba(148, 163, 184, 0.08); }
+.management-table-skeleton span {
+  height: 68px;
+  background: linear-gradient(100deg, rgba(15, 23, 42, 0.72) 20%, rgba(56, 189, 248, 0.1) 44%, rgba(15, 23, 42, 0.72) 68%);
+  background-size: 220% 100%;
+  animation: management-skeleton-shimmer 2s linear infinite;
+}
+
+.confirm-dialog-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 9000;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: rgba(1, 5, 16, 0.78);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+
+.confirm-dialog {
+  width: min(520px, 100%);
+  padding: 30px;
+  border: 1px solid rgba(125, 211, 252, 0.23);
+  border-radius: 22px;
+  background: linear-gradient(145deg, rgba(10, 24, 45, 0.98), rgba(2, 8, 23, 0.98));
+  box-shadow: 0 34px 100px rgba(0, 0, 0, 0.5);
+}
+
+.confirm-dialog > span { color: #7dd3fc; font-size: 10px; font-weight: 900; letter-spacing: 0.12em; text-transform: uppercase; }
+.confirm-dialog h2 { margin: 9px 0 12px; color: #f8fafc; font-size: 27px; }
+.confirm-dialog > p { margin: 0; color: #9dafc2; font-size: 13px; line-height: 1.65; }
+.confirm-dialog-input { display: grid; gap: 8px; margin-top: 22px; color: #aec0d2; font-size: 12px; }
+.confirm-dialog-input input { height: 44px; padding: 0 13px; border: 1px solid rgba(248, 113, 113, 0.25); border-radius: 11px; outline: none; color: #fff; background: rgba(2, 8, 23, 0.7); font: inherit; }
+.confirm-dialog-input input:focus { border-color: rgba(248, 113, 113, 0.56); box-shadow: 0 0 0 3px rgba(248, 113, 113, 0.08); }
+.confirm-dialog-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 26px; }
+.confirm-dialog-actions button { min-height: 40px; padding: 0 15px; border: 1px solid rgba(148, 163, 184, 0.2); border-radius: 10px; color: #cfdae6; background: rgba(30, 41, 59, 0.58); font: inherit; font-size: 12px; font-weight: 800; cursor: pointer; }
+.confirm-dialog-actions button.is-primary { border-color: rgba(45, 212, 191, 0.26); color: #ccfbf1; background: rgba(13, 148, 136, 0.18); }
+.confirm-dialog-actions button.is-danger { border-color: rgba(248, 113, 113, 0.28); color: #fecaca; background: rgba(127, 29, 29, 0.25); }
+.confirm-dialog-actions button:disabled { cursor: not-allowed; opacity: 0.45; }
+.paper-management-shell .site-footer { position: relative; z-index: 2; background: linear-gradient(180deg, transparent, rgba(2, 6, 23, 0.8) 24%, #020617); }
+
+@keyframes management-skeleton-shimmer {
+  from { background-position: 100% 0; }
+  to { background-position: -120% 0; }
+}
+
+@media (max-width: 1000px) {
+  .paper-management-main { width: min(100% - 36px, 920px); padding-top: 56px; }
+  .paper-management-header { align-items: flex-start; padding: 32px; }
+  .paper-management-filters { grid-template-columns: 1fr 1fr; }
+  .paper-management-filters form { grid-column: 1 / -1; }
+  .paper-management-table th:first-child { width: 28%; }
+}
+
+@media (max-width: 760px) {
+  .paper-management-main { width: min(100% - 28px, 680px); padding: 42px 0 72px; }
+  .paper-management-header { flex-direction: column; padding: 27px 24px; border-radius: 23px; }
+  .management-primary-action { width: 100%; }
+  .paper-management-filters { grid-template-columns: 1fr; padding: 18px; }
+  .paper-management-filters form { grid-column: auto; }
+  .paper-management-results { padding: 16px; }
+  .paper-management-table-shell { display: none; }
+  .paper-management-cards { display: grid; gap: 12px; }
+  .paper-management-card { padding: 20px; border-radius: 17px; }
+  .paper-management-card > div:first-child { display: flex; align-items: center; justify-content: space-between; gap: 10px; color: #74879e; font-size: 10px; }
+  .paper-management-card h2 { margin: 16px 0; color: #edf6ff; font-size: 18px; overflow-wrap: anywhere; }
+  .paper-management-card dl { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 0 0 17px; }
+  .paper-management-card dl div { min-width: 0; }
+  .paper-management-card dt { color: #667990; font-size: 9px; font-weight: 850; letter-spacing: 0.05em; text-transform: uppercase; }
+  .paper-management-card dd { margin: 5px 0 0; color: #a8b8c9; font-size: 11px; overflow-wrap: anywhere; }
+  .paper-management-results-heading { align-items: flex-start; flex-direction: column; }
+  .management-row-actions a { flex: 1; justify-content: center; }
+  .management-state-panel { padding: 42px 24px; }
+}
+
+@media (max-width: 460px) {
+  .paper-management-filters form > div { flex-direction: column; }
+  .paper-management-filters form button { min-height: 42px; }
+  .paper-management-card dl { grid-template-columns: 1fr; }
+  .confirm-dialog { padding: 24px; }
+  .confirm-dialog-actions { flex-direction: column-reverse; }
+  .confirm-dialog-actions button { width: 100%; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .management-table-skeleton span { animation: none; }
+  .management-primary-action,
+  .management-state-panel a,
+  .management-state-panel button,
+  .paper-management-pagination button,
+  .paper-management-table tbody tr { transition: none; }
+}

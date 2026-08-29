@@ -1,8 +1,12 @@
 import type {
+  ManagedPaper,
   Paper,
+  PaperCreator,
   PaperDifficulty,
   PaperPublicationType,
   PaperResourceCategory,
+  PaperStatus,
+  PaperWriteInput,
 } from '../types/paper'
 
 export type PaperPagination = {
@@ -28,8 +32,55 @@ export type PaperListResponse = {
   filters: PaperApiFilters
 }
 
+export type PaperManagementSort = PaperApiFilters['sort']
+
+export type ManagedPaperApiFilters = {
+  q: string
+  status: PaperStatus | null
+  sort: PaperManagementSort
+}
+
+export type ManagedPaperListResponse = {
+  papers: ManagedPaper[]
+  pagination: PaperPagination
+  filters: ManagedPaperApiFilters
+}
+
 type FetchPapersOptions = {
   signal?: AbortSignal
+}
+
+type FetchPaperBySlugOptions = {
+  signal?: AbortSignal
+}
+
+type FetchManagedPapersOptions = {
+  page?: number
+  q?: string
+  signal?: AbortSignal
+  sort?: PaperManagementSort
+  status?: PaperStatus | 'all'
+}
+
+export class PaperNotFoundError extends Error {
+  constructor() {
+    super('Paper not found')
+    this.name = 'PaperNotFoundError'
+  }
+}
+
+export class PaperApiError extends Error {
+  code: string | null
+  field: string | null
+  status: number
+
+  constructor(message: string, status: number, code: string | null, field: string | null) {
+    super(message)
+    this.name = 'PaperApiError'
+    this.status = status
+    this.code = code
+    this.field = field
+  }
 }
 
 const PUBLICATION_TYPES: readonly PaperPublicationType[] = [
@@ -60,6 +111,9 @@ const API_SORTS: readonly PaperApiFilters['sort'][] = [
   'title',
 ]
 
+const PAPER_STATUSES: readonly PaperStatus[] = ['draft', 'published', 'archived']
+const USER_ROLES: readonly PaperCreator['role'][] = ['user', 'teacher', 'admin']
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
 }
@@ -74,6 +128,10 @@ function isNullableString(value: unknown): value is string | null {
 
 function isFiniteNumber(value: unknown): value is number {
   return typeof value === 'number' && Number.isFinite(value)
+}
+
+function isNullableFiniteNumber(value: unknown): value is number | null {
+  return value === null || isFiniteNumber(value)
 }
 
 function isPaper(value: unknown): value is Paper {
@@ -101,6 +159,23 @@ function isPaper(value: unknown): value is Paper {
     && isNullableString(value.publishedAt)
 }
 
+function isPaperCreator(value: unknown): value is PaperCreator {
+  return isRecord(value)
+    && isFiniteNumber(value.id)
+    && typeof value.username === 'string'
+    && USER_ROLES.includes(value.role as PaperCreator['role'])
+}
+
+function isManagedPaper(value: unknown): value is ManagedPaper {
+  if (!isPaper(value) || !isRecord(value)) return false
+
+  const managedFields = value as Record<string, unknown>
+
+  return PAPER_STATUSES.includes(managedFields.status as PaperStatus)
+    && (managedFields.createdBy === null || isPaperCreator(managedFields.createdBy))
+    && isNullableFiniteNumber(managedFields.updatedById)
+}
+
 function isPagination(value: unknown): value is PaperPagination {
   if (!isRecord(value)) return false
 
@@ -125,6 +200,14 @@ function isApiFilters(value: unknown): value is PaperApiFilters {
     && API_SORTS.includes(value.sort as PaperApiFilters['sort'])
 }
 
+function isManagedApiFilters(value: unknown): value is ManagedPaperApiFilters {
+  if (!isRecord(value)) return false
+
+  return typeof value.q === 'string'
+    && (value.status === null || PAPER_STATUSES.includes(value.status as PaperStatus))
+    && API_SORTS.includes(value.sort as PaperManagementSort)
+}
+
 function parsePaperListResponse(payload: unknown): PaperListResponse {
   if (
     !isRecord(payload)
@@ -137,6 +220,68 @@ function parsePaperListResponse(payload: unknown): PaperListResponse {
   }
 
   return payload as PaperListResponse
+}
+
+function parsePaperDetailResponse(payload: unknown): Paper {
+  if (!isRecord(payload) || !isPaper(payload.paper)) {
+    throw new Error('Invalid paper API response')
+  }
+
+  return payload.paper
+}
+
+function parseManagedPaperListResponse(payload: unknown): ManagedPaperListResponse {
+  if (
+    !isRecord(payload)
+    || !Array.isArray(payload.papers)
+    || !payload.papers.every(isManagedPaper)
+    || !isPagination(payload.pagination)
+    || !isManagedApiFilters(payload.filters)
+  ) {
+    throw new Error('Invalid managed papers API response')
+  }
+
+  return payload as ManagedPaperListResponse
+}
+
+function parseManagedPaperResponse(payload: unknown): ManagedPaper {
+  if (!isRecord(payload) || !isManagedPaper(payload.paper)) {
+    throw new Error('Invalid managed paper API response')
+  }
+
+  return payload.paper
+}
+
+async function readJsonPayload(response: Response): Promise<unknown> {
+  try {
+    return await response.json()
+  } catch {
+    return null
+  }
+}
+
+function getPaperApiError(response: Response, payload: unknown) {
+  const record = isRecord(payload) ? payload : null
+  const message = record && typeof record.error === 'string'
+    ? record.error
+    : 'The paper request could not be completed.'
+  const code = record && typeof record.code === 'string' ? record.code : null
+  const field = record && typeof record.field === 'string' ? record.field : null
+  return new PaperApiError(message, response.status, code, field)
+}
+
+async function requestManagedPaper(
+  url: string,
+  options: RequestInit,
+): Promise<ManagedPaper> {
+  const response = await fetch(url, {
+    ...options,
+    credentials: 'include',
+  })
+  const payload = await readJsonPayload(response)
+
+  if (!response.ok) throw getPaperApiError(response, payload)
+  return parseManagedPaperResponse(payload)
 }
 
 export async function fetchPapers({ signal }: FetchPapersOptions = {}) {
@@ -153,4 +298,95 @@ export async function fetchPapers({ signal }: FetchPapersOptions = {}) {
 
   const payload: unknown = await response.json()
   return parsePaperListResponse(payload)
+}
+
+export async function fetchPaperBySlug(
+  slug: string,
+  { signal }: FetchPaperBySlugOptions = {},
+): Promise<Paper> {
+  const response = await fetch(`/api/papers/${encodeURIComponent(slug)}`, {
+    credentials: 'include',
+    signal,
+  })
+
+  if (response.status === 404) {
+    throw new PaperNotFoundError()
+  }
+
+  if (!response.ok) {
+    throw new Error(`Paper API request failed with status ${response.status}`)
+  }
+
+  const payload: unknown = await response.json()
+  return parsePaperDetailResponse(payload)
+}
+
+export async function fetchManagedPapers({
+  page = 1,
+  q = '',
+  signal,
+  sort = 'recommended',
+  status = 'all',
+}: FetchManagedPapersOptions = {}) {
+  const searchParams = new URLSearchParams({
+    page: String(page),
+    perPage: '50',
+    q: q.trim(),
+    sort,
+  })
+
+  if (status !== 'all') searchParams.set('status', status)
+
+  const response = await fetch(`/api/papers/manage?${searchParams}`, {
+    credentials: 'include',
+    signal,
+  })
+  const payload = await readJsonPayload(response)
+
+  if (!response.ok) throw getPaperApiError(response, payload)
+  return parseManagedPaperListResponse(payload)
+}
+
+export function fetchManagedPaper(id: number, { signal }: { signal?: AbortSignal } = {}) {
+  return requestManagedPaper(`/api/papers/manage/${id}`, { method: 'GET', signal })
+}
+
+export function createPaper(input: PaperWriteInput) {
+  return requestManagedPaper('/api/papers', {
+    body: JSON.stringify(input),
+    headers: { 'Content-Type': 'application/json' },
+    method: 'POST',
+  })
+}
+
+export function updatePaper(id: number, input: PaperWriteInput) {
+  return requestManagedPaper(`/api/papers/${id}`, {
+    body: JSON.stringify(input),
+    headers: { 'Content-Type': 'application/json' },
+    method: 'PATCH',
+  })
+}
+
+export function archivePaper(id: number) {
+  return requestManagedPaper(`/api/papers/${id}/archive`, { method: 'POST' })
+}
+
+export async function deletePaper(id: number) {
+  const response = await fetch(`/api/papers/${id}`, {
+    credentials: 'include',
+    method: 'DELETE',
+  })
+  const payload = await readJsonPayload(response)
+
+  if (!response.ok) throw getPaperApiError(response, payload)
+
+  if (
+    !isRecord(payload)
+    || payload.deleted !== true
+    || !isFiniteNumber(payload.paperId)
+  ) {
+    throw new Error('Invalid delete paper API response')
+  }
+
+  return payload.paperId
 }
