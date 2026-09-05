@@ -16,3 +16,7 @@ project/instance/
 users.db
 app.db
 AGENTS.md
+# Local attachment storage (never commit uploaded resources).
+/instance/uploads/
+/project/instance/uploads/
+/uploads/

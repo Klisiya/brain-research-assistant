@@ -20,8 +20,11 @@ from flask_login import (
 from flask_migrate import Migrate
 from flask_sqlalchemy import SQLAlchemy
 from openai import OpenAI
+from sqlalchemy import event
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from werkzeug.security import check_password_hash, generate_password_hash
+
+from attachment_api import register_attachment_api
 
 load_dotenv()
 
@@ -43,6 +46,18 @@ app.config["SQLALCHEMY_DATABASE_URI"] = get_database_url()
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 
 db = SQLAlchemy(app)
+
+# SQLite otherwise declares foreign keys without enforcing them on connections.
+with app.app_context():
+    if db.engine.dialect.name == "sqlite":
+        @event.listens_for(db.engine, "connect")
+        def enable_sqlite_foreign_keys(connection, _record):
+            cursor = connection.cursor()
+            try:
+                cursor.execute("PRAGMA foreign_keys=ON")
+            finally:
+                cursor.close()
+
 migrate = Migrate(app, db)
 
 login_manager = LoginManager(app)
@@ -326,6 +341,61 @@ class Paper(db.Model):
         foreign_keys=[updated_by_id],
         backref=db.backref("updated_papers", lazy="dynamic"),
     )
+
+    attachments = db.relationship(
+        "PaperAttachment", back_populates="paper", cascade="all, delete-orphan",
+        order_by="(PaperAttachment.sort_order, PaperAttachment.created_at, PaperAttachment.id)",
+    )
+
+
+class PaperAttachment(db.Model):
+    __tablename__ = "paper_attachments"
+    __table_args__ = (
+        db.CheckConstraint("attachment_type IN ('pdf', 'cover', 'slides', 'document', 'external_link')", name="ck_attachment_type"),
+        db.CheckConstraint("access_level IN ('public', 'authenticated', 'staff')", name="ck_attachment_access"),
+        db.CheckConstraint("version >= 1", name="ck_attachment_version"),
+        db.CheckConstraint(
+            "(attachment_type = 'external_link' AND external_url IS NOT NULL AND storage_key IS NULL "
+            "AND sha256 IS NULL AND file_size IS NULL AND mime_type IS NULL AND original_filename IS NULL) OR "
+            "(attachment_type != 'external_link' AND external_url IS NULL AND storage_key IS NOT NULL "
+            "AND sha256 IS NOT NULL AND file_size > 0 AND mime_type IS NOT NULL AND original_filename IS NOT NULL)",
+            name="ck_attachment_resource",
+        ),
+        db.UniqueConstraint("paper_id", "attachment_type", "sha256", name="uq_attachment_sha"),
+        db.Index("uq_attachment_primary", "paper_id", "attachment_type", unique=True,
+                 sqlite_where=db.text("attachment_type IN ('pdf', 'cover')"),
+                 postgresql_where=db.text("attachment_type IN ('pdf', 'cover')")),
+        {"sqlite_autoincrement": True},
+    )
+
+    id = db.Column(db.Integer, primary_key=True)
+    paper_id = db.Column(db.Integer, db.ForeignKey("papers.id"), nullable=False, index=True)
+    attachment_type = db.Column(db.String(30), nullable=False, index=True)
+    display_name = db.Column(db.String(300), nullable=False)
+    description = db.Column(db.String(1000), nullable=True)
+    original_filename = db.Column(db.String(500), nullable=True)
+    storage_key = db.Column(db.String(1000), nullable=True, unique=True)
+    mime_type = db.Column(db.String(150), nullable=True)
+    file_size = db.Column(db.Integer, nullable=True)
+    sha256 = db.Column(db.String(64), nullable=True, index=True)
+    external_url = db.Column(db.String(1500), nullable=True)
+    access_level = db.Column(db.String(30), nullable=False, default="public", server_default="public")
+    version = db.Column(db.Integer, nullable=False, default=1, server_default="1")
+    sort_order = db.Column(db.Integer, nullable=False, default=0, server_default="0")
+    uploaded_by_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False, index=True)
+    created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    paper = db.relationship("Paper", back_populates="attachments")
+    uploaded_by = db.relationship("User", foreign_keys=[uploaded_by_id])
+    __mapper_args__ = {"version_id_col": version, "version_id_generator": False}
+
+
+class AttachmentFileCleanup(db.Model):
+    """Durable outbox: deleting metadata cannot lose the file cleanup work."""
+    __tablename__ = "attachment_file_cleanup"
+    storage_key = db.Column(db.String(1000), primary_key=True)
+    created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
 
 
 @login_manager.user_loader
@@ -1708,18 +1778,7 @@ def api_archive_paper(paper_id):
 @app.route("/api/papers/<int:paper_id>", methods=["DELETE"])
 @roles_required(ADMIN_ROLE)
 def api_delete_paper(paper_id):
-    paper = db.session.get(Paper, paper_id)
-
-    if paper is None:
-        return paper_not_found_response()
-
-    db.session.delete(paper)
-    database_error = commit_paper_database_changes()
-
-    if database_error is not None:
-        return database_error
-
-    return jsonify({"deleted": True, "paperId": paper_id}), 200
+    return delete_paper_with_attachments(paper_id)
 
 
 @app.route("/assets/models/brain.glb")
@@ -1869,6 +1928,12 @@ def forgot_password():
 def logout():
     logout_user()
     return redirect(get_frontend_home_url())
+
+
+delete_paper_with_attachments = register_attachment_api(
+    app, db, Paper, PaperAttachment, AttachmentFileCleanup, roles_required,
+    can_manage_paper, paper_not_found_response,
+)
 
 
 if __name__ == "__main__":
