@@ -12,6 +12,7 @@ import BrainRegionPage from './pages/BrainRegionPage'
 import ContactPage from './pages/ContactPage'
 import InnovationHubPage from './pages/InnovationHubPage'
 import LoginPage from './pages/LoginPage'
+import NotFoundPage from './pages/NotFoundPage'
 import PaperDetailPage from './pages/PaperDetailPage'
 import PaperEditorPage from './pages/PaperEditorPage'
 import PaperManagementPage from './pages/PaperManagementPage'
@@ -82,6 +83,7 @@ function App() {
       />
       <Route element={<InnovationHubPage />} path="/innovation-hub" />
       <Route element={<BrainRegionPage />} path="/brain-region/:slug" />
+      <Route element={<NotFoundPage />} path="*" />
     </Routes>
   )
 }

@@ -35,5 +35,6 @@ export const PAPER_SORT_OPTIONS: readonly {
   { label: 'Recommended', value: 'recommended' },
   { label: 'Newest', value: 'newest' },
   { label: 'Oldest', value: 'oldest' },
-  { label: 'Reading Time', value: 'reading-time' },
+  { label: 'Reading Time', value: 'readingTime' },
+  { label: 'Title', value: 'title' },
 ]

@@ -5,7 +5,9 @@ import type {
   PaperDifficulty,
   PaperPublicationType,
   PaperResourceCategory,
+  PaperSort,
   PaperStatus,
+  PaperView,
   PaperWriteInput,
 } from '../types/paper'
 
@@ -19,6 +21,9 @@ export type PaperPagination = {
 export type PaperApiFilters = {
   q: string
   topic: string | null
+  author: string | null
+  year: number | null
+  view: Exclude<PaperView, 'progress'>
   difficulty: PaperDifficulty | null
   publicationType: PaperPublicationType | null
   resourceCategory: PaperResourceCategory | null
@@ -26,10 +31,22 @@ export type PaperApiFilters = {
   sort: 'recommended' | 'newest' | 'oldest' | 'readingTime' | 'title'
 }
 
+export type PaperAvailableFilters = {
+  topics: string[]
+  authors: string[]
+  years: number[]
+  difficulties: PaperDifficulty[]
+  publicationTypes: PaperPublicationType[]
+  resourceCategories: PaperResourceCategory[]
+}
+
 export type PaperListResponse = {
   papers: Paper[]
+  libraryTotal: number
   pagination: PaperPagination
   filters: PaperApiFilters
+  availableFilters: PaperAvailableFilters
+  highlights: Paper[]
 }
 
 export type PaperManagementSort = PaperApiFilters['sort']
@@ -47,7 +64,17 @@ export type ManagedPaperListResponse = {
 }
 
 type FetchPapersOptions = {
+  author?: string
+  difficulty?: PaperDifficulty
+  page?: number
+  perPage?: number
+  publicationType?: PaperPublicationType
+  q?: string
   signal?: AbortSignal
+  sort?: PaperSort
+  topic?: string
+  view?: Exclude<PaperView, 'progress'>
+  year?: number
 }
 
 type FetchPaperBySlugOptions = {
@@ -112,6 +139,7 @@ const API_SORTS: readonly PaperApiFilters['sort'][] = [
 ]
 
 const PAPER_STATUSES: readonly PaperStatus[] = ['draft', 'published', 'archived']
+const PAPER_VIEWS: readonly PaperApiFilters['view'][] = ['all', 'recommended', 'resources']
 const USER_ROLES: readonly PaperCreator['role'][] = ['user', 'teacher', 'admin']
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -190,6 +218,9 @@ function isApiFilters(value: unknown): value is PaperApiFilters {
 
   return typeof value.q === 'string'
     && isNullableString(value.topic)
+    && isNullableString(value.author)
+    && isNullableFiniteNumber(value.year)
+    && PAPER_VIEWS.includes(value.view as PaperApiFilters['view'])
     && (value.difficulty === null
       || DIFFICULTIES.includes(value.difficulty as PaperDifficulty))
     && (value.publicationType === null
@@ -198,6 +229,21 @@ function isApiFilters(value: unknown): value is PaperApiFilters {
       || RESOURCE_CATEGORIES.includes(value.resourceCategory as PaperResourceCategory))
     && (value.featured === null || typeof value.featured === 'boolean')
     && API_SORTS.includes(value.sort as PaperApiFilters['sort'])
+}
+
+function isAvailableFilters(value: unknown): value is PaperAvailableFilters {
+  if (!isRecord(value)) return false
+
+  return isStringArray(value.topics)
+    && isStringArray(value.authors)
+    && Array.isArray(value.years)
+    && value.years.every(isFiniteNumber)
+    && Array.isArray(value.difficulties)
+    && value.difficulties.every((entry) => DIFFICULTIES.includes(entry as PaperDifficulty))
+    && Array.isArray(value.publicationTypes)
+    && value.publicationTypes.every((entry) => PUBLICATION_TYPES.includes(entry as PaperPublicationType))
+    && Array.isArray(value.resourceCategories)
+    && value.resourceCategories.every((entry) => RESOURCE_CATEGORIES.includes(entry as PaperResourceCategory))
 }
 
 function isManagedApiFilters(value: unknown): value is ManagedPaperApiFilters {
@@ -213,8 +259,12 @@ function parsePaperListResponse(payload: unknown): PaperListResponse {
     !isRecord(payload)
     || !Array.isArray(payload.papers)
     || !payload.papers.every(isPaper)
+    || !isFiniteNumber(payload.libraryTotal)
     || !isPagination(payload.pagination)
     || !isApiFilters(payload.filters)
+    || !isAvailableFilters(payload.availableFilters)
+    || !Array.isArray(payload.highlights)
+    || !payload.highlights.every(isPaper)
   ) {
     throw new Error('Invalid papers API response')
   }
@@ -284,19 +334,39 @@ async function requestManagedPaper(
   return parseManagedPaperResponse(payload)
 }
 
-export async function fetchPapers({ signal }: FetchPapersOptions = {}) {
-  // Stage 4 will move filtering, pagination, and URL-backed search state to the API.
-  const searchParams = new URLSearchParams({ perPage: '50', sort: 'recommended' })
+export async function fetchPapers({
+  author,
+  difficulty,
+  page = 1,
+  perPage = 12,
+  publicationType,
+  q = '',
+  signal,
+  sort = 'recommended',
+  topic,
+  view = 'all',
+  year,
+}: FetchPapersOptions = {}) {
+  const searchParams = new URLSearchParams({
+    page: String(page),
+    perPage: String(perPage),
+    q: q.trim(),
+    sort,
+    view,
+  })
+
+  if (author) searchParams.set('author', author)
+  if (difficulty) searchParams.set('difficulty', difficulty)
+  if (publicationType) searchParams.set('publicationType', publicationType)
+  if (topic) searchParams.set('topic', topic)
+  if (year !== undefined) searchParams.set('year', String(year))
   const response = await fetch(`/api/papers?${searchParams}`, {
     credentials: 'include',
     signal,
   })
 
-  if (!response.ok) {
-    throw new Error(`Papers API request failed with status ${response.status}`)
-  }
-
-  const payload: unknown = await response.json()
+  const payload = await readJsonPayload(response)
+  if (!response.ok) throw getPaperApiError(response, payload)
   return parsePaperListResponse(payload)
 }
 

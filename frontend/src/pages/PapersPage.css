@@ -411,7 +411,7 @@
 
 .paper-filter-grid {
   display: grid;
-  grid-template-columns: minmax(260px, 2fr) repeat(4, minmax(122px, 1fr));
+  grid-template-columns: minmax(260px, 2fr) repeat(3, minmax(122px, 1fr));
   gap: 12px;
 }
 
@@ -474,6 +474,45 @@
 }
 
 .paper-filter-summary button:disabled { opacity: 0.38; cursor: default; }
+
+.papers-results-loading {
+  margin: 18px 0 -4px;
+  color: #7dd3fc;
+  font-size: 13px;
+  text-align: center;
+}
+
+.papers-pagination {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 30px;
+}
+
+.papers-pagination button {
+  min-width: 40px;
+  min-height: 40px;
+  padding: 0 13px;
+  border: 1px solid rgba(125, 211, 252, 0.2);
+  border-radius: 12px;
+  color: #bae6fd;
+  background: rgba(8, 47, 73, 0.36);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.papers-pagination button.is-active {
+  border-color: rgba(56, 189, 248, 0.7);
+  color: #f8fafc;
+  background: rgba(14, 116, 144, 0.5);
+}
+
+.papers-pagination button:disabled { opacity: 0.38; cursor: default; }
+.papers-pagination span { color: #64748b; }
 
 .paper-card-grid {
   display: grid;
@@ -636,6 +675,7 @@
 .paper-card-link:focus-visible,
 .reading-progress-column a:focus-visible,
 .paper-filter-summary button:focus-visible,
+.papers-pagination button:focus-visible,
 .papers-empty-state button:focus-visible {
   outline: 2px solid #7dd3fc;
   outline-offset: 3px;

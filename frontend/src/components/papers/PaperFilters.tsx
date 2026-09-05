@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react'
 import {
   PAPER_DIFFICULTIES,
   PAPER_PUBLICATION_TYPES,
@@ -11,49 +12,93 @@ import type {
 } from '../../types/paper'
 
 type PaperFiltersProps = {
+  author: string
+  availableAuthors: readonly string[]
   availableTopics: readonly string[]
+  availableYears: readonly number[]
   difficulty: PaperDifficulty | 'all'
   hasActiveFilters: boolean
   onClear: () => void
+  onAuthorChange: (author: string) => void
   onDifficultyChange: (difficulty: PaperDifficulty | 'all') => void
   onPublicationTypeChange: (publicationType: PaperPublicationType | 'all') => void
   onSearchChange: (searchTerm: string) => void
   onSortChange: (sort: PaperSort) => void
   onTopicChange: (topic: PaperTopic | 'all') => void
+  onYearChange: (year: number | null) => void
   publicationType: PaperPublicationType | 'all'
   resultCount: number
-  searchTerm: string
+  initialSearchTerm: string
   sort: PaperSort
   topic: PaperTopic | 'all'
+  year: number | null
 }
 
 function PaperFilters({
+  author,
+  availableAuthors,
   availableTopics,
+  availableYears,
   difficulty,
   hasActiveFilters,
   onClear,
+  onAuthorChange,
   onDifficultyChange,
   onPublicationTypeChange,
   onSearchChange,
   onSortChange,
   onTopicChange,
+  onYearChange,
   publicationType,
   resultCount,
-  searchTerm,
+  initialSearchTerm,
   sort,
   topic,
+  year,
 }: PaperFiltersProps) {
+  const [searchTerm, setSearchTerm] = useState(initialSearchTerm)
+
+  useEffect(() => {
+    const normalizedSearch = searchTerm.trim()
+    if (normalizedSearch === initialSearchTerm) return undefined
+    const timeoutId = window.setTimeout(() => onSearchChange(normalizedSearch), 400)
+    return () => window.clearTimeout(timeoutId)
+  }, [initialSearchTerm, onSearchChange, searchTerm])
+
   return (
     <section aria-label="Paper search and filters" className="paper-filters">
       <div className="paper-filter-grid">
         <label className="paper-search-field">
           <span>Search library</span>
           <input
-            onChange={(event) => onSearchChange(event.target.value)}
+            onChange={(event) => setSearchTerm(event.target.value)}
             placeholder="Search papers, authors, topics, or keywords..."
             type="search"
             value={searchTerm}
           />
+        </label>
+
+        <label>
+          <span>Author</span>
+          <select onChange={(event) => onAuthorChange(event.target.value)} value={author}>
+            <option value="">All Authors</option>
+            {availableAuthors.map((option) => (
+              <option key={option} value={option}>{option}</option>
+            ))}
+          </select>
+        </label>
+
+        <label>
+          <span>Year</span>
+          <select
+            onChange={(event) => onYearChange(event.target.value ? Number(event.target.value) : null)}
+            value={year ?? ''}
+          >
+            <option value="">All Years</option>
+            {availableYears.map((option) => (
+              <option key={option} value={option}>{option}</option>
+            ))}
+          </select>
         </label>
 
         <label>

@@ -16,7 +16,7 @@ export type PaperTopic = string
 
 export type PaperView = 'all' | 'recommended' | 'resources' | 'progress'
 
-export type PaperSort = 'recommended' | 'newest' | 'oldest' | 'reading-time'
+export type PaperSort = 'recommended' | 'newest' | 'oldest' | 'readingTime' | 'title'
 
 export type PaperStatus = 'draft' | 'published' | 'archived'
 

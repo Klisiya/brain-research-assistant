@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useLocation, useSearchParams } from 'react-router-dom'
-import { fetchPapers } from '../api/papers'
+import { fetchPapers, type PaperListResponse } from '../api/papers'
 import Footer from '../components/Footer'
 import Navbar from '../components/Navbar'
 import PageParticleBackground from '../components/PageParticleBackground'
@@ -10,11 +10,9 @@ import PapersHero from '../components/papers/PapersHero'
 import PapersTabs from '../components/papers/PapersTabs'
 import ReadingProgressPanel from '../components/papers/ReadingProgressPanel'
 import type {
-  Paper,
   PaperDifficulty,
   PaperPublicationType,
   PaperSort,
-  PaperTopic,
   PaperView,
 } from '../types/paper'
 import './PapersPage.css'
@@ -23,19 +21,82 @@ function isPaperView(value: string | null): value is Exclude<PaperView, 'all'> {
   return value === 'recommended' || value === 'resources' || value === 'progress'
 }
 
-function getRecommendationScore(paper: Paper) {
-  return Number(paper.featured) * 2 + Number(paper.resourceCategory === 'Recommended')
+const PAPER_SORTS: readonly PaperSort[] = [
+  'recommended',
+  'newest',
+  'oldest',
+  'readingTime',
+  'title',
+]
+
+type PaperQueryState = {
+  q: string
+  topic: string
+  author: string
+  difficulty: PaperDifficulty | 'all'
+  publicationType: PaperPublicationType | 'all'
+  year: number | null
+  view: PaperView
+  sort: PaperSort
+  page: number
 }
 
-function compareYears(
-  firstYear: number | null,
-  secondYear: number | null,
-  direction: 'newest' | 'oldest',
-) {
-  if (firstYear === null && secondYear === null) return 0
-  if (firstYear === null) return 1
-  if (secondYear === null) return -1
-  return direction === 'newest' ? secondYear - firstYear : firstYear - secondYear
+function readPaperQuery(searchParams: URLSearchParams): PaperQueryState {
+  const requestedSort = searchParams.get('sort') === 'reading-time'
+    ? 'readingTime'
+    : searchParams.get('sort')
+  const requestedPage = Number(searchParams.get('page'))
+  const requestedYear = Number(searchParams.get('year'))
+  const requestedDifficulty = searchParams.get('difficulty')
+  const requestedPublicationType = searchParams.get('publicationType')
+  const requestedView = searchParams.get('view')
+
+  return {
+    q: searchParams.get('q')?.trim() ?? '',
+    topic: searchParams.get('topic')?.trim() ?? '',
+    author: searchParams.get('author')?.trim() ?? '',
+    difficulty: requestedDifficulty === 'Beginner'
+      || requestedDifficulty === 'Intermediate'
+      || requestedDifficulty === 'Advanced'
+      ? requestedDifficulty
+      : 'all',
+    publicationType: requestedPublicationType === 'Research Article'
+      || requestedPublicationType === 'Review'
+      || requestedPublicationType === 'Book Chapter'
+      || requestedPublicationType === 'Learning Resource'
+      ? requestedPublicationType
+      : 'all',
+    year: Number.isInteger(requestedYear) && requestedYear >= 1800 ? requestedYear : null,
+    view: isPaperView(requestedView) ? requestedView : 'all',
+    sort: PAPER_SORTS.includes(requestedSort as PaperSort)
+      ? requestedSort as PaperSort
+      : 'recommended',
+    page: Number.isInteger(requestedPage) && requestedPage > 0 ? requestedPage : 1,
+  }
+}
+
+function buildPaperSearchParams(query: PaperQueryState) {
+  const params = new URLSearchParams({ page: String(query.page), sort: query.sort })
+  if (query.q) params.set('q', query.q)
+  if (query.topic) params.set('topic', query.topic)
+  if (query.author) params.set('author', query.author)
+  if (query.difficulty !== 'all') params.set('difficulty', query.difficulty)
+  if (query.publicationType !== 'all') params.set('publicationType', query.publicationType)
+  if (query.year !== null) params.set('year', String(query.year))
+  if (query.view !== 'all') params.set('view', query.view)
+  return params
+}
+
+function getPaginationItems(page: number, totalPages: number) {
+  if (totalPages <= 7) return Array.from({ length: totalPages }, (_, index) => index + 1)
+  const pages = new Set([1, totalPages, page - 1, page, page + 1])
+  const sorted = [...pages].filter((value) => value > 0 && value <= totalPages).sort((a, b) => a - b)
+  const items: Array<number | 'ellipsis'> = []
+  sorted.forEach((value, index) => {
+    if (index > 0 && value - sorted[index - 1] > 1) items.push('ellipsis')
+    items.push(value)
+  })
+  return items
 }
 
 function PapersLoadingState() {
@@ -61,137 +122,119 @@ function PapersLoadingState() {
 function PapersPage() {
   const location = useLocation()
   const [searchParams, setSearchParams] = useSearchParams()
-  const [searchTerm, setSearchTerm] = useState('')
-  const [topic, setTopic] = useState<PaperTopic | 'all'>('all')
-  const [difficulty, setDifficulty] = useState<PaperDifficulty | 'all'>('all')
-  const [publicationType, setPublicationType] = useState<PaperPublicationType | 'all'>('all')
-  const [sort, setSort] = useState<PaperSort>('recommended')
-  const [papers, setPapers] = useState<Paper[]>([])
-  const [resourceCount, setResourceCount] = useState(0)
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+  const query = readPaperQuery(searchParams)
   const [requestVersion, setRequestVersion] = useState(0)
+  const canonicalSearch = buildPaperSearchParams(query).toString()
+  const requestKey = `${canonicalSearch}:${requestVersion}`
+  const [requestState, setRequestState] = useState<{
+    key: string
+    payload: PaperListResponse | null
+    error: string | null
+  }>({ key: '', payload: null, error: null })
+  const payload = requestState.payload
+  const loading = requestState.key !== requestKey
+  const error = requestState.key === requestKey ? requestState.error : null
 
-  const requestedView = searchParams.get('view')
-  const activeView: PaperView = isPaperView(requestedView) ? requestedView : 'all'
+  const activeView = query.view
   const returnPath = `${location.pathname}${location.search}`
+  const papers = payload?.papers ?? []
+  const availableTopics = payload?.availableFilters.topics ?? []
+  const availableAuthors = payload?.availableFilters.authors ?? []
+  const availableYears = payload?.availableFilters.years ?? []
+  const topicCount = availableTopics.length
+  const difficultyLevelCount = payload?.availableFilters.difficulties.length ?? 0
+  const resourceCount = payload?.libraryTotal ?? 0
+  const resultCount = payload?.pagination.total ?? 0
+  const currentPage = payload?.pagination.page ?? query.page
+  const totalPages = payload?.pagination.totalPages ?? 0
+
+  const updateQuery = useCallback((
+    changes: Partial<PaperQueryState>,
+    { replace = false, resetPage = true } = {},
+  ) => {
+    const currentQuery = readPaperQuery(searchParams)
+    const nextQuery = {
+      ...currentQuery,
+      ...changes,
+      page: resetPage ? 1 : changes.page ?? currentQuery.page,
+    }
+    setSearchParams(buildPaperSearchParams(nextQuery), { replace })
+  }, [searchParams, setSearchParams])
+
+  const updateSearch = useCallback((q: string) => {
+    updateQuery({ q }, { replace: true })
+  }, [updateQuery])
 
   useEffect(() => {
     window.scrollTo({ left: 0, top: 0 })
   }, [])
 
   useEffect(() => {
+    if (canonicalSearch !== searchParams.toString()) {
+      setSearchParams(canonicalSearch, { replace: true })
+    }
+  }, [canonicalSearch, searchParams, setSearchParams])
+
+  useEffect(() => {
     const controller = new AbortController()
 
-    fetchPapers({ signal: controller.signal })
-      .then((payload) => {
+    fetchPapers({
+      author: query.author || undefined,
+      difficulty: query.difficulty === 'all' ? undefined : query.difficulty,
+      page: query.view === 'progress' ? 1 : query.page,
+      publicationType: query.publicationType === 'all' ? undefined : query.publicationType,
+      q: query.q,
+      signal: controller.signal,
+      sort: query.sort,
+      topic: query.topic || undefined,
+      view: query.view === 'progress' ? 'all' : query.view,
+      year: query.year ?? undefined,
+    })
+      .then((nextPayload) => {
         if (controller.signal.aborted) return
-        setPapers(payload.papers)
-        setResourceCount(payload.pagination.total)
-        setTopic((currentTopic) => (
-          currentTopic === 'all'
-          || payload.papers.some((paper) => paper.topics.includes(currentTopic))
-            ? currentTopic
-            : 'all'
-        ))
+        setRequestState({ key: requestKey, payload: nextPayload, error: null })
+        if (query.view !== 'progress' && nextPayload.pagination.page !== query.page) {
+          setSearchParams(buildPaperSearchParams({
+            q: query.q,
+            topic: query.topic,
+            author: query.author,
+            difficulty: query.difficulty,
+            publicationType: query.publicationType,
+            year: query.year,
+            view: query.view,
+            sort: query.sort,
+            page: nextPayload.pagination.page,
+          }), { replace: true })
+        }
       })
       .catch((requestError: unknown) => {
         if (controller.signal.aborted) return
         console.error('Unable to load the research library.', requestError)
-        setPapers([])
-        setResourceCount(0)
-        setError("We couldn't load the paper library right now.")
-      })
-      .finally(() => {
-        if (!controller.signal.aborted) setLoading(false)
+        setRequestState((current) => ({
+          key: requestKey,
+          payload: current.payload,
+          error: "We couldn't load the paper library right now.",
+        }))
       })
 
     return () => controller.abort()
-  }, [requestVersion])
+  }, [query.author, query.difficulty, query.page, query.publicationType, query.q,
+    query.sort, query.topic, query.view, query.year, requestKey, setSearchParams])
 
-  useEffect(() => {
-    if (requestedView && !isPaperView(requestedView)) {
-      const normalizedParams = new URLSearchParams(searchParams)
-      normalizedParams.delete('view')
-      setSearchParams(normalizedParams, { replace: true })
-    }
-  }, [requestedView, searchParams, setSearchParams])
-
-  const visiblePapers = useMemo(() => {
-    const normalizedSearch = searchTerm.trim().toLocaleLowerCase()
-
-    const filteredPapers = papers.filter((paper) => {
-      const matchesView = activeView === 'all'
-        || activeView === 'progress'
-        || (activeView === 'recommended'
-          && (paper.featured || paper.resourceCategory === 'Recommended'))
-        || (activeView === 'resources'
-          && (paper.publicationType === 'Review'
-            || paper.publicationType === 'Book Chapter'
-            || paper.publicationType === 'Learning Resource'
-            || paper.resourceCategory === 'Course Resource'))
-
-      const searchableText = [
-        paper.title,
-        ...paper.authors,
-        paper.journal ?? '',
-        paper.year?.toString() ?? '',
-        paper.abstract,
-        ...paper.topics,
-        ...paper.keywords,
-        ...paper.learningObjectives,
-        paper.publicationType,
-        paper.resourceCategory,
-      ].join(' ').toLocaleLowerCase()
-
-      return matchesView
-        && (!normalizedSearch || searchableText.includes(normalizedSearch))
-        && (topic === 'all' || paper.topics.includes(topic))
-        && (difficulty === 'all' || paper.difficulty === difficulty)
-        && (publicationType === 'all' || paper.publicationType === publicationType)
-    })
-
-    return [...filteredPapers].sort((firstPaper, secondPaper) => {
-      if (sort === 'newest') return compareYears(firstPaper.year, secondPaper.year, 'newest')
-      if (sort === 'oldest') return compareYears(firstPaper.year, secondPaper.year, 'oldest')
-      if (sort === 'reading-time') {
-        return firstPaper.estimatedReadingMinutes - secondPaper.estimatedReadingMinutes
-      }
-
-      const scoreDifference = getRecommendationScore(secondPaper)
-        - getRecommendationScore(firstPaper)
-      return scoreDifference || compareYears(firstPaper.year, secondPaper.year, 'newest')
-    })
-  }, [activeView, difficulty, papers, publicationType, searchTerm, sort, topic])
-
-  const availableTopics = useMemo(
-    () => Array.from(new Set(papers.flatMap((paper) => paper.topics)))
-      .sort((firstTopic, secondTopic) => firstTopic.localeCompare(secondTopic)),
-    [papers],
-  )
-  const topicCount = availableTopics.length
-  const difficultyLevelCount = useMemo(
-    () => new Set(papers.map((paper) => paper.difficulty)).size,
-    [papers],
-  )
-
-  const hasActiveFilters = Boolean(searchTerm)
-    || topic !== 'all'
-    || difficulty !== 'all'
-    || publicationType !== 'all'
+  const hasActiveFilters = Boolean(query.q)
+    || Boolean(query.topic)
+    || Boolean(query.author)
+    || query.difficulty !== 'all'
+    || query.publicationType !== 'all'
+    || query.year !== null
 
   const clearFilters = () => {
-    setSearchTerm('')
-    setTopic('all')
-    setDifficulty('all')
-    setPublicationType('all')
+    updateQuery({
+      q: '', topic: '', author: '', difficulty: 'all', publicationType: 'all', year: null,
+    })
   }
 
   const retryPapers = () => {
-    setLoading(true)
-    setError(null)
-    setPapers([])
-    setResourceCount(0)
     setRequestVersion((version) => version + 1)
   }
 
@@ -203,15 +246,18 @@ function PapersPage() {
       <main className="papers-main">
         <PapersHero
           difficultyLevelCount={difficultyLevelCount}
-          loading={loading}
-          papers={papers}
+          loading={loading && payload === null}
+          papers={payload?.highlights ?? []}
           resourceCount={resourceCount}
           topicCount={topicCount}
         />
 
-        <PapersTabs activeView={activeView} />
+        <PapersTabs
+          activeView={activeView}
+          searchParams={buildPaperSearchParams(query)}
+        />
 
-        {loading ? (
+        {loading && payload === null ? (
           <PapersLoadingState />
         ) : error ? (
           <section className="papers-empty-state papers-error-state" role="alert">
@@ -224,7 +270,7 @@ function PapersPage() {
           </section>
         ) : activeView === 'progress' ? (
           <ReadingProgressPanel />
-        ) : papers.length === 0 ? (
+        ) : resourceCount === 0 ? (
           <section className="papers-empty-state">
             <span>Research Library</span>
             <h2>No published resources yet</h2>
@@ -233,25 +279,34 @@ function PapersPage() {
         ) : (
           <>
             <PaperFilters
+              author={query.author}
+              availableAuthors={availableAuthors}
               availableTopics={availableTopics}
-              difficulty={difficulty}
+              availableYears={availableYears}
+              difficulty={query.difficulty}
               hasActiveFilters={hasActiveFilters}
+              initialSearchTerm={query.q}
+              key={query.q}
+              onAuthorChange={(author) => updateQuery({ author })}
               onClear={clearFilters}
-              onDifficultyChange={setDifficulty}
-              onPublicationTypeChange={setPublicationType}
-              onSearchChange={setSearchTerm}
-              onSortChange={setSort}
-              onTopicChange={setTopic}
-              publicationType={publicationType}
-              resultCount={visiblePapers.length}
-              searchTerm={searchTerm}
-              sort={sort}
-              topic={topic}
+              onDifficultyChange={(difficulty) => updateQuery({ difficulty })}
+              onPublicationTypeChange={(publicationType) => updateQuery({ publicationType })}
+              onSearchChange={updateSearch}
+              onSortChange={(sort) => updateQuery({ sort })}
+              onTopicChange={(topic) => updateQuery({ topic: topic === 'all' ? '' : topic })}
+              onYearChange={(year) => updateQuery({ year })}
+              publicationType={query.publicationType}
+              resultCount={resultCount}
+              sort={query.sort}
+              topic={query.topic || 'all'}
+              year={query.year}
             />
 
-            {visiblePapers.length > 0 ? (
-              <section aria-label="Paper results" className="paper-card-grid">
-                {visiblePapers.map((paper) => (
+            {loading && <p aria-live="polite" className="papers-results-loading">Updating results...</p>}
+
+            {papers.length > 0 ? (
+              <section aria-busy={loading} aria-label="Paper results" className="paper-card-grid">
+                {papers.map((paper) => (
                   <PaperCard key={paper.id} paper={paper} returnPath={returnPath} />
                 ))}
               </section>
@@ -262,6 +317,41 @@ function PapersPage() {
                 <p>Adjust your search terms or clear one or more library filters.</p>
                 <button onClick={clearFilters} type="button">Clear Filters</button>
               </section>
+            )}
+
+            {totalPages > 1 && (
+              <nav aria-label="Paper results pages" className="papers-pagination">
+                <button
+                  disabled={currentPage <= 1 || loading}
+                  onClick={() => updateQuery({ page: currentPage - 1 }, { resetPage: false })}
+                  type="button"
+                >
+                  Previous
+                </button>
+                {getPaginationItems(currentPage, totalPages).map((item, index) => (
+                  item === 'ellipsis' ? (
+                    <span aria-hidden="true" key={`ellipsis-${index}`}>...</span>
+                  ) : (
+                    <button
+                      aria-current={item === currentPage ? 'page' : undefined}
+                      className={item === currentPage ? 'is-active' : undefined}
+                      disabled={loading}
+                      key={item}
+                      onClick={() => updateQuery({ page: item }, { resetPage: false })}
+                      type="button"
+                    >
+                      {item}
+                    </button>
+                  )
+                ))}
+                <button
+                  disabled={currentPage >= totalPages || loading}
+                  onClick={() => updateQuery({ page: currentPage + 1 }, { resetPage: false })}
+                  type="button"
+                >
+                  Next
+                </button>
+              </nav>
             )}
           </>
         )}

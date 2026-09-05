@@ -81,6 +81,8 @@ PAPER_RESOURCE_CATEGORIES = {"Foundational", "Recommended", "Course Resource", "
 PAPER_STATUSES = {"draft", "published", "archived"}
 PAPER_PUBLIC_SORTS = {"recommended", "newest", "oldest", "readingTime", "title"}
 PAPER_MANAGEMENT_SORTS = PAPER_PUBLIC_SORTS
+PAPER_PUBLIC_VIEWS = {"all", "recommended", "resources"}
+PAPER_RESOURCE_PUBLICATION_TYPES = {"Review", "Book Chapter", "Learning Resource"}
 
 instructions = """
 You are a Brain Research Learning Assistant
@@ -1051,9 +1053,29 @@ def parse_paper_list_filters(*, management=False):
         return filters
 
     topic = request.args.get("topic") or None
+    author = request.args.get("author") or None
+    year_raw = request.args.get("year")
+    view = request.args.get("view", "all")
 
     if topic is not None:
         topic = validate_paper_string(topic, "topic", maximum_length=100)
+
+    if author is not None:
+        author = validate_paper_string(author, "author", maximum_length=300)
+
+    if year_raw in {None, ""}:
+        year = None
+    else:
+        try:
+            year = validate_paper_year(int(year_raw))
+        except (TypeError, ValueError) as error:
+            raise PaperValidationError("year must be a valid integer.", "year") from error
+
+    if view not in PAPER_PUBLIC_VIEWS:
+        raise PaperValidationError(
+            f"view must be one of: {', '.join(sorted(PAPER_PUBLIC_VIEWS))}.",
+            "view",
+        )
 
     difficulty = request.args.get("difficulty") or None
     publication_type = request.args.get("publicationType") or None
@@ -1087,6 +1109,9 @@ def parse_paper_list_filters(*, management=False):
     filters.update(
         {
             "topic": topic,
+            "author": author,
+            "year": year,
+            "view": view,
             "difficulty": difficulty,
             "publicationType": publication_type,
             "resourceCategory": resource_category,
@@ -1125,6 +1150,28 @@ def apply_paper_python_filters(papers, filters, *, management=False):
             if any(topic.casefold() == normalized_topic for topic in (paper.topics or []))
         ]
 
+    if not management and filters["author"] is not None:
+        normalized_author = filters["author"].casefold()
+        filtered = [
+            paper
+            for paper in filtered
+            if any(author.casefold() == normalized_author for author in (paper.authors or []))
+        ]
+
+    if not management and filters["view"] == "recommended":
+        filtered = [
+            paper
+            for paper in filtered
+            if paper.featured or paper.resource_category == "Recommended"
+        ]
+    elif not management and filters["view"] == "resources":
+        filtered = [
+            paper
+            for paper in filtered
+            if paper.publication_type in PAPER_RESOURCE_PUBLICATION_TYPES
+            or paper.resource_category == "Course Resource"
+        ]
+
     return filtered
 
 
@@ -1133,7 +1180,7 @@ def get_paper_sort_timestamp(paper):
     return timestamp.timestamp() if timestamp else 0
 
 
-def sort_papers(papers, sort):
+def sort_papers(papers, sort, *, include_resource_recommendation=False):
     if sort == "newest":
         return sorted(
             papers,
@@ -1163,6 +1210,16 @@ def sort_papers(papers, sort):
     if sort == "title":
         return sorted(papers, key=lambda paper: paper.title.casefold())
 
+    if include_resource_recommendation:
+        return sorted(
+            papers,
+            key=lambda paper: (
+                -(int(paper.featured) * 2 + int(paper.resource_category == "Recommended")),
+                -get_paper_sort_timestamp(paper),
+                paper.title.casefold(),
+            ),
+        )
+
     return sorted(
         papers,
         key=lambda paper: (not paper.featured, -get_paper_sort_timestamp(paper)),
@@ -1171,12 +1228,14 @@ def sort_papers(papers, sort):
 
 def paginate_papers(papers, page, per_page):
     total = len(papers)
-    start = (page - 1) * per_page
+    total_pages = ceil(total / per_page) if total else 0
+    normalized_page = min(page, total_pages) if total_pages else 1
+    start = (normalized_page - 1) * per_page
     return papers[start : start + per_page], {
-        "page": page,
+        "page": normalized_page,
         "perPage": per_page,
         "total": total,
-        "totalPages": ceil(total / per_page) if total else 0,
+        "totalPages": total_pages,
     }
 
 
@@ -1235,6 +1294,9 @@ def public_paper_filter_response(filters):
     return {
         "q": filters["q"],
         "topic": filters["topic"],
+        "author": filters["author"],
+        "year": filters["year"],
+        "view": filters["view"],
         "difficulty": filters["difficulty"],
         "publicationType": filters["publicationType"],
         "resourceCategory": filters["resourceCategory"],
@@ -1579,6 +1641,7 @@ def api_papers():
         return paper_validation_error_response(error)
 
     query = Paper.query.filter_by(status="published")
+    published_papers = query.all()
 
     if filters["difficulty"] is not None:
         query = query.filter_by(difficulty=filters["difficulty"])
@@ -1592,8 +1655,15 @@ def api_papers():
     if filters["featured"] is not None:
         query = query.filter_by(featured=filters["featured"])
 
+    if filters["year"] is not None:
+        query = query.filter_by(year=filters["year"])
+
     papers = apply_paper_python_filters(query.all(), filters)
-    papers = sort_papers(papers, filters["sort"])
+    papers = sort_papers(
+        papers,
+        filters["sort"],
+        include_resource_recommendation=filters["sort"] == "recommended",
+    )
     page_items, pagination = paginate_papers(
         papers,
         filters["page"],
@@ -1604,8 +1674,34 @@ def api_papers():
         jsonify(
             {
                 "papers": [serialize_paper(paper) for paper in page_items],
+                "libraryTotal": len(published_papers),
                 "pagination": pagination,
                 "filters": public_paper_filter_response(filters),
+                "availableFilters": {
+                    "topics": sorted(
+                        {topic for paper in published_papers for topic in (paper.topics or [])},
+                        key=str.casefold,
+                    ),
+                    "authors": sorted(
+                        {author for paper in published_papers for author in (paper.authors or [])},
+                        key=str.casefold,
+                    ),
+                    "years": sorted(
+                        {paper.year for paper in published_papers if paper.year is not None},
+                        reverse=True,
+                    ),
+                    "difficulties": sorted({paper.difficulty for paper in published_papers}),
+                    "publicationTypes": sorted({paper.publication_type for paper in published_papers}),
+                    "resourceCategories": sorted({paper.resource_category for paper in published_papers}),
+                },
+                "highlights": [
+                    serialize_paper(paper)
+                    for paper in sort_papers(
+                        published_papers,
+                        "recommended",
+                        include_resource_recommendation=True,
+                    )[:12]
+                ],
             }
         ),
         200,
