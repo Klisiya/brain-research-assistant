@@ -1,4 +1,4 @@
-"""R1A public Papers query closure with more than 50 published records."""
+"""Public Papers search, filtering, and pagination tests."""
 from datetime import datetime
 import os
 from pathlib import Path

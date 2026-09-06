@@ -6,17 +6,31 @@
 python-*.exe
 
 .env
-**/.env
+.env.*
+!.env.example
 
 instance/
-project/instance/
+uploads/
 *.db
 *.sqlite
 *.sqlite3
-users.db
-app.db
-AGENTS.md
-# Local attachment storage (never commit uploaded resources).
-/instance/uploads/
-/project/instance/uploads/
-/uploads/
+
+node_modules/
+dist/
+dist-ssr/
+coverage/
+.coverage
+htmlcov/
+.pytest_cache/
+*.log
+*.bak
+
+/temp/
+/tmp/
+/backup/
+/project/temp/
+/project/tmp/
+/project/backup/
+/frontend/temp/
+/frontend/tmp/
+/frontend/backup/

@@ -1,4 +1,4 @@
-"""Stage 3A tests: memory DB, disposable uploads, generated fixtures only."""
+"""Attachment API tests with isolated storage and generated fixtures."""
 import hashlib
 from io import BytesIO
 import os
