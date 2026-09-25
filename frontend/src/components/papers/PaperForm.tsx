@@ -21,6 +21,11 @@ type PaperFormValues = {
   externalUrl: string
   featured: boolean
   journal: string
+  doi: string
+  volume: string
+  issue: string
+  pages: string
+  publisher: string
   keywords: string
   learningObjectives: string
   openAccess: boolean
@@ -68,6 +73,11 @@ const FORM_FIELDS: readonly PaperFormField[] = [
   'externalUrl',
   'featured',
   'journal',
+  'doi',
+  'volume',
+  'issue',
+  'pages',
+  'publisher',
   'keywords',
   'learningObjectives',
   'openAccess',
@@ -87,6 +97,11 @@ function getInitialValues(paper?: ManagedPaper): PaperFormValues {
     externalUrl: paper?.externalUrl ?? '',
     featured: paper?.featured ?? false,
     journal: paper?.journal ?? '',
+    doi: paper?.doi ?? '',
+    volume: paper?.volume ?? '',
+    issue: paper?.issue ?? '',
+    pages: paper?.pages ?? '',
+    publisher: paper?.publisher ?? '',
     keywords: paper?.keywords.join(', ') ?? '',
     learningObjectives: paper?.learningObjectives.join('\n') ?? '',
     openAccess: paper?.openAccess ?? false,
@@ -144,6 +159,17 @@ function validateForm(values: PaperFormValues, status: PaperStatus) {
 
   if (journal.length > 300) errors.journal = 'Journal must be at most 300 characters.'
 
+  const doi = values.doi.trim().replace(/^(?:doi:\s*|https?:\/\/doi\.org\/)/i, '').trim()
+  if (values.doi.trim() && (doi.length > 255 || !/^10\.[0-9]{4,9}\/\S+$/u.test(doi)
+    || Array.from(doi).some((character) => character.charCodeAt(0) < 32
+      || (character.charCodeAt(0) >= 127 && character.charCodeAt(0) <= 159)))) {
+    errors.doi = 'Enter a valid DOI identifier.'
+  }
+  for (const field of ['volume', 'issue', 'pages', 'publisher'] as const) {
+    const limit = field === 'publisher' ? 300 : 100
+    if (values[field].trim().length > limit) errors[field] = `${field} must be at most ${limit} characters.`
+  }
+
   if (topics.length === 0) errors.topics = 'Add at least one topic.'
   else if (topics.some((topic) => topic.length > 100)) {
     errors.topics = 'Each topic must be at most 100 characters.'
@@ -191,6 +217,11 @@ function validateForm(values: PaperFormValues, status: PaperStatus) {
     externalUrl: externalUrl || null,
     featured: values.featured,
     journal: journal || null,
+    doi: values.doi.trim() || null,
+    volume: values.volume.trim() || null,
+    issue: values.issue.trim() || null,
+    pages: values.pages.trim() || null,
+    publisher: values.publisher.trim() || null,
     keywords,
     learningObjectives,
     openAccess: values.openAccess,
@@ -363,6 +394,19 @@ function PaperForm({ initialPaper, mode, onSubmit }: PaperFormProps) {
                 />
                 <FieldError field="journal" message={fieldErrors.journal} />
               </label>
+              <label className="paper-form-field" htmlFor="paper-doi">
+                <span>DOI</span>
+                <input aria-describedby={fieldErrors.doi ? 'paper-doi-error' : 'paper-doi-hint'} aria-invalid={Boolean(fieldErrors.doi)} id="paper-doi" onChange={(event) => updateValue('doi', event.target.value)} placeholder="10.xxxx/xxxxx" value={values.doi} />
+                <small id="paper-doi-hint">DOI identifier only. DOI URLs are also accepted.</small>
+                <FieldError field="doi" message={fieldErrors.doi} />
+              </label>
+              {(['volume', 'issue', 'pages', 'publisher'] as const).map((field) => (
+                <label className="paper-form-field" htmlFor={`paper-${field}`} key={field}>
+                  <span>{field.charAt(0).toUpperCase() + field.slice(1)}</span>
+                  <input aria-describedby={fieldErrors[field] ? `paper-${field}-error` : undefined} aria-invalid={Boolean(fieldErrors[field])} id={`paper-${field}`} maxLength={field === 'publisher' ? 300 : 100} onChange={(event) => updateValue(field, event.target.value)} value={values[field]} />
+                  <FieldError field={field} message={fieldErrors[field]} />
+                </label>
+              ))}
             </div>
           </section>
 

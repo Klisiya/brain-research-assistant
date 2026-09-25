@@ -33,6 +33,11 @@ export type Paper = {
   authors: string[]
   year: number | null
   journal: string | null
+  doi?: string | null
+  volume?: string | null
+  issue?: string | null
+  pages?: string | null
+  publisher?: string | null
   publicationType: PaperPublicationType
   topics: string[]
   difficulty: PaperDifficulty
@@ -55,11 +60,21 @@ export type ManagedPaper = Paper & {
   updatedById: number | null
 }
 
+export type PreviewPaper = Paper & {
+  status: PaperStatus
+  preview: true
+}
+
 export type PaperWriteInput = {
   title: string
   authors: string[]
   year: number | null
   journal: string | null
+  doi: string | null
+  volume: string | null
+  issue: string | null
+  pages: string | null
+  publisher: string | null
   publicationType: PaperPublicationType
   topics: string[]
   difficulty: PaperDifficulty

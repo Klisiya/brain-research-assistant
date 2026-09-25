@@ -1,17 +1,17 @@
 import { useEffect, useState } from 'react'
 import { Link, useLocation, useParams } from 'react-router-dom'
-import { fetchPaperBySlug, PaperNotFoundError } from '../api/papers'
+import { fetchManagedPaperPreview, fetchPaperBySlug, PaperApiError, PaperNotFoundError } from '../api/papers'
 import Footer from '../components/Footer'
 import Navbar from '../components/Navbar'
 import PageParticleBackground from '../components/PageParticleBackground'
-import type { Paper } from '../types/paper'
+import type { Paper, PreviewPaper } from '../types/paper'
 import './PaperDetailPage.css'
 
-type PaperDetailError = 'not-found' | 'unavailable'
+type PaperDetailError = 'not-found' | 'unavailable' | 'forbidden' | 'session'
 
 type PaperDetailResult = {
   error: PaperDetailError | null
-  paper: Paper | null
+  paper: Paper | PreviewPaper | null
   requestId: string
 }
 
@@ -60,8 +60,34 @@ function getExternalSourceUrl(externalUrl: string | null) {
   }
 }
 
+function getDoiUrl(doi: string | null | undefined) {
+  return doi ? `https://doi.org/${encodeURIComponent(doi)}` : null
+}
+
+function getCitation(paper: Paper) {
+  const sentence = (value: string) => `${value.replace(/\.+$/, '')}.`
+  const source = paper.journal?.trim() || paper.publisher?.trim()
+  const volume = paper.volume?.trim()
+  const issue = paper.issue?.trim()
+  const pages = paper.pages?.trim()
+  const publication = [source, volume ? `${volume}${issue ? `(${issue})` : ''}` : issue ? `(${issue})` : null, pages]
+    .filter(Boolean).join(', ')
+  const pieces = [
+    paper.authors.length ? sentence(paper.authors.join(', ')) : null,
+    paper.year ? `(${paper.year}).` : null,
+    paper.title.trim() ? sentence(paper.title.trim()) : null,
+    publication ? sentence(publication) : null,
+    getDoiUrl(paper.doi)?.replace(/%2F/gi, '/'),
+  ]
+  return pieces.filter(Boolean).join(' ')
+}
+
 function isAbortError(error: unknown) {
   return error instanceof DOMException && error.name === 'AbortError'
+}
+
+function isPreviewPaper(paper: Paper | PreviewPaper): paper is PreviewPaper {
+  return 'preview' in paper && paper.preview === true
 }
 
 function PaperDetailLoadingState() {
@@ -128,12 +154,17 @@ function PaperDetailStatus({
   error,
   onRetry,
   returnPath,
+  preview,
 }: {
   error: PaperDetailError
   onRetry: () => void
   returnPath: string
+  preview: boolean
 }) {
   const isNotFound = error === 'not-found'
+  const title = isNotFound ? 'Paper Not Found' : preview
+    ? error === 'forbidden' ? 'Preview Access Denied' : error === 'session' ? 'Sign In Required' : 'Preview Unavailable'
+    : 'Research Library Unavailable'
 
   return (
     <section
@@ -142,46 +173,55 @@ function PaperDetailStatus({
       role={isNotFound ? undefined : 'alert'}
     >
       <span>Research Library</span>
-      <h1>{isNotFound ? 'Paper Not Found' : 'Research Library Unavailable'}</h1>
+      <h1>{title}</h1>
       <p>
         {isNotFound
           ? 'The requested resource is not available in the research library.'
-          : "We couldn't load this research resource right now."}
+          : error === 'forbidden' ? 'You do not have permission to preview this paper.'
+            : error === 'session' ? 'Your session has expired. Please sign in again.'
+              : "We couldn't load this research resource right now."}
       </p>
       <div className="paper-detail-status-actions">
-        {!isNotFound && (
+        {error === 'unavailable' && (
           <button className="paper-detail-retry" onClick={onRetry} type="button">
             Try Again
           </button>
         )}
-        <Link to={returnPath}>Back to Paper Library</Link>
+        {error === 'session' ? <Link state={{ from: window.location.pathname, managementRequired: true }} to="/login">Sign In</Link> : null}
+        <Link to={returnPath}>{preview ? 'Back to Papers Management' : 'Back to Paper Library'}</Link>
       </div>
     </section>
   )
 }
 
-function PaperDetailPage() {
-  const { slug } = useParams<{ slug: string }>()
+function PaperDetailPage({ preview = false }: { preview?: boolean }) {
+  const { slug, id } = useParams<{ slug: string; id: string }>()
   const location = useLocation()
-  const returnPath = getReturnPath(location.state)
+  const returnPath = preview ? '/manage/papers' : getReturnPath(location.state)
+  const paperId = id ? Number(id) : null
+  const validId = paperId !== null && Number.isInteger(paperId) && paperId > 0
   const [result, setResult] = useState<PaperDetailResult | null>(null)
   const [requestVersion, setRequestVersion] = useState(0)
-  const requestId = `${slug ?? ''}:${requestVersion}`
+  const [copyState, setCopyState] = useState<'copied' | 'failed' | null>(null)
+  const requestId = `${preview ? `preview:${id ?? ''}` : `public:${slug ?? ''}`}:${requestVersion}`
   const currentResult = result?.requestId === requestId ? result : null
-  const loading = Boolean(slug) && currentResult === null
+  const loading = (preview ? validId : Boolean(slug)) && currentResult === null
   const paper = currentResult?.paper ?? null
-  const error = slug ? (currentResult?.error ?? null) : 'not-found'
+  const error = (preview ? validId : Boolean(slug)) ? (currentResult?.error ?? null) : 'not-found'
 
   useEffect(() => {
     window.scrollTo({ left: 0, top: 0 })
-  }, [slug])
+  }, [id, slug])
 
   useEffect(() => {
-    if (!slug) return undefined
+    if (preview ? !validId || paperId === null : !slug) return undefined
 
     const controller = new AbortController()
 
-    fetchPaperBySlug(slug, { signal: controller.signal })
+    const request = preview && paperId !== null
+      ? fetchManagedPaperPreview(paperId, { signal: controller.signal })
+      : fetchPaperBySlug(slug!, { signal: controller.signal })
+    request
       .then((loadedPaper) => {
         if (!controller.signal.aborted) {
           setResult({ error: null, paper: loadedPaper, requestId })
@@ -190,8 +230,13 @@ function PaperDetailPage() {
       .catch((requestError: unknown) => {
         if (controller.signal.aborted || isAbortError(requestError)) return
 
-        if (requestError instanceof PaperNotFoundError) {
+        if (requestError instanceof PaperNotFoundError || (requestError instanceof PaperApiError && requestError.status === 404)) {
           setResult({ error: 'not-found', paper: null, requestId })
+          return
+        }
+
+        if (preview && requestError instanceof PaperApiError && (requestError.status === 401 || requestError.status === 403)) {
+          setResult({ error: requestError.status === 401 ? 'session' : 'forbidden', paper: null, requestId })
           return
         }
 
@@ -200,7 +245,7 @@ function PaperDetailPage() {
       })
 
     return () => controller.abort()
-  }, [requestId, slug])
+  }, [requestId, slug, preview, paperId, validId])
 
   const retryPaper = () => {
     setRequestVersion((version) => version + 1)
@@ -210,27 +255,47 @@ function PaperDetailPage() {
     ? formatPublishedDate(paper.publishedAt)
     : null
   const externalSourceUrl = paper ? getExternalSourceUrl(paper.externalUrl) : null
+  const citation = paper ? getCitation(paper) : ''
+  const doiUrl = paper ? getDoiUrl(paper.doi) : null
 
-  return (
-    <div className="paper-detail-page">
-      <PageParticleBackground />
-      <Navbar />
+  useEffect(() => {
+    if (!copyState) return undefined
+    const timeout = window.setTimeout(() => setCopyState(null), 2400)
+    return () => window.clearTimeout(timeout)
+  }, [copyState])
 
-      <main className="paper-detail-main">
+  const copyCitation = async () => {
+    try {
+      await navigator.clipboard.writeText(citation)
+      setCopyState('copied')
+    } catch {
+      setCopyState('failed')
+    }
+  }
+
+  const content = (
+      <main className={`paper-detail-main${preview ? ' is-preview' : ''}`}>
         {loading ? (
           <>
             <Link className="paper-detail-back" to={returnPath}>
-              <span aria-hidden="true">←</span> Back to Paper Library
+              <span aria-hidden="true">←</span> {preview ? 'Back to Papers Management' : 'Back to Paper Library'}
             </Link>
             <PaperDetailLoadingState />
           </>
         ) : error ? (
-          <PaperDetailStatus error={error} onRetry={retryPaper} returnPath={returnPath} />
+          <PaperDetailStatus error={error} onRetry={retryPaper} preview={preview} returnPath={returnPath} />
         ) : paper ? (
           <>
             <Link className="paper-detail-back" to={returnPath}>
-              <span aria-hidden="true">←</span> Back to Paper Library
+              <span aria-hidden="true">←</span> {preview ? 'Back to Papers Management' : 'Back to Paper Library'}
             </Link>
+
+            {preview && isPreviewPaper(paper) ? (
+              <div className="paper-preview-banner">
+                <strong>Preview Mode · {paper.status.charAt(0).toUpperCase() + paper.status.slice(1)}</strong>
+                <Link to={`/manage/papers/${paper.id}/edit`}>Back to Edit</Link>
+              </div>
+            ) : null}
 
             <article>
               <header className="paper-detail-hero">
@@ -327,6 +392,22 @@ function PaperDetailPage() {
                       <p className="paper-detail-empty-meta">No keywords listed.</p>
                     )}
                   </section>
+                  <section className="paper-detail-citation">
+                    <h2>Citation</h2>
+                    <dl>
+                      {paper.authors.length > 0 && <div><dt>Authors</dt><dd>{paper.authors.join(', ')}</dd></div>}
+                      {paper.year && <div><dt>Year</dt><dd>{paper.year}</dd></div>}
+                      {paper.title && <div><dt>Title</dt><dd>{paper.title}</dd></div>}
+                      {paper.journal && <div><dt>Journal</dt><dd>{paper.journal}</dd></div>}
+                      {paper.publisher && <div><dt>Publisher</dt><dd>{paper.publisher}</dd></div>}
+                      {paper.volume && <div><dt>Volume</dt><dd>{paper.volume}</dd></div>}
+                      {paper.issue && <div><dt>Issue</dt><dd>{paper.issue}</dd></div>}
+                      {paper.pages && <div><dt>Pages</dt><dd>{paper.pages}</dd></div>}
+                      {doiUrl && <div><dt>DOI</dt><dd><a href={doiUrl} rel="noopener noreferrer" target="_blank">{paper.doi}</a></dd></div>}
+                    </dl>
+                    <button onClick={() => void copyCitation()} type="button">Copy Citation</button>
+                    <span aria-live="polite">{copyState === 'copied' ? 'Copied' : copyState === 'failed' ? 'Could not copy citation.' : ''}</span>
+                  </section>
                   <section className="paper-detail-source">
                     <h2>Source</h2>
                     {externalSourceUrl ? (
@@ -343,7 +424,15 @@ function PaperDetailPage() {
           </>
         ) : null}
       </main>
+  )
 
+  if (preview) return content
+
+  return (
+    <div className="paper-detail-page">
+      <PageParticleBackground />
+      <Navbar />
+      {content}
       <Footer />
     </div>
   )

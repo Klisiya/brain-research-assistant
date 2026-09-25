@@ -81,6 +81,14 @@ function App() {
         )}
         path="/manage/papers/:id/edit"
       />
+      <Route
+        element={(
+          <PapersManagementGuard>
+            {() => <PaperDetailPage preview />}
+          </PapersManagementGuard>
+        )}
+        path="/manage/papers/:id/preview"
+      />
       <Route element={<InnovationHubPage />} path="/innovation-hub" />
       <Route element={<BrainRegionPage />} path="/brain-region/:slug" />
       <Route element={<NotFoundPage />} path="*" />

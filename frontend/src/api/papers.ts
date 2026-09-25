@@ -2,6 +2,7 @@ import type {
   ManagedPaper,
   Paper,
   PaperCreator,
+  PreviewPaper,
   PaperDifficulty,
   PaperPublicationType,
   PaperResourceCategory,
@@ -171,6 +172,11 @@ function isPaper(value: unknown): value is Paper {
     && isStringArray(value.authors)
     && (value.year === null || isFiniteNumber(value.year))
     && isNullableString(value.journal)
+    && (value.doi === undefined || isNullableString(value.doi))
+    && (value.volume === undefined || isNullableString(value.volume))
+    && (value.issue === undefined || isNullableString(value.issue))
+    && (value.pages === undefined || isNullableString(value.pages))
+    && (value.publisher === undefined || isNullableString(value.publisher))
     && PUBLICATION_TYPES.includes(value.publicationType as PaperPublicationType)
     && isStringArray(value.topics)
     && DIFFICULTIES.includes(value.difficulty as PaperDifficulty)
@@ -419,6 +425,20 @@ export async function fetchManagedPapers({
 
 export function fetchManagedPaper(id: number, { signal }: { signal?: AbortSignal } = {}) {
   return requestManagedPaper(`/api/papers/manage/${id}`, { method: 'GET', signal })
+}
+
+export async function fetchManagedPaperPreview(id: number, { signal }: { signal?: AbortSignal } = {}): Promise<PreviewPaper> {
+  const response = await fetch(`/api/papers/manage/${id}/preview`, { credentials: 'include', signal })
+  const payload = await readJsonPayload(response)
+  if (!response.ok) throw getPaperApiError(response, payload)
+  if (!isRecord(payload) || !isPaper(payload.paper)) {
+    throw new Error('Invalid paper preview API response')
+  }
+  const paper = payload.paper as unknown as Record<string, unknown>
+  if (paper.preview !== true || !PAPER_STATUSES.includes(paper.status as PaperStatus)) {
+    throw new Error('Invalid paper preview API response')
+  }
+  return payload.paper as PreviewPaper
 }
 
 export function createPaper(input: PaperWriteInput) {

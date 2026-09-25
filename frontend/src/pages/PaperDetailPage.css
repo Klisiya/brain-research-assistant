@@ -30,6 +30,19 @@
   padding: 140px 0 92px;
 }
 
+.paper-detail-main.is-preview { width: min(1180px, 100%); min-height: 0; padding: 0; }
+.paper-preview-banner { display: flex; align-items: center; justify-content: space-between; gap: 14px; margin: 0 0 22px; padding: 16px 20px; border: 1px solid rgba(125, 211, 252, 0.28); border-radius: 16px; background: rgba(14, 116, 144, 0.16); color: #dbeafe; }
+.paper-preview-banner a { color: #7dd3fc; font-size: 13px; font-weight: 800; }
+.paper-detail-citation dl { display: grid; gap: 10px; margin: 0 0 18px; }
+.paper-detail-citation dl div { min-width: 0; }
+.paper-detail-citation dt { color: #71839a; font-size: 10px; font-weight: 800; text-transform: uppercase; }
+.paper-detail-citation dd { margin: 3px 0 0; color: #dbeafe; font-size: 12px; line-height: 1.5; overflow-wrap: anywhere; }
+.paper-detail-citation a { color: #7dd3fc; }
+.paper-detail-citation button { padding: 9px 13px; border: 1px solid rgba(125, 211, 252, 0.26); border-radius: 999px; background: rgba(14, 116, 144, 0.14); color: #bae6fd; font: inherit; font-size: 12px; font-weight: 800; cursor: pointer; }
+.paper-detail-citation button:hover { background: rgba(14, 116, 144, 0.24); }
+.paper-detail-citation > span { display: block; min-height: 18px; margin-top: 7px; color: #a5def8; font-size: 11px; }
+.paper-detail-citation button:focus-visible, .paper-detail-citation a:focus-visible, .paper-preview-banner a:focus-visible { outline: 2px solid #7dd3fc; outline-offset: 3px; }
+
 .paper-detail-back,
 .paper-detail-not-found a,
 .paper-detail-retry {
@@ -281,6 +294,7 @@
 }
 
 @media (max-width: 720px) {
+  .paper-preview-banner { flex-wrap: wrap; }
   .paper-detail-main { width: min(100% - 28px, 660px); padding: 42px 0 70px; }
   .paper-detail-hero { padding: 34px 25px; border-radius: 24px; }
   .paper-detail-meta { grid-template-columns: 1fr; }

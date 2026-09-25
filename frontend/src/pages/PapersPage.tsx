@@ -357,8 +357,8 @@ function PapersPage() {
         )}
 
         <p className="papers-library-boundary">
-          This library is a curated learning resource. Publication management and learner
-          submissions are not available in this preview.
+          This library contains published learning resources. Instructors manage drafts and
+          publication separately; learner submissions are not available yet.
         </p>
       </main>
 

@@ -206,7 +206,7 @@ function PaperEditorPage({ currentUser }: { currentUser: AuthUser }) {
             <PaperStatusBadge status={paper.status} />
             <span>Current slug</span>
             <code>{paper.slug}</code>
-            {paper.status === 'published' ? <Link to={`/papers/${paper.slug}`}>Preview</Link> : null}
+            <Link to={`/manage/papers/${paper.id}/preview`}>Preview</Link>
           </div>
         ) : null}
       </header>

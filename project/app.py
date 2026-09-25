@@ -305,6 +305,11 @@ class Paper(db.Model):
     authors = db.Column(db.JSON, nullable=False, default=list)
     year = db.Column(db.Integer, nullable=True)
     journal = db.Column(db.String(300), nullable=True)
+    doi = db.Column(db.String(255), nullable=True)
+    volume = db.Column(db.String(100), nullable=True)
+    issue = db.Column(db.String(100), nullable=True)
+    pages = db.Column(db.String(100), nullable=True)
+    publisher = db.Column(db.String(300), nullable=True)
     publication_type = db.Column(db.String(50), nullable=False)
     topics = db.Column(db.JSON, nullable=False, default=list)
     difficulty = db.Column(db.String(30), nullable=False)
@@ -614,6 +619,11 @@ def serialize_paper(paper, include_management_fields=False):
         "authors": paper.authors,
         "year": paper.year,
         "journal": paper.journal,
+        "doi": paper.doi,
+        "volume": paper.volume,
+        "issue": paper.issue,
+        "pages": paper.pages,
+        "publisher": paper.publisher,
         "publicationType": paper.publication_type,
         "topics": paper.topics,
         "difficulty": paper.difficulty,
@@ -693,6 +703,11 @@ PAPER_WRITABLE_FIELDS = {
     "authors",
     "year",
     "journal",
+    "doi",
+    "volume",
+    "issue",
+    "pages",
+    "publisher",
     "publicationType",
     "topics",
     "difficulty",
@@ -749,6 +764,19 @@ def validate_optional_paper_string(value, field, *, maximum_length):
         allow_empty=True,
     )
     return normalized or None
+
+
+def validate_paper_doi(value):
+    normalized = validate_optional_paper_string(value, "doi", maximum_length=300)
+    if normalized is None:
+        return None
+
+    normalized = re.sub(r"^(?:doi:\s*|https?://doi\.org/)", "", normalized, flags=re.IGNORECASE).strip()
+    if (len(normalized) > 255
+            or not re.fullmatch(r"10\.[0-9]{4,9}/[^\s\x00-\x1f\x7f]+", normalized)
+            or any(unicodedata.category(character) == "Cc" for character in normalized)):
+        raise PaperValidationError("Enter a valid DOI identifier.", "doi")
+    return normalized
 
 
 def validate_paper_string_list(value, field, *, minimum_items, item_maximum_length):
@@ -908,6 +936,13 @@ def validate_paper_payload(payload, *, partial=False):
             "journal",
             maximum_length=300,
         )
+
+    if "doi" in payload:
+        validated["doi"] = validate_paper_doi(payload["doi"])
+
+    for field, maximum_length in (("volume", 100), ("issue", 100), ("pages", 100), ("publisher", 300)):
+        if field in payload:
+            validated[field] = validate_optional_paper_string(payload[field], field, maximum_length=maximum_length)
 
     if "publicationType" in payload:
         validated["publication_type"] = validate_paper_enum(
@@ -1759,6 +1794,19 @@ def api_manage_paper(paper_id):
         return paper_edit_forbidden_response()
 
     return jsonify({"paper": serialize_paper(paper, include_management_fields=True)}), 200
+
+
+@app.route("/api/papers/manage/<int:paper_id>/preview", methods=["GET"])
+@roles_required(*PAPER_EDITOR_ROLES)
+def api_preview_paper(paper_id):
+    paper = db.session.get(Paper, paper_id)
+    if paper is None:
+        return paper_not_found_response()
+    if not can_manage_paper(paper):
+        return paper_edit_forbidden_response()
+    preview = serialize_paper(paper)
+    preview.update({"status": paper.status, "preview": True})
+    return jsonify({"paper": preview}), 200
 
 
 @app.route("/api/papers/<string:slug>", methods=["GET"])
