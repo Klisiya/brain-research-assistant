@@ -1,10 +1,11 @@
-export type UserRole = 'user' | 'teacher' | 'admin'
+export type UserRole = 'student' | 'teacher' | 'admin'
 
 export type AuthUser = {
   id: number
   username: string
   email: string
   role: UserRole
+  isActive?: boolean
 }
 
 export type AuthMePayload =

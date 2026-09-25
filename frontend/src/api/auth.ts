@@ -1,6 +1,6 @@
 import type { AuthMePayload, AuthUser, UserRole } from '../types/auth'
 
-const USER_ROLES: readonly UserRole[] = ['user', 'teacher', 'admin']
+const USER_ROLES: readonly UserRole[] = ['student', 'teacher', 'admin']
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
@@ -13,6 +13,7 @@ export function isAuthUser(value: unknown): value is AuthUser {
     && typeof value.username === 'string'
     && typeof value.email === 'string'
     && USER_ROLES.includes(value.role as UserRole)
+    && (value.isActive === undefined || typeof value.isActive === 'boolean')
 }
 
 function isAuthMePayload(value: unknown): value is AuthMePayload {
@@ -28,6 +29,8 @@ export async function fetchAuthMe({ signal }: { signal?: AbortSignal } = {}) {
     credentials: 'include',
     signal,
   })
+
+  if (response.status === 401) return { authenticated: false, user: null } as const
 
   if (!response.ok) {
     throw new Error(`Authentication request failed with status ${response.status}`)

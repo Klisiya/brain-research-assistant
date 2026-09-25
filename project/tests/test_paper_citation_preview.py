@@ -52,7 +52,8 @@ class CitationPreviewTests(unittest.TestCase):
         with self.client.session_transaction() as session:
             session.clear()
             if uid is not None:
-                session["_user_id"] = str(uid)
+                session["_user_id"] = f"{uid}:1"
+                session["auth_version"] = 1
                 session["_fresh"] = True
 
     def create(self, **changes):

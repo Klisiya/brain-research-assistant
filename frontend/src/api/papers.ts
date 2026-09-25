@@ -141,7 +141,7 @@ const API_SORTS: readonly PaperApiFilters['sort'][] = [
 
 const PAPER_STATUSES: readonly PaperStatus[] = ['draft', 'published', 'archived']
 const PAPER_VIEWS: readonly PaperApiFilters['view'][] = ['all', 'recommended', 'resources']
-const USER_ROLES: readonly PaperCreator['role'][] = ['user', 'teacher', 'admin']
+const USER_ROLES: readonly PaperCreator['role'][] = ['student', 'teacher', 'admin']
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)

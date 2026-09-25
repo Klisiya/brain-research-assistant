@@ -23,7 +23,7 @@ export type PaperStatus = 'draft' | 'published' | 'archived'
 export type PaperCreator = {
   id: number
   username: string
-  role: 'user' | 'teacher' | 'admin'
+  role: 'student' | 'teacher' | 'admin'
 }
 
 export type Paper = {

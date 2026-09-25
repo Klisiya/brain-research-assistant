@@ -29,7 +29,7 @@ def register_attachment_api(app, db, Paper, Attachment, Cleanup, roles_required,
 
     def log_failure(operation, error):
         app.logger.error("Attachment operation=%s actor=%s category=%s", operation,
-                         current_user.get_id() if current_user else None, type(error).__name__)
+                         current_user.id if current_user.is_authenticated else None, type(error).__name__)
 
     def error_response(error):
         return jsonify({"error": str(error), "code": error.code}), error.status

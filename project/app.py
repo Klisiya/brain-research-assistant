@@ -8,7 +8,7 @@ from urllib.parse import urlparse
 
 import click
 from dotenv import load_dotenv
-from flask import Flask, abort, jsonify, redirect, request, send_file
+from flask import Flask, abort, g, jsonify, redirect, request, send_file, session
 from flask_login import (
     LoginManager,
     UserMixin,
@@ -25,12 +25,16 @@ from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from werkzeug.security import check_password_hash, generate_password_hash
 
 from attachment_api import register_attachment_api
+from account_service import ACCOUNT_ROLES, AccountError, AccountService, account_role
+from account_api import register_account_api
 
 load_dotenv()
 
 app = Flask(__name__)
 app.config["SECRET_KEY"] = os.getenv("SECRET_KEY") or os.urandom(32)
 app.config["SEND_FILE_MAX_AGE_DEFAULT"] = 31536000
+app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
+app.config["REMEMBER_COOKIE_SAMESITE"] = "Lax"
 
 
 def get_database_url():
@@ -70,10 +74,10 @@ MAX_CHAT_MESSAGE_LENGTH = 4000
 MAX_CHAT_HISTORY_ITEMS = 10
 ALLOWED_CHAT_HISTORY_ROLES = {"user", "assistant"}
 DEFAULT_FRONTEND_URL = "http://127.0.0.1:5173"
-USER_ROLE = "user"
+USER_ROLE = "student"
 TEACHER_ROLE = "teacher"
 ADMIN_ROLE = "admin"
-USER_ROLES = {USER_ROLE, TEACHER_ROLE, ADMIN_ROLE}
+USER_ROLES = ACCOUNT_ROLES
 PAPER_EDITOR_ROLES = {TEACHER_ROLE, ADMIN_ROLE}
 PAPER_PUBLICATION_TYPES = {"Research Article", "Review", "Book Chapter", "Learning Resource"}
 PAPER_DIFFICULTIES = {"Beginner", "Intermediate", "Advanced"}
@@ -287,13 +291,39 @@ class User(UserMixin, db.Model):
     email = db.Column(db.String(255), nullable=False, unique=True, index=True)
     password_hash = db.Column(db.String(255), nullable=False)
     role = db.Column(db.String(50), nullable=False, default=USER_ROLE)
+    is_active = db.Column(db.Boolean, nullable=False, default=True, server_default=db.true())
+    auth_version = db.Column(db.Integer, nullable=False, default=1, server_default="1")
+    disabled_at = db.Column(db.DateTime, nullable=True)
+    last_login_at = db.Column(db.DateTime, nullable=True)
     created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
 
+    def get_id(self):
+        # Flask-Login signs this identifier in both session and remember cookies.
+        return f"{self.id}:{self.auth_version}"
+
     def set_password(self, password):
+        if self.password_hash is not None:
+            self.auth_version = (self.auth_version or 1) + 1
         self.password_hash = generate_password_hash(password)
 
     def check_password(self, password):
         return check_password_hash(self.password_hash, password)
+
+
+class AccountAuditLog(db.Model):
+    __tablename__ = "account_audit_logs"
+
+    id = db.Column(db.Integer, primary_key=True)
+    actor_user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=True, index=True)
+    target_user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False, index=True)
+    action = db.Column(db.String(50), nullable=False, index=True)
+    details = db.Column(db.JSON, nullable=False, default=dict)
+    created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow, index=True)
+    actor = db.relationship("User", foreign_keys=[actor_user_id])
+    target = db.relationship("User", foreign_keys=[target_user_id])
+
+
+account_service = AccountService(db, User, AccountAuditLog)
 
 
 class Paper(db.Model):
@@ -408,9 +438,33 @@ class AttachmentFileCleanup(db.Model):
 @login_manager.user_loader
 def load_user(user_id):
     try:
-        return db.session.get(User, int(user_id))
-    except (TypeError, ValueError):
-        return None
+        identifier, version = user_id.split(":", 1)
+        identifier, version = int(identifier), int(version)
+        user = db.session.get(User, identifier)
+        if (user is not None and user.is_active and account_role(user.role) in USER_ROLES
+                and version == user.auth_version
+                and session.get("auth_version", version) == user.auth_version):
+            if "auth_version" not in session:
+                session["auth_version"] = version
+            return user
+    except (AttributeError, TypeError, ValueError):
+        pass
+    clear_auth_session()
+    g.auth_invalidated = True
+    return None
+
+
+def clear_auth_session():
+    for key in ("_user_id", "auth_version", "_fresh", "_id", "_remember_seconds"):
+        session.pop(key, None)
+    session["_remember"] = "clear"
+
+
+def auth_required_response():
+    payload = {"error": "Authentication required.", "code": "AUTH_REQUIRED"}
+    if request.endpoint == "api_chat":
+        payload["login_url"] = get_api_login_url()
+    return jsonify(payload), 401
 
 
 def roles_required(*allowed_roles):
@@ -420,17 +474,9 @@ def roles_required(*allowed_roles):
         @wraps(view_function)
         def wrapped_view(*args, **kwargs):
             if not current_user.is_authenticated:
-                return (
-                    jsonify(
-                        {
-                            "error": "Authentication required.",
-                            "code": "AUTH_REQUIRED",
-                        }
-                    ),
-                    401,
-                )
+                return auth_required_response()
 
-            if current_user.role not in allowed_role_set:
+            if allowed_role_set and account_role(current_user.role) not in allowed_role_set:
                 return (
                     jsonify(
                         {
@@ -446,6 +492,17 @@ def roles_required(*allowed_roles):
         return wrapped_view
 
     return decorator
+
+
+require_auth = roles_required()
+
+
+@app.after_request
+def account_cache_headers(response):
+    if request.path.startswith(("/api/auth/", "/api/admin/")):
+        response.headers["Cache-Control"] = "private, no-store"
+        response.vary.add("Cookie")
+    return response
 
 
 def get_frontend_url():
@@ -588,7 +645,8 @@ def serialize_user(user):
         "id": user.id,
         "username": user.username,
         "email": user.email,
-        "role": user.role,
+        "role": account_role(user.role),
+        "isActive": user.is_active,
     }
 
 
@@ -649,7 +707,7 @@ def serialize_paper(paper, include_management_fields=False):
                     {
                         "id": creator.id,
                         "username": creator.username,
-                        "role": creator.role,
+                        "role": account_role(creator.role),
                     }
                     if creator
                     else None
@@ -1376,10 +1434,26 @@ def validate_auth_login_payload():
 def authenticate_user(email, password):
     user = User.query.filter_by(email=email).first()
 
-    if user and user.check_password(password):
+    if user and user.check_password(password) and user.is_active and account_role(user.role) in USER_ROLES:
         return user
 
     return None
+
+
+def establish_login(user, remember=False):
+    verified_version = user.auth_version
+    user.last_login_at = datetime.utcnow()
+    db.session.commit()
+    db.session.refresh(user)
+    # Do not issue a new-version cookie if access changed during password verification.
+    if not user.is_active or user.auth_version != verified_version:
+        return False
+    session.clear()
+    session["_remember"] = "clear"
+    if not login_user(user, remember=remember):
+        return False
+    session["auth_version"] = user.auth_version
+    return True
 
 
 def build_brain_region_summary(region):
@@ -1556,10 +1630,10 @@ def set_user_role_command(email, role):
     if user is None:
         raise click.ClickException("User not found for the supplied email address.")
 
-    user.role = normalized_role
-
     try:
-        db.session.commit()
+        user = account_service.change_role(user.id, normalized_role)
+    except AccountError as error:
+        raise click.ClickException(str(error)) from error
     except SQLAlchemyError as error:
         db.session.rollback()
         app.logger.exception("Unable to update user role: %s", error.__class__.__name__)
@@ -1966,7 +2040,12 @@ def api_auth_login():
     if not user:
         return jsonify({"error": "Invalid email or password.", "code": "INVALID_CREDENTIALS"}), 401
 
-    login_user(user, remember=remember)
+    try:
+        if not establish_login(user, remember=remember):
+            return jsonify({"error": "Invalid email or password.", "code": "INVALID_CREDENTIALS"}), 401
+    except SQLAlchemyError:
+        db.session.rollback()
+        return jsonify({"error": "Unable to sign in right now.", "code": "AUTH_UNAVAILABLE"}), 503
 
     return jsonify({"authenticated": True, "user": serialize_user(user)}), 200
 
@@ -1974,6 +2053,8 @@ def api_auth_login():
 @app.route("/api/auth/me")
 def api_auth_me():
     if not current_user.is_authenticated:
+        if getattr(g, "auth_invalidated", False):
+            return auth_required_response()
         return jsonify({"authenticated": False, "user": None}), 200
 
     return jsonify({"authenticated": True, "user": serialize_user(current_user)}), 200
@@ -1982,23 +2063,13 @@ def api_auth_me():
 @app.route("/api/auth/logout", methods=["POST"])
 def api_auth_logout():
     logout_user()
+    clear_auth_session()
     return jsonify({"authenticated": False}), 200
 
 
 @app.route("/api/chat", methods=["POST"])
+@require_auth
 def api_chat():
-    if not current_user.is_authenticated:
-        return (
-            jsonify(
-                {
-                    "error": "Authentication required.",
-                    "code": "AUTH_REQUIRED",
-                    "login_url": get_api_login_url(),
-                }
-            ),
-            401,
-        )
-
     try:
         message, history = validate_chat_payload()
     except ValueError as error:
@@ -2052,8 +2123,7 @@ def login():
 
         user = authenticate_user(email, password)
 
-        if user:
-            login_user(user, remember=remember)
+        if user and establish_login(user, remember=remember):
             return redirect(get_frontend_home_url())
 
     return redirect(get_frontend_login_url())
@@ -2071,7 +2141,11 @@ def forgot_password():
 @login_required
 def logout():
     logout_user()
+    clear_auth_session()
     return redirect(get_frontend_home_url())
+
+
+register_account_api(app, db, User, AccountAuditLog, account_service, roles_required)
 
 
 delete_paper_with_attachments = register_attachment_api(
