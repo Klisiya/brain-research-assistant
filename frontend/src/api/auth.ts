@@ -9,11 +9,12 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 export function isAuthUser(value: unknown): value is AuthUser {
   return isRecord(value)
     && typeof value.id === 'number'
-    && Number.isFinite(value.id)
+    && Number.isSafeInteger(value.id)
+    && value.id > 0
     && typeof value.username === 'string'
     && typeof value.email === 'string'
     && USER_ROLES.includes(value.role as UserRole)
-    && (value.isActive === undefined || typeof value.isActive === 'boolean')
+    && typeof value.isActive === 'boolean'
 }
 
 function isAuthMePayload(value: unknown): value is AuthMePayload {
@@ -43,4 +44,23 @@ export async function fetchAuthMe({ signal }: { signal?: AbortSignal } = {}) {
   }
 
   return payload
+}
+
+export class AuthLoginError extends Error {}
+
+export async function login(email: string, password: string, remember: boolean): Promise<AuthUser> {
+  try {
+  const response = await fetch('/api/auth/login', { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email, password, remember }) })
+  if (!response.ok) throw new AuthLoginError(response.status === 401 ? 'Invalid email or password.' : 'Unable to sign in right now. Please try again.')
+  const payload: unknown = await response.json()
+  if (!isAuthMePayload(payload) || !payload.authenticated) throw new AuthLoginError('Unable to sign in right now. Please try again.')
+  return payload.user
+  } catch (error) {
+    if (error instanceof AuthLoginError) throw error
+    throw new AuthLoginError('Unable to sign in right now. Please try again.')
+  }
+}
+export async function logout() {
+  const response = await fetch('/api/auth/logout', { method: 'POST', credentials: 'include' })
+  if (!response.ok) throw new Error('Unable to sign out. Please try again.')
 }

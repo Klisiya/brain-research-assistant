@@ -1,3 +1,4 @@
+import { sessionFetch } from './session'
 import type {
   ManagedPaper,
   Paper,
@@ -330,7 +331,7 @@ async function requestManagedPaper(
   url: string,
   options: RequestInit,
 ): Promise<ManagedPaper> {
-  const response = await fetch(url, {
+  const response = await sessionFetch(url, {
     ...options,
     credentials: 'include',
   })
@@ -366,7 +367,7 @@ export async function fetchPapers({
   if (publicationType) searchParams.set('publicationType', publicationType)
   if (topic) searchParams.set('topic', topic)
   if (year !== undefined) searchParams.set('year', String(year))
-  const response = await fetch(`/api/papers?${searchParams}`, {
+  const response = await sessionFetch(`/api/papers?${searchParams}`, {
     credentials: 'include',
     signal,
   })
@@ -380,7 +381,7 @@ export async function fetchPaperBySlug(
   slug: string,
   { signal }: FetchPaperBySlugOptions = {},
 ): Promise<Paper> {
-  const response = await fetch(`/api/papers/${encodeURIComponent(slug)}`, {
+  const response = await sessionFetch(`/api/papers/${encodeURIComponent(slug)}`, {
     credentials: 'include',
     signal,
   })
@@ -413,7 +414,7 @@ export async function fetchManagedPapers({
 
   if (status !== 'all') searchParams.set('status', status)
 
-  const response = await fetch(`/api/papers/manage?${searchParams}`, {
+  const response = await sessionFetch(`/api/papers/manage?${searchParams}`, {
     credentials: 'include',
     signal,
   })
@@ -428,7 +429,7 @@ export function fetchManagedPaper(id: number, { signal }: { signal?: AbortSignal
 }
 
 export async function fetchManagedPaperPreview(id: number, { signal }: { signal?: AbortSignal } = {}): Promise<PreviewPaper> {
-  const response = await fetch(`/api/papers/manage/${id}/preview`, { credentials: 'include', signal })
+  const response = await sessionFetch(`/api/papers/manage/${id}/preview`, { credentials: 'include', signal })
   const payload = await readJsonPayload(response)
   if (!response.ok) throw getPaperApiError(response, payload)
   if (!isRecord(payload) || !isPaper(payload.paper)) {
@@ -462,7 +463,7 @@ export function archivePaper(id: number) {
 }
 
 export async function deletePaper(id: number) {
-  const response = await fetch(`/api/papers/${id}`, {
+  const response = await sessionFetch(`/api/papers/${id}`, {
     credentials: 'include',
     method: 'DELETE',
   })

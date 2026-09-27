@@ -1,5 +1,5 @@
 import { useEffect } from 'react'
-import { Route, Routes, useLocation } from 'react-router-dom'
+import { Navigate, Route, Routes, useLocation } from 'react-router-dom'
 import BrainSection from './components/BrainSection'
 import AITutorSection from './components/AITutorSection'
 import Footer from './components/Footer'
@@ -17,6 +17,7 @@ import PaperDetailPage from './pages/PaperDetailPage'
 import PaperEditorPage from './pages/PaperEditorPage'
 import PaperManagementPage from './pages/PaperManagementPage'
 import PapersPage from './pages/PapersPage'
+import AdminUsersPage from './pages/admin/AdminUsersPage'
 import './App.css'
 
 function HomePage() {
@@ -89,6 +90,8 @@ function App() {
         )}
         path="/manage/papers/:id/preview"
       />
+      <Route path="/admin" element={<PapersManagementGuard adminOnly>{() => <Navigate replace to="/admin/users" />}</PapersManagementGuard>} />
+      <Route path="/admin/users" element={<PapersManagementGuard adminOnly>{() => <AdminUsersPage />}</PapersManagementGuard>} />
       <Route element={<InnovationHubPage />} path="/innovation-hub" />
       <Route element={<BrainRegionPage />} path="/brain-region/:slug" />
       <Route element={<NotFoundPage />} path="*" />

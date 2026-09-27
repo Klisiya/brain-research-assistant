@@ -1,3 +1,4 @@
+import { sessionFetch } from '../api/session'
 import { useCallback, useEffect, useRef, useState, type FormEvent, type KeyboardEvent } from 'react'
 import ReactMarkdown, { type Components } from 'react-markdown'
 import { useNavigate } from 'react-router-dom'
@@ -130,7 +131,7 @@ async function requestTutorReply(message: string, signal: AbortSignal) {
   let response: Response
 
   try {
-    response = await fetch('/api/chat', {
+    response = await sessionFetch('/api/chat', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

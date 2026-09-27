@@ -1,8 +1,8 @@
 import { useEffect, useState, type FormEvent, type MouseEvent } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
-import { isAuthUser } from '../api/auth'
+import { AuthLoginError } from '../api/auth'
+import { useAuth } from '../auth/useAuth'
 import Footer from '../components/Footer'
-import type { AuthUser } from '../types/auth'
 import LoginShaderBackground from './LoginShaderBackground'
 import './LoginPage.css'
 
@@ -11,15 +11,10 @@ type LoginStatus = {
   message: string
 }
 
-const INVALID_CREDENTIALS_MESSAGE = 'Invalid email or password.'
 const UNEXPECTED_LOGIN_ERROR = 'Unable to sign in right now. Please try again.'
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null
-}
-
-function isAuthenticatedPayload(payload: unknown): payload is { authenticated: true; user: AuthUser } {
-  return isRecord(payload) && payload.authenticated === true && isAuthUser(payload.user)
 }
 
 function isAuthRequiredLocationState(value: unknown): value is { authRequired: true } {
@@ -43,23 +38,8 @@ function getLoginReturnPath(value: unknown) {
   return '/'
 }
 
-function getPayloadError(payload: unknown) {
-  if (isRecord(payload) && typeof payload.error === 'string') {
-    return payload.error
-  }
-
-  return null
-}
-
-async function readJsonPayload(response: Response): Promise<unknown> {
-  try {
-    return await response.json()
-  } catch {
-    return null
-  }
-}
-
 function LoginPage() {
+  const { state: authState, signIn } = useAuth()
   const location = useLocation()
   const navigate = useNavigate()
   const [email, setEmail] = useState('')
@@ -71,32 +51,8 @@ function LoginPage() {
   const returnPath = getLoginReturnPath(location.state)
 
   useEffect(() => {
-    const controller = new AbortController()
-
-    const checkSession = async () => {
-      try {
-        const response = await fetch('/api/auth/me', {
-          credentials: 'include',
-          signal: controller.signal,
-        })
-        const payload = await readJsonPayload(response)
-
-        if (!controller.signal.aborted && response.ok && isAuthenticatedPayload(payload)) {
-          navigate(returnPath, { replace: true })
-        }
-      } catch (error) {
-        if (error instanceof DOMException && error.name === 'AbortError') {
-          return
-        }
-      }
-    }
-
-    checkSession()
-
-    return () => {
-      controller.abort()
-    }
-  }, [navigate, returnPath])
+    if (authState.status === 'authenticated') navigate(returnPath, { replace: true })
+  }, [authState.status, navigate, returnPath])
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
@@ -112,36 +68,9 @@ function LoginPage() {
     setStatus(null)
 
     try {
-      const response = await fetch('/api/auth/login', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        credentials: 'include',
-        body: JSON.stringify({
-          email: trimmedEmail,
-          password,
-          remember,
-        }),
-      })
-      const payload = await readJsonPayload(response)
-
-      if (!response.ok) {
-        setStatus({
-          type: 'error',
-          message: response.status === 401 ? INVALID_CREDENTIALS_MESSAGE : getPayloadError(payload) || UNEXPECTED_LOGIN_ERROR,
-        })
-        return
-      }
-
-      if (!isAuthenticatedPayload(payload)) {
-        setStatus({ type: 'error', message: UNEXPECTED_LOGIN_ERROR })
-        return
-      }
-
-      navigate(returnPath, { replace: true })
-    } catch {
-      setStatus({ type: 'error', message: UNEXPECTED_LOGIN_ERROR })
+      await signIn(trimmedEmail, password, remember)
+    } catch (error) {
+      setStatus({ type: 'error', message: error instanceof AuthLoginError ? error.message : UNEXPECTED_LOGIN_ERROR })
     } finally {
       setIsSubmitting(false)
     }
@@ -277,9 +206,9 @@ function LoginPage() {
 
               {shouldShowTutorNotice ? <p className="login-status error">Please sign in to use the AI Tutor.</p> : null}
               {shouldShowManagementNotice ? (
-                <p className="login-status error">Please sign in to access Papers Management.</p>
+                <p className="login-status error">Please sign in to access this management area.</p>
               ) : null}
-              {status ? <p className={`login-status ${status.type}`}>{status.message}</p> : null}
+              {status ? <p role={status.type === 'error' ? 'alert' : 'status'} className={`login-status ${status.type}`}>{status.message}</p> : null}
             </form>
           </section>
         </main>

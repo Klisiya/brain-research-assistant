@@ -5,7 +5,7 @@ export type AuthUser = {
   username: string
   email: string
   role: UserRole
-  isActive?: boolean
+  isActive: boolean
 }
 
 export type AuthMePayload =

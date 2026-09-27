@@ -1,17 +1,11 @@
 import { useEffect, useLayoutEffect, useRef, useState, type FocusEvent, type FormEvent } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
-import { fetchAuthMe } from '../api/auth'
-import type { AuthUser } from '../types/auth'
+import { useAuth } from '../auth/useAuth'
 import './Navbar.css'
 
 type DropdownItem = { label: string; href?: string }
 type NavId = 'home' | 'learning' | 'research' | 'innovation' | 'more'
 type NavItem = { id: NavId; label: string; icon?: string; href?: string; dropdown?: DropdownItem[] }
-type AuthState =
-  | { status: 'loading'; user: null }
-  | { status: 'anonymous'; user: null }
-  | { status: 'authenticated'; user: AuthUser }
-
 const NAVBAR_SEPARATE_THRESHOLD = 72
 const NAVBAR_MERGE_THRESHOLD = 40
 const DESKTOP_MEDIA_QUERY = '(min-width: 1001px)'
@@ -74,7 +68,7 @@ function Navbar() {
   const navigate = useNavigate()
   const [openMenu, setOpenMenu] = useState<string | null>(null)
   const [searchTerm, setSearchTerm] = useState('')
-  const [authState, setAuthState] = useState<AuthState>({ status: 'loading', user: null })
+  const { state: authState, signOut } = useAuth()
   const [isAccountMenuOpen, setIsAccountMenuOpen] = useState(false)
   const [isSigningOut, setIsSigningOut] = useState(false)
   const [signOutError, setSignOutError] = useState<string | null>(null)
@@ -135,24 +129,6 @@ function Navbar() {
   useEffect(() => () => {
     halfAnimationsRef.current.forEach((animation) => animation.cancel())
     halfAnimationsRef.current = []
-  }, [])
-
-  useEffect(() => {
-    const controller = new AbortController()
-    const loadAuthState = async () => {
-      try {
-        const payload = await fetchAuthMe({ signal: controller.signal })
-        if (controller.signal.aborted) return
-        setAuthState(payload.authenticated
-          ? { status: 'authenticated', user: payload.user }
-          : { status: 'anonymous', user: null })
-      } catch (error) {
-        if (error instanceof DOMException && error.name === 'AbortError') return
-        setAuthState({ status: 'anonymous', user: null })
-      }
-    }
-    loadAuthState()
-    return () => controller.abort()
   }, [])
 
   useEffect(() => {
@@ -254,9 +230,7 @@ function Navbar() {
     setIsSigningOut(true)
     setSignOutError(null)
     try {
-      const response = await fetch('/api/auth/logout', { method: 'POST', credentials: 'include' })
-      if (!response.ok) throw new Error('Sign out failed.')
-      setAuthState({ status: 'anonymous', user: null })
+      await signOut()
       setIsAccountMenuOpen(false)
       navigate('/', { replace: false })
     } catch {
@@ -340,6 +314,7 @@ function Navbar() {
               <div aria-label="Account menu" className={`account-menu${isAccountMenuOpen ? ' is-open' : ''}`}
                 id="account-menu" role="menu">
                 <div className="account-email" role="presentation">{authState.user.email}</div>
+                {authState.user.role === 'admin' ? <Link className="account-menu-action" onClick={() => setIsAccountMenuOpen(false)} role="menuitem" to="/admin/users">Admin Console</Link> : null}
                 {(authState.user.role === 'teacher' || authState.user.role === 'admin') ? (
                   <Link
                     className="account-menu-action"
