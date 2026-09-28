@@ -437,7 +437,8 @@ class AccountMigrationTests(unittest.TestCase):
                 connection.execute("UPDATE papers SET doi='10.1234/preserved', journal='Preserved Journal', volume='12', issue='3', pages='4-8' WHERE id=1")
                 connection.execute("INSERT INTO paper_attachments(id,paper_id,attachment_type,display_name,external_url,access_level,version,sort_order,uploaded_by_id,created_at,updated_at) VALUES(7,1,'external_link','Preserved resource','https://example.test/resource','staff',1,0,2,'2026-01-01','2026-01-01')")
                 connection.commit()
-                preserved = {table: connection.execute(f"SELECT * FROM {table}").fetchall() for table in ["papers", "paper_attachments"]}
+                preserved_queries = {table: "SELECT " + ",".join(row[1] for row in connection.execute(f"PRAGMA table_info({table})")) + f" FROM {table}" for table in ["papers", "paper_attachments"]}
+                preserved = {table: connection.execute(query).fetchall() for table, query in preserved_queries.items()}
                 original = connection.execute("SELECT id, username, email, password_hash, role, created_at FROM user ORDER BY id").fetchall()
             migrate("upgrade", "head")
             with closing(sqlite3.connect(database)) as connection:
@@ -446,18 +447,18 @@ class AccountMigrationTests(unittest.TestCase):
                 self.assertEqual(connection.execute("SELECT created_by_id FROM papers WHERE id=1").fetchone()[0], 2)
                 self.assertEqual(connection.execute("SELECT COUNT(*) FROM account_audit_logs").fetchone()[0], 0)
                 self.assertEqual(connection.execute("PRAGMA foreign_key_check").fetchall(), [])
-                for table, rows in preserved.items(): self.assertEqual(connection.execute(f"SELECT * FROM {table}").fetchall(), rows)
+                for table, rows in preserved.items(): self.assertEqual(connection.execute(preserved_queries[table]).fetchall(), rows)
             migrate("downgrade", "6a3f4c2d91e0")
             with closing(sqlite3.connect(database)) as connection:
                 self.assertEqual(connection.execute("SELECT id, username, email, password_hash, role, created_at FROM user ORDER BY id").fetchall(), original)
                 self.assertEqual(connection.execute("SELECT created_by_id FROM papers WHERE id=1").fetchone()[0], 2)
                 self.assertNotIn("auth_version", {row[1] for row in connection.execute("PRAGMA table_info(user)")})
                 self.assertEqual(connection.execute("PRAGMA foreign_key_check").fetchall(), [])
-                for table, rows in preserved.items(): self.assertEqual(connection.execute(f"SELECT * FROM {table}").fetchall(), rows)
+                for table, rows in preserved.items(): self.assertEqual(connection.execute(preserved_queries[table]).fetchall(), rows)
             migrate("upgrade", "head")
             with closing(sqlite3.connect(database)) as connection:
                 self.assertEqual(connection.execute("SELECT id, username, email, password_hash, role, created_at FROM user ORDER BY id").fetchall(), original)
-                for table, rows in preserved.items(): self.assertEqual(connection.execute(f"SELECT * FROM {table}").fetchall(), rows)
+                for table, rows in preserved.items(): self.assertEqual(connection.execute(preserved_queries[table]).fetchall(), rows)
                 self.assertEqual(connection.execute("PRAGMA foreign_key_check").fetchall(), [])
 
 

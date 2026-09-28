@@ -9,11 +9,12 @@ from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.orm.exc import StaleDataError
 from werkzeug.exceptions import BadRequest, RequestEntityTooLarge
 
-from attachment_files import AttachmentError, FILE_LIMITS, safe_filename, too_large, validate_file, validate_metadata
+from attachment_files import AttachmentError, FILE_LIMITS, safe_filename, too_large, validate_metadata
 from storage import LocalAttachmentStorage, StorageWriteError
+from file_asset_service import FileAssetService
 
 
-def register_attachment_api(app, db, Paper, Attachment, Cleanup, roles_required,
+def register_attachment_api(app, db, Paper, Attachment, Cleanup, Asset, roles_required,
                             can_manage_paper, paper_not_found_response):
     app.config.setdefault("MAX_CONTENT_LENGTH", 64 * 1024 * 1024)
     # Flask defines this key as None, so setdefault alone would not set a limit.
@@ -46,50 +47,23 @@ def register_attachment_api(app, db, Paper, Attachment, Cleanup, roles_required,
             response.vary.add("Cookie")
         return response
 
-    def queue_cleanup(key):
-        if key and db.session.get(Cleanup, key) is None:
-            db.session.add(Cleanup(storage_key=key))
+    def can_read_paper(paper, item):
+        if paper.status != "published":
+            return current_user.is_authenticated and can_manage_paper(paper)
+        if item.access_level == "public":
+            return True
+        if not current_user.is_authenticated:
+            return False
+        return item.access_level == "authenticated" or current_user.role in {"teacher", "admin"}
 
-    def drain_cleanup(keys=None):
-        # Queue rows share the metadata transaction and survive process restarts.
-        query = Cleanup.query
-        if keys is not None:
-            if not keys:
-                return 0
-            query = query.filter(Cleanup.storage_key.in_(keys))
-        pending = 0
-        ordered = query.order_by(Cleanup.created_at, Cleanup.storage_key)
-        if keys is None:
-            ordered = ordered.limit(100)
-        for item in ordered.all():
-            try:
-                # A referenced file must never be collected, even after a rollback.
-                if Attachment.query.filter_by(storage_key=item.storage_key).first() is not None:
-                    app.logger.error("Attachment cleanup category=still_referenced")
-                    pending += 1
-                    continue
-                if not storage().delete_file(item.storage_key):
-                    app.logger.warning("Attachment cleanup category=disk_file_missing")
-                db.session.delete(item)
-                db.session.commit()
-            except (OSError, ValueError, SQLAlchemyError) as error:
-                db.session.rollback()
-                app.logger.error("Attachment cleanup category=%s; retry required", type(error).__name__)
-                pending += 1
-        return pending
+    assets = FileAssetService(db, Asset, Cleanup, storage, app.logger)
+    assets.register_resource("paper", Attachment, "paper_id", can_read=can_read_paper, can_manage=can_manage_paper)
+    app.extensions["file_asset_service"] = assets
+    queue_cleanup = assets.queue_cleanup
+    drain_cleanup = assets.drain_cleanup
 
     def rollback_uploads():
-        for key in getattr(g, "attachment_new_keys", []):
-            try:
-                storage().delete_file(key)
-            except (OSError, ValueError) as error:
-                log_failure("rollback_cleanup", error)
-                try:
-                    queue_cleanup(key)
-                    db.session.commit()
-                except SQLAlchemyError as queue_error:
-                    db.session.rollback()
-                    log_failure("rollback_cleanup_queue", queue_error)
+        assets.compensate(getattr(g, "attachment_new_keys", []))
         g.attachment_new_keys = []
 
     def guarded(view):
@@ -184,7 +158,7 @@ def register_attachment_api(app, db, Paper, Attachment, Cleanup, roles_required,
 
     def save_upload(paper, values, *, existing=None):
         upload = request.files.get("file")
-        metadata, extension = validate_file(upload, values["attachment_type"], app.config["ATTACHMENT_FILE_LIMITS"])
+        metadata, extension = assets.validate_upload(upload, values["attachment_type"], app.config["ATTACHMENT_FILE_LIMITS"])
         fingerprint = {"paper_id": paper.id, "attachment_type": values["attachment_type"], "sha256": metadata["sha256"]}
         g.attachment_fingerprint = fingerprint
         query = Attachment.query.filter_by(**fingerprint)
@@ -197,9 +171,7 @@ def register_attachment_api(app, db, Paper, Attachment, Cleanup, roles_required,
         ).first() is not None:
             raise AttachmentError("This paper already has this attachment type. Use the replace endpoint.",
                                   "PRIMARY_ATTACHMENT_EXISTS", 409)
-        backend = storage()
-        save = backend.replace_file if existing else backend.save_file
-        key = save(upload.stream, paper.id, extension)
+        key = assets.save("paper", paper, upload.stream, extension, replacing=existing is not None)
         g.attachment_new_keys.append(key)
         return {**metadata, "storage_key": key}
 
@@ -215,7 +187,8 @@ def register_attachment_api(app, db, Paper, Attachment, Cleanup, roles_required,
         paper = managed_paper(paper_id)
         values = validate_metadata(read_payload())
         values.update(save_upload(paper, values))
-        item = Attachment(paper_id=paper.id, uploaded_by_id=current_user.id, **values)
+        asset = assets.create("paper", paper, values, current_user.id)
+        item = Attachment(paper_id=paper.id, uploaded_by_id=current_user.id, asset=asset, **values)
         db.session.add(item)
         commit()
         return jsonify({"attachment": serialize(item, paper, managed=True)}), 201
@@ -226,7 +199,8 @@ def register_attachment_api(app, db, Paper, Attachment, Cleanup, roles_required,
     def api_create_attachment_link(paper_id):
         paper = managed_paper(paper_id)
         values = validate_metadata(read_payload(link=True), link=True)
-        item = Attachment(paper_id=paper.id, uploaded_by_id=current_user.id, **values)
+        asset = assets.create("paper", paper, values, current_user.id)
+        item = Attachment(paper_id=paper.id, uploaded_by_id=current_user.id, asset=asset, **values)
         db.session.add(item)
         commit()
         return jsonify({"attachment": serialize(item, paper, managed=True)}), 201
@@ -263,7 +237,7 @@ def register_attachment_api(app, db, Paper, Attachment, Cleanup, roles_required,
         if item.attachment_type == "external_link":
             raise AttachmentError("External links cannot be downloaded through this endpoint.", "ATTACHMENT_NOT_DOWNLOADABLE")
         try:
-            stream = storage().open_file(item.storage_key)
+            stream = assets.open("paper", paper, item)
         except FileNotFoundError:
             app.logger.warning("Attachment download attachment=%s paper=%s category=disk_file_missing", item.id, paper.id)
             raise AttachmentError("Attachment file not found.", "ATTACHMENT_NOT_FOUND", 404) from None
@@ -287,14 +261,16 @@ def register_attachment_api(app, db, Paper, Attachment, Cleanup, roles_required,
         item = attachment_for(paper, attachment_id)
         link = item.attachment_type == "external_link"
         values = validate_metadata(read_payload(link=link), existing=item, link=link)
-        old_key = item.storage_key
+        old_key, old_asset_id = item.storage_key, item.asset_id
         if not link:
             values.update(save_upload(paper, values, existing=item))
+        item.asset = assets.create("paper", paper, values, current_user.id)
         for name, value in values.items():
             setattr(item, name, value)
         item.version += 1
         item.uploaded_by_id = current_user.id
-        if old_key:
+        assets.retire_unreferenced([old_asset_id])
+        if old_asset_id is None and old_key:
             queue_cleanup(old_key)
         commit()
         result = {"attachment": serialize(item, paper, managed=True)}
@@ -308,9 +284,11 @@ def register_attachment_api(app, db, Paper, Attachment, Cleanup, roles_required,
     def api_delete_attachment(paper_id, attachment_id):
         paper = managed_paper(paper_id)
         item = attachment_for(paper, attachment_id)
-        key = item.storage_key
-        queue_cleanup(key)
+        key, asset_id = item.storage_key, item.asset_id
         db.session.delete(item)
+        assets.retire_unreferenced([asset_id])
+        if asset_id is None:
+            queue_cleanup(key)
         commit()
         result = {"deleted": True, "attachmentId": attachment_id}
         if drain_cleanup([key] if key else []):
@@ -323,9 +301,12 @@ def register_attachment_api(app, db, Paper, Attachment, Cleanup, roles_required,
         if paper is None:
             return paper_not_found_response()
         keys = [item.storage_key for item in paper.attachments if item.storage_key]
-        for key in keys:
-            queue_cleanup(key)
+        asset_ids = [item.asset_id for item in paper.attachments]
+        legacy_keys = [item.storage_key for item in paper.attachments if item.asset_id is None]
         db.session.delete(paper)
+        assets.retire_unreferenced(asset_ids)
+        for key in legacy_keys:
+            queue_cleanup(key)
         commit()
         result = {"deleted": True, "paperId": paper_id}
         if drain_cleanup(keys):

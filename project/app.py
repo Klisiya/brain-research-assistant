@@ -25,6 +25,7 @@ from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from werkzeug.security import check_password_hash, generate_password_hash
 
 from attachment_api import register_attachment_api
+from file_assets import define_file_asset
 from account_service import ACCOUNT_ROLES, AccountError, AccountService, account_role
 from account_api import register_account_api
 from account_credentials import define_credentials
@@ -401,6 +402,9 @@ class Paper(db.Model):
     )
 
 
+FileAsset = define_file_asset(db)
+
+
 class PaperAttachment(db.Model):
     __tablename__ = "paper_attachments"
     __table_args__ = (
@@ -423,11 +427,13 @@ class PaperAttachment(db.Model):
 
     id = db.Column(db.Integer, primary_key=True)
     paper_id = db.Column(db.Integer, db.ForeignKey("papers.id"), nullable=False, index=True)
+    asset_id = db.Column(db.Integer, db.ForeignKey("file_assets.id", ondelete="RESTRICT"), nullable=True, index=True)
+    asset = db.relationship("FileAsset")
     attachment_type = db.Column(db.String(30), nullable=False, index=True)
     display_name = db.Column(db.String(300), nullable=False)
     description = db.Column(db.String(1000), nullable=True)
     original_filename = db.Column(db.String(500), nullable=True)
-    storage_key = db.Column(db.String(1000), nullable=True, unique=True)
+    storage_key = db.Column(db.String(1000), nullable=True)
     mime_type = db.Column(db.String(150), nullable=True)
     file_size = db.Column(db.Integer, nullable=True)
     sha256 = db.Column(db.String(64), nullable=True, index=True)
@@ -2159,7 +2165,7 @@ limiter = install_security(app)
 
 
 delete_paper_with_attachments = register_attachment_api(
-    app, db, Paper, PaperAttachment, AttachmentFileCleanup, roles_required,
+    app, db, Paper, PaperAttachment, AttachmentFileCleanup, FileAsset, roles_required,
     can_manage_paper, paper_not_found_response,
 )
 

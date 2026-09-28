@@ -154,6 +154,8 @@ def _validate_office(stream, kind):
 
 
 def validate_file(upload, kind, limits=None):
+    if not isinstance(kind, str) or kind not in FORMATS:
+        raise AttachmentError("This file type is not allowed.", "FILE_TYPE_NOT_ALLOWED")
     if upload is None or not upload.filename:
         raise AttachmentError("A file is required.")
     filename = safe_filename(upload.filename)
