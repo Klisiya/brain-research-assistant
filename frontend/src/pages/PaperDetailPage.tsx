@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link, useLocation, useParams } from 'react-router-dom'
 import { fetchManagedPaperPreview, fetchPaperBySlug, PaperApiError, PaperNotFoundError } from '../api/papers'
+import PaperResources from '../components/papers/PaperResources'
 import Footer from '../components/Footer'
 import Navbar from '../components/Navbar'
 import PageParticleBackground from '../components/PageParticleBackground'
@@ -352,6 +353,8 @@ function PaperDetailPage({ preview = false }: { preview?: boolean }) {
                       <p>No guided learning objectives are currently listed for this resource.</p>
                     )}
                   </section>
+
+                  <PaperResources key={`${preview}:${paper.id}`} paperId={paper.id} slug={paper.slug} managed={preview} />
 
                   <section className="paper-detail-block">
                     <span>Resource Tools</span>

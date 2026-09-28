@@ -1,5 +1,13 @@
 import { sessionFetch } from './session'
 import type {
+  AttachmentFileInput,
+  AttachmentLinkInput,
+  AttachmentMutationResult,
+  AttachmentType,
+  AttachmentAccessLevel,
+  ManagedPaperAttachment,
+  PaperAttachment,
+  PaperAttachmentUploader,
   ManagedPaper,
   Paper,
   PaperCreator,
@@ -480,4 +488,91 @@ export async function deletePaper(id: number) {
   }
 
   return payload.paperId
+}
+
+const ATTACHMENT_TYPES: readonly AttachmentType[] = ['pdf', 'cover', 'slides', 'document', 'external_link']
+const ATTACHMENT_ACCESS: readonly AttachmentAccessLevel[] = ['public', 'authenticated', 'staff']
+function isAttachment(value: unknown): value is PaperAttachment {
+  if (!isRecord(value)) return false
+  return isFiniteNumber(value.id) && isFiniteNumber(value.paperId)
+    && ATTACHMENT_TYPES.includes(value.attachmentType as AttachmentType)
+    && typeof value.displayName === 'string' && isNullableString(value.description)
+    && isNullableString(value.mimeType) && isNullableFiniteNumber(value.fileSize)
+    && isNullableString(value.externalUrl)
+    && ATTACHMENT_ACCESS.includes(value.accessLevel as AttachmentAccessLevel)
+    && isFiniteNumber(value.version) && isFiniteNumber(value.sortOrder)
+    && typeof value.createdAt === 'string' && typeof value.updatedAt === 'string'
+    && isNullableString(value.downloadUrl)
+}
+function isManagedAttachment(value: unknown): value is ManagedPaperAttachment {
+  if (!isRecord(value) || !isAttachment(value)) return false
+  const record = value as Record<string, unknown>
+  const uploader = record.uploadedBy
+  const validUploader = isRecord(uploader) && isFiniteNumber(uploader.id) && typeof uploader.username === 'string'
+    && [...USER_ROLES, 'user'].includes(uploader.role as PaperAttachmentUploader['role'])
+  return isNullableString(record.originalFilename) && isNullableString(record.sha256) && validUploader
+}
+async function attachmentRequest(url: string, options: RequestInit = {}): Promise<unknown> {
+  const response = await sessionFetch(url, options)
+  const payload = await readJsonPayload(response)
+  if (!response.ok) throw getPaperApiError(response, payload)
+  return payload
+}
+export async function fetchManagedAttachments(paperId: number, { signal }: { signal?: AbortSignal } = {}): Promise<ManagedPaperAttachment[]> {
+  const payload = await attachmentRequest(`/api/papers/manage/${paperId}/attachments`, { signal })
+  if (!isRecord(payload) || !Array.isArray(payload.attachments) || !payload.attachments.every(isManagedAttachment)) throw new Error('Invalid managed attachment response')
+  return payload.attachments
+}
+export async function fetchPublicAttachments(slug: string, { signal }: { signal?: AbortSignal } = {}): Promise<PaperAttachment[]> {
+  const payload = await attachmentRequest(`/api/papers/${encodeURIComponent(slug)}/attachments`, { signal })
+  if (!isRecord(payload) || !Array.isArray(payload.attachments) || !payload.attachments.every(isAttachment)) throw new Error('Invalid attachment response')
+  return payload.attachments
+}
+function attachmentBody(input: AttachmentFileInput | AttachmentLinkInput): RequestInit {
+  const { attachmentType, displayName, description, accessLevel, sortOrder } = input
+  const metadata = { attachmentType, displayName, description, accessLevel, sortOrder }
+  if (input.attachmentType === 'external_link') return {
+    headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...metadata, externalUrl: input.externalUrl }),
+  }
+  const body = new FormData()
+  body.set('attachmentType', attachmentType)
+  body.set('displayName', displayName)
+  body.set('description', description ?? '')
+  body.set('accessLevel', accessLevel)
+  body.set('sortOrder', String(sortOrder))
+  body.set('file', input.file)
+  return { body }
+}
+async function mutateAttachment(url: string, method: string, input: AttachmentFileInput | AttachmentLinkInput): Promise<AttachmentMutationResult> {
+  const payload = await attachmentRequest(url, { ...attachmentBody(input), method })
+  if (!isRecord(payload) || !isManagedAttachment(payload.attachment)) throw new Error('Invalid attachment mutation response')
+  return { attachment: payload.attachment, cleanupPending: payload.cleanupPending === true }
+}
+export function uploadPaperAttachment(paperId: number, input: AttachmentFileInput) {
+  return mutateAttachment(`/api/papers/${paperId}/attachments`, 'POST', input)
+}
+export function createPaperAttachmentLink(paperId: number, input: AttachmentLinkInput) {
+  return mutateAttachment(`/api/papers/${paperId}/attachments/link`, 'POST', input)
+}
+export function replacePaperAttachment(paperId: number, attachmentId: number, input: AttachmentFileInput | AttachmentLinkInput) {
+  return mutateAttachment(`/api/papers/${paperId}/attachments/${attachmentId}`, 'PUT', input)
+}
+export async function deletePaperAttachment(paperId: number, attachmentId: number) {
+  const payload = await attachmentRequest(`/api/papers/${paperId}/attachments/${attachmentId}`, { method: 'DELETE' })
+  if (!isRecord(payload) || payload.deleted !== true || payload.attachmentId !== attachmentId) throw new Error('Invalid attachment removal response')
+  return { cleanupPending: payload.cleanupPending === true }
+}
+export async function fetchAttachmentFile(attachment: PaperAttachment, download: boolean, signal?: AbortSignal) {
+  if (!attachment.downloadUrl) throw new Error('No downloadable file is available.')
+  const url = new URL(attachment.downloadUrl, window.location.origin)
+  if (url.origin !== window.location.origin || !url.pathname.startsWith('/api/papers/')) throw new Error('Invalid attachment download URL')
+  if (download) url.searchParams.set('download', '1')
+  const response = await sessionFetch(url, { signal })
+  if (!response.ok) throw getPaperApiError(response, await readJsonPayload(response))
+  const disposition = response.headers.get('Content-Disposition') ?? ''
+  const encodedName = /filename\*=UTF-8''([^;]+)/i.exec(disposition)?.[1]
+  const plainName = /filename="([^"]+)"|filename=([^;]+)/i.exec(disposition)
+  let filename = plainName?.[1] ?? plainName?.[2]?.trim() ?? attachment.displayName
+  if (encodedName) { try { filename = decodeURIComponent(encodedName) } catch { /* Keep the plain filename. */ } }
+  return { blob: await response.blob(), filename }
 }

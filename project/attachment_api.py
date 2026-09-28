@@ -131,7 +131,8 @@ def register_attachment_api(app, db, Paper, Attachment, Cleanup, Asset, roles_re
             "mimeType": item.mime_type, "fileSize": item.file_size, "externalUrl": item.external_url,
             "accessLevel": item.access_level, "version": item.version, "sortOrder": item.sort_order,
             "createdAt": item.created_at.isoformat(), "updatedAt": item.updated_at.isoformat(),
-            "downloadUrl": url_for("api_download_attachment", slug=paper.slug, attachment_id=item.id)
+            "downloadUrl": (url_for("api_download_managed_attachment", paper_id=paper.id, attachment_id=item.id)
+                            if managed else url_for("api_download_attachment", slug=paper.slug, attachment_id=item.id))
             if item.attachment_type != "external_link" else None,
         }
         if managed:
@@ -220,6 +221,8 @@ def register_attachment_api(app, db, Paper, Attachment, Cleanup, Asset, roles_re
     def api_public_attachments(slug):
         paper = published_paper(slug)
         levels = ["public", "authenticated"] if current_user.is_authenticated else ["public"]
+        if current_user.is_authenticated and current_user.role in {"teacher", "admin"}:
+            levels.append("staff")
         items = Attachment.query.filter(Attachment.paper_id == paper.id, Attachment.access_level.in_(levels)).order_by(
             Attachment.sort_order, Attachment.created_at, Attachment.id
         ).all()
@@ -234,6 +237,19 @@ def register_attachment_api(app, db, Paper, Attachment, Cleanup, Asset, roles_re
             raise AttachmentError("Authentication required.", "AUTH_REQUIRED", 401)
         if item.access_level == "staff" and current_user.role not in {"teacher", "admin"}:
             raise AttachmentError("You do not have permission to access this attachment.", "ATTACHMENT_ACCESS_DENIED", 403)
+        if item.attachment_type == "external_link":
+            raise AttachmentError("External links cannot be downloaded through this endpoint.", "ATTACHMENT_NOT_DOWNLOADABLE")
+        return send_attachment_file(paper, item)
+
+    @app.route("/api/papers/manage/<int:paper_id>/attachments/<int:attachment_id>/download", methods=["GET"])
+    @roles_required("teacher", "admin")
+    @guarded
+    def api_download_managed_attachment(paper_id, attachment_id):
+        paper = managed_paper(paper_id)
+        item = attachment_for(paper, attachment_id)
+        return send_attachment_file(paper, item)
+
+    def send_attachment_file(paper, item):
         if item.attachment_type == "external_link":
             raise AttachmentError("External links cannot be downloaded through this endpoint.", "ATTACHMENT_NOT_DOWNLOADABLE")
         try:

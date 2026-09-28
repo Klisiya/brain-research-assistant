@@ -88,3 +88,39 @@ export type PaperWriteInput = {
   resourceCategory: PaperResourceCategory
   status: PaperStatus
 }
+
+export type AttachmentFileType = 'pdf' | 'cover' | 'slides' | 'document'
+export type AttachmentType = AttachmentFileType | 'external_link'
+export type AttachmentAccessLevel = 'public' | 'authenticated' | 'staff'
+export type PaperAttachment = {
+  id: number
+  paperId: number
+  attachmentType: AttachmentType
+  displayName: string
+  description: string | null
+  mimeType: string | null
+  fileSize: number | null
+  externalUrl: string | null
+  accessLevel: AttachmentAccessLevel
+  version: number
+  sortOrder: number
+  createdAt: string
+  updatedAt: string
+  downloadUrl: string | null
+}
+export type PaperAttachmentUploader = { id: number; username: string; role: PaperCreator['role'] | 'user' }
+export type ManagedPaperAttachment = PaperAttachment & {
+  originalFilename: string | null
+  sha256: string | null
+  uploadedBy: PaperAttachmentUploader
+}
+export type AttachmentWriteInput = {
+  attachmentType: AttachmentType
+  displayName: string
+  description: string | null
+  accessLevel: AttachmentAccessLevel
+  sortOrder: number
+}
+export type AttachmentFileInput = AttachmentWriteInput & { attachmentType: AttachmentFileType; file: File }
+export type AttachmentLinkInput = AttachmentWriteInput & { attachmentType: 'external_link'; externalUrl: string }
+export type AttachmentMutationResult = { attachment: ManagedPaperAttachment; cleanupPending: boolean }

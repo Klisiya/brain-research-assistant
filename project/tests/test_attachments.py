@@ -543,7 +543,7 @@ class AttachmentTests(unittest.TestCase):
         self.create()
         for level in ["public", "authenticated", "staff"]:
             self.link(accessLevel=level)
-        for uid, count in [(None, 2), (4, 3), (1, 3), (3, 3)]:
+        for uid, count in [(None, 2), (4, 3), (1, 4), (2, 4), (3, 4)]:
             with self.subTest(uid=uid):
                 self.login(uid)
                 response = self.client.get("/api/papers/paper-1/attachments")
@@ -552,6 +552,32 @@ class AttachmentTests(unittest.TestCase):
                 for forbidden in ["storage_key", "storageKey", self.temp.name, "email", "password", "uploadedBy", "sha256"]:
                     self.assertNotIn(forbidden, raw)
                 self.assertIn("no-store", response.headers["Cache-Control"])
+
+    def test_managed_download_draft_and_archived_permission_matrix(self):
+        for pid in [3, 4]:
+            self.login(1)
+            item = self.upload(paper_id=pid).json["attachment"]
+            url = item["downloadUrl"]
+            self.assertEqual(url, f"/api/papers/manage/{pid}/attachments/{item['id']}/download")
+            for uid, status in [(None, 401), (4, 403), (2, 403), (1, 200), (3, 200)]:
+                self.login(uid)
+                response = self.client.get(url)
+                self.assertEqual(response.status_code, status)
+                if status == 200:
+                    self.assertEqual(response.get_data(), pdf())
+                    self.assertIn("no-store", response.headers["Cache-Control"])
+                    self.assertEqual(response.headers["X-Content-Type-Options"], "nosniff")
+                response.close()
+            self.assert_error(self.download(item, 3, paper_id=pid), 404, "PAPER_NOT_FOUND")
+
+    def test_managed_download_requires_matching_paper_and_file(self):
+        item = self.create()
+        self.login(3)
+        self.assert_error(self.client.get(f"/api/papers/manage/2/attachments/{item['id']}/download"), 404, "ATTACHMENT_NOT_FOUND")
+        self.assert_error(self.client.get("/api/papers/manage/999/attachments/1/download"), 404, "PAPER_NOT_FOUND")
+        self.assert_error(self.client.get("/api/papers/manage/1/attachments/999/download"), 404, "ATTACHMENT_NOT_FOUND")
+        item = self.link().json["attachment"]
+        self.assert_error(self.client.get(f"/api/papers/manage/1/attachments/{item['id']}/download"), 400, "ATTACHMENT_NOT_DOWNLOADABLE")
 
     def test_invalid_metadata_and_no_mass_assignment(self):
         self.login()

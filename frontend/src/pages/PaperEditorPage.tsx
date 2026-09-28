@@ -8,6 +8,7 @@ import {
   PaperApiError,
   updatePaper,
 } from '../api/papers'
+import AttachmentManager from '../components/papers/AttachmentManager'
 import ConfirmDialog from '../components/papers/ConfirmDialog'
 import PaperForm from '../components/papers/PaperForm'
 import PaperStatusBadge from '../components/papers/PaperStatusBadge'
@@ -220,6 +221,8 @@ function PaperEditorPage({ currentUser }: { currentUser: AuthUser }) {
         mode={isCreateMode ? 'create' : 'edit'}
         onSubmit={handleSave}
       />
+
+      {paper ? <AttachmentManager key={paper.id} paperId={paper.id} /> : <p className="paper-editor-notice">Save this paper before adding resources.</p>}
 
       {paper ? (
         <section className="paper-editor-resource-actions">
