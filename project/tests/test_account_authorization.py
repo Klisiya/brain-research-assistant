@@ -1,3 +1,4 @@
+from csrf_client import csrf_client
 """Account state, session revocation, admin privacy and transaction regressions."""
 from contextlib import closing
 import os
@@ -30,8 +31,8 @@ PASSWORD_HASH = generate_password_hash(PASSWORD)
 class AccountAuthorizationTests(unittest.TestCase):
     def setUp(self):
         app.config.update(TESTING=True, SECRET_KEY="isolated-account-test-session")
-        self.client = app.test_client()
-        self.admin = app.test_client()
+        self.client = csrf_client(app)
+        self.admin = csrf_client(app)
         with app.app_context():
             self.assertEqual(db.engine.url.database, ":memory:")
             db.create_all()
@@ -155,7 +156,7 @@ class AccountAuthorizationTests(unittest.TestCase):
         self.assert_auth_required(self.client.get("/api/auth/me"))
 
     def test_role_change_increments_version_and_invalidates_multiple_sessions(self):
-        second = app.test_client()
+        second = csrf_client(app)
         self.login(self.client)
         self.login(second)
         self.assertEqual(self.change(4, "teacher").status_code, 200)
@@ -187,7 +188,7 @@ class AccountAuthorizationTests(unittest.TestCase):
                      ("get", "/api/admin/audit-logs"), ("patch", "/api/admin/users/4/role"),
                      ("post", "/api/admin/users/4/disable"), ("post", "/api/admin/users/4/enable")]
         for uid, status in [(None, 401), (4, 403), (2, 403), (3, 403)]:
-            client = app.test_client()
+            client = csrf_client(app)
             if uid:
                 self.login(client, uid)
             for method, path in endpoints:
@@ -433,7 +434,10 @@ class AccountMigrationTests(unittest.TestCase):
                     connection.execute("INSERT INTO user (id, username, email, password_hash, role, created_at) VALUES (?, ?, ?, ?, ?, ?)",
                                        (uid, f"Legacy {uid}", f"legacy-{uid}@example.test", "existing-password-hash", role, "2026-01-01"))
                 connection.execute("INSERT INTO papers (id, slug, title, authors, publication_type, topics, difficulty, estimated_reading_minutes, abstract, learning_objectives, keywords, featured, open_access, resource_category, status, created_by_id, created_at, updated_at) VALUES (1, 'legacy-paper', 'Legacy Paper', '[\"Author\"]', 'Research Article', '[\"Memory\"]', 'Beginner', 10, 'Abstract', '[\"Learn\"]', '[]', 0, 0, 'Foundational', 'draft', 2, '2026-01-01', '2026-01-01')")
+                connection.execute("UPDATE papers SET doi='10.1234/preserved', journal='Preserved Journal', volume='12', issue='3', pages='4-8' WHERE id=1")
+                connection.execute("INSERT INTO paper_attachments(id,paper_id,attachment_type,display_name,external_url,access_level,version,sort_order,uploaded_by_id,created_at,updated_at) VALUES(7,1,'external_link','Preserved resource','https://example.test/resource','staff',1,0,2,'2026-01-01','2026-01-01')")
                 connection.commit()
+                preserved = {table: connection.execute(f"SELECT * FROM {table}").fetchall() for table in ["papers", "paper_attachments"]}
                 original = connection.execute("SELECT id, username, email, password_hash, role, created_at FROM user ORDER BY id").fetchall()
             migrate("upgrade", "head")
             with closing(sqlite3.connect(database)) as connection:
@@ -442,12 +446,20 @@ class AccountMigrationTests(unittest.TestCase):
                 self.assertEqual(connection.execute("SELECT created_by_id FROM papers WHERE id=1").fetchone()[0], 2)
                 self.assertEqual(connection.execute("SELECT COUNT(*) FROM account_audit_logs").fetchone()[0], 0)
                 self.assertEqual(connection.execute("PRAGMA foreign_key_check").fetchall(), [])
+                for table, rows in preserved.items(): self.assertEqual(connection.execute(f"SELECT * FROM {table}").fetchall(), rows)
             migrate("downgrade", "6a3f4c2d91e0")
             with closing(sqlite3.connect(database)) as connection:
                 self.assertEqual(connection.execute("SELECT id, username, email, password_hash, role, created_at FROM user ORDER BY id").fetchall(), original)
                 self.assertEqual(connection.execute("SELECT created_by_id FROM papers WHERE id=1").fetchone()[0], 2)
                 self.assertNotIn("auth_version", {row[1] for row in connection.execute("PRAGMA table_info(user)")})
                 self.assertEqual(connection.execute("PRAGMA foreign_key_check").fetchall(), [])
+                for table, rows in preserved.items(): self.assertEqual(connection.execute(f"SELECT * FROM {table}").fetchall(), rows)
+            migrate("upgrade", "head")
+            with closing(sqlite3.connect(database)) as connection:
+                self.assertEqual(connection.execute("SELECT id, username, email, password_hash, role, created_at FROM user ORDER BY id").fetchall(), original)
+                for table, rows in preserved.items(): self.assertEqual(connection.execute(f"SELECT * FROM {table}").fetchall(), rows)
+                self.assertEqual(connection.execute("PRAGMA foreign_key_check").fetchall(), [])
+
 
 
 if __name__ == "__main__":

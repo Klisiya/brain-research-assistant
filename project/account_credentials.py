@@ -12,6 +12,7 @@ def define_credentials(db):
         id = db.Column(db.Integer, primary_key=True)
         email = db.Column(db.String(255), nullable=False, index=True)
         role = db.Column(db.String(50), nullable=False)
+        suggested_username = db.Column(db.String(80))
         token_hash = db.Column(db.String(64), nullable=False, unique=True)
         pending_email = db.Column(db.String(255), nullable=True, unique=True)
         created_by_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False)

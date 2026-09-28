@@ -18,7 +18,7 @@ class AccountMail:
             sink(email, kind, link)
             return
         mode = config.get("ACCOUNT_MAIL_MODE", "disabled")
-        if mode == "development" and self.app.debug:
+        if mode == "development" and self.app.debug and config.get("APP_ENV") != "production":
             # A local spool, separate from application/access logs and HTTP responses.
             try:
                 directory = Path(self.app.instance_path) / "account-mail"

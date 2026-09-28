@@ -1,8 +1,9 @@
 import { useEffect, useState, type FormEvent } from 'react'
-import { useSearchParams } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import { AdminApiError, adminErrorMessage, fetchAdminUsers, type AdminUsersResponse, type UserFilters } from '../../api/admin'
 import { useAuth } from '../../auth/useAuth'
 import UserDialog from './UserDialog'
+import ImportUsersPanel from './ImportUsersPanel'
 import InvitationsPanel from './InvitationsPanel'
 import { readUserFilters, userFilterParams } from './user-filters'
 import './AdminUsersPage.css'
@@ -47,7 +48,7 @@ export default function AdminUsersPage() {
   const payload = current?.payload
   const filtered = Boolean(filters.q || filters.role || filters.status)
   return <div className="admin-users-page">
-    <header className="paper-management-header"><div><span>Admin Console</span><h1 id="admin-users-title" tabIndex={-1}>Users</h1><p>Manage account roles and access.</p></div></header>
+    <header className="paper-management-header"><div><span>Admin Console</span><h1 id="admin-users-title" tabIndex={-1}>Users</h1><p>Manage account roles and access.</p><Link to="/admin/audit-log">Audit Log</Link></div></header>
     <section className="admin-filters admin-glass" aria-label="User filters">
       <SearchForm key={filters.q} query={filters.q} onSearch={q => update({ q })} />
       <label htmlFor="users-role">Role</label><select id="users-role" value={filters.role} onChange={event => update({ role: event.target.value as UserFilters['role'] })}><option value="">All roles</option><option value="student">Student</option><option value="teacher">Teacher</option><option value="admin">Admin</option></select>
@@ -61,7 +62,8 @@ export default function AdminUsersPage() {
       </> : null}
       {payload ? <nav className="admin-pagination" aria-label="Users pagination"><button disabled={payload.pagination.page <= 1} onClick={() => update({ page: filters.page - 1 })}>Previous</button><span>Page {payload.pagination.totalPages === 0 ? 0 : payload.pagination.page} of {payload.pagination.totalPages}</span><button disabled={payload.pagination.page >= payload.pagination.totalPages} onClick={() => update({ page: filters.page + 1 })}>Next</button></nav> : null}
     </section>
-    <InvitationsPanel />
+    <ImportUsersPanel onImported={() => setRevision(value => value + 1)} />
+    <InvitationsPanel key={revision} />
     {selectedId !== null ? <UserDialog key={selectedId} id={selectedId} onClose={() => setSelectedId(null)} onChanged={() => setRevision(value => value + 1)} /> : null}
   </div>
 }

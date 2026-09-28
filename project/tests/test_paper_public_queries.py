@@ -1,3 +1,4 @@
+from csrf_client import csrf_client
 """Public Papers search, filtering, and pagination tests."""
 from datetime import datetime
 import os
@@ -20,7 +21,7 @@ class PublicPaperQueryTests(unittest.TestCase):
 
     def setUp(self):
         app.config.update(TESTING=True, SECRET_KEY="public-query-test")
-        self.client = app.test_client()
+        self.client = csrf_client(app)
         with app.app_context():
             db.create_all()
             owner = User(

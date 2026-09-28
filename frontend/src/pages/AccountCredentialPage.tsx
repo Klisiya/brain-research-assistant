@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react'
+import { useEffect, useState, type FormEvent } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { lifecycleRequest } from '../api/account-lifecycle'
 import { useAuth } from '../auth/useAuth'
@@ -11,6 +11,14 @@ export default function AccountCredentialPage({ mode }: { mode: 'forgot' | 'rese
   const { refreshAuth } = useAuth()
   const [email, setEmail] = useState('')
   const [username, setUsername] = useState('')
+  useEffect(() => {
+    if (mode !== 'accept' || !token) return
+    const controller = new AbortController()
+    lifecycleRequest('/api/auth/invitation-details', { token }, controller.signal).then(data => {
+      if (!controller.signal.aborted && typeof data === 'object' && data !== null && 'username' in data && typeof data.username === 'string') setUsername(current => current || String(data.username))
+    }).catch(() => { /* Submission presents the authoritative credential error. */ })
+    return () => controller.abort()
+  }, [mode, token])
   const [current, setCurrent] = useState('')
   const [password, setPassword] = useState('')
   const [confirmation, setConfirmation] = useState('')
@@ -34,7 +42,7 @@ export default function AccountCredentialPage({ mode }: { mode: 'forgot' | 'rese
       if (mode === 'change') data.currentPassword = current
       await lifecycleRequest(`/api/auth/${mode === 'forgot' ? 'forgot-password' : mode === 'reset' ? 'reset-password' : mode === 'accept' ? 'accept-invitation' : 'change-password'}`, data)
       setPassword(''); setConfirmation(''); setCurrent('')
-      setSuccess(mode === 'forgot' ? 'If an account exists for this email, a reset link has been sent.' : mode === 'accept' ? 'Account created. Please sign in.' : 'Password updated. Please sign in again.')
+      setSuccess(mode === 'forgot' ? 'If an eligible account exists, a reset link will be sent. If no email arrives, try again later.' : mode === 'accept' ? 'Account created. Please sign in.' : 'Password updated. Please sign in again.')
       if (mode === 'reset' || mode === 'change') await refreshAuth()
     } catch (reason) { setError(reason instanceof Error ? reason.message : 'Unable to complete the request.') }
     finally { setBusy(false) }

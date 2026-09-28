@@ -59,7 +59,7 @@ class AccountService:
                 if actor.role != "admin":
                     raise AccountError("You do not have permission to perform this action.", "ACCESS_DENIED", 403)
 
-            user = transaction.get(User, user_id)
+            user = transaction.scalar(select(User).where(User.id == user_id).with_for_update())
             if user is None:
                 raise AccountError("User not found.", "USER_NOT_FOUND", 404)
 

@@ -17,6 +17,7 @@ import PaperDetailPage from './pages/PaperDetailPage'
 import PaperEditorPage from './pages/PaperEditorPage'
 import PaperManagementPage from './pages/PaperManagementPage'
 import PapersPage from './pages/PapersPage'
+import AdminAuditPage from './pages/admin/AdminAuditPage'
 import AdminUsersPage from './pages/admin/AdminUsersPage'
 import AccountCredentialPage from './pages/AccountCredentialPage'
 import './App.css'
@@ -57,10 +58,10 @@ function App() {
       <Route element={<AboutPage />} path="/about" />
       <Route element={<ContactPage />} path="/contact" />
       <Route element={<LoginPage />} path="/login" />
-      <Route path="/forgot-password" element={<AccountCredentialPage mode="forgot" />} />
-      <Route path="/reset-password" element={<AccountCredentialPage mode="reset" />} />
-      <Route path="/accept-invitation" element={<AccountCredentialPage mode="accept" />} />
-      <Route path="/change-password" element={<PapersManagementGuard allowedRoles={['student', 'teacher', 'admin']}>{() => <AccountCredentialPage mode="change" />}</PapersManagementGuard>} />
+      <Route path="/forgot-password" element={<AccountCredentialPage key="forgot" mode="forgot" />} />
+      <Route path="/reset-password" element={<AccountCredentialPage key="reset" mode="reset" />} />
+      <Route path="/accept-invitation" element={<AccountCredentialPage key="accept" mode="accept" />} />
+      <Route path="/change-password" element={<PapersManagementGuard allowedRoles={['student', 'teacher', 'admin']}>{() => <AccountCredentialPage key="change" mode="change" />}</PapersManagementGuard>} />
       <Route element={<PapersPage />} path="/papers" />
       <Route element={<PaperDetailPage />} path="/papers/:slug" />
       <Route
@@ -96,6 +97,7 @@ function App() {
         path="/manage/papers/:id/preview"
       />
       <Route path="/admin" element={<PapersManagementGuard adminOnly>{() => <Navigate replace to="/admin/users" />}</PapersManagementGuard>} />
+      <Route path="/admin/audit-log" element={<PapersManagementGuard adminOnly>{() => <AdminAuditPage />}</PapersManagementGuard>} />
       <Route path="/admin/users" element={<PapersManagementGuard adminOnly>{() => <AdminUsersPage />}</PapersManagementGuard>} />
       <Route element={<InnovationHubPage />} path="/innovation-hub" />
       <Route element={<BrainRegionPage />} path="/brain-region/:slug" />

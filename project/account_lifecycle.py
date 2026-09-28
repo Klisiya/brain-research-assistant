@@ -60,8 +60,10 @@ class AccountLifecycleService(AccountService):
             raise AccountError("Email delivery is unavailable.", "MAIL_UNAVAILABLE", 503)
         return base.rstrip("/") + path + "?" + urlencode({"token": token})
 
-    def invite(self, email, role, uid, version):
+    def invite(self, email, role, uid, version, username=None):
         email, role = email_address(email), validate_role(role)
+        if username is not None and (not isinstance(username, str) or not 1 <= len(username.strip()) <= 80):
+            raise AccountError("Use a name between 1 and 80 characters.", "VALIDATION_ERROR", 400)
         now = utc_now()
         with self.transaction() as tx:
             self.actor(tx, uid, version, True)
@@ -75,7 +77,8 @@ class AccountLifecycleService(AccountService):
             tx.flush()
             token = secrets.token_urlsafe(32)
             entry = self.Invitation(email=email, role=role, token_hash=digest(token), pending_email=email,
-                                    created_by_id=uid, expires_at=now + timedelta(hours=48))
+                                    created_by_id=uid, expires_at=now + timedelta(hours=48),
+                                    suggested_username=username.strip() if username else None)
             tx.add(entry); tx.flush()
             self.audit(tx, "invitation_created", uid, uid, invitationId=entry.id)
             self.mail.send(email, "Account invitation", self.link("/accept-invitation", token))

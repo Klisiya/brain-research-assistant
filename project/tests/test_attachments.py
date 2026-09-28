@@ -1,3 +1,4 @@
+from csrf_client import csrf_client
 """Attachment API tests with isolated storage and generated fixtures."""
 import hashlib
 from io import BytesIO
@@ -78,7 +79,7 @@ class AttachmentTests(unittest.TestCase):
         app.config.update(TESTING=True, SECRET_KEY="isolated-test-session-key", MAX_CONTENT_LENGTH=64 * 1024 * 1024,
                           ATTACHMENT_UPLOAD_ROOT=self.temp.name, ATTACHMENT_FILE_LIMITS=dict(FILE_LIMITS))
         app.extensions["attachment_storage"] = self.backend
-        self.client = app.test_client()
+        self.client = csrf_client(app)
         with app.app_context():
             self.assertEqual(db.engine.url.database, ":memory:")
             self.assertEqual(db.session.execute(text("PRAGMA foreign_keys")).scalar(), 1)
@@ -685,7 +686,7 @@ class AttachmentTests(unittest.TestCase):
             self.assertIn("paper_attachments", inspector.get_table_names())
             self.assertEqual(len(inspector.get_foreign_keys("paper_attachments")), 2)
             self.assertIn("uq_attachment_primary", {item["name"] for item in inspector.get_indexes("paper_attachments")})
-            self.assertEqual(db.session.execute(text("SELECT version_num FROM alembic_version")).scalar(), "c83b9e4a1702")
+            self.assertEqual(db.session.execute(text("SELECT version_num FROM alembic_version")).scalar(), "d2f481a6c930")
             db.session.remove()
             downgrade(directory=migrations, revision="8cadd5a4f419")
             self.assertNotIn("paper_attachments", inspect(db.engine).get_table_names())

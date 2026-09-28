@@ -31,6 +31,7 @@ from account_credentials import define_credentials
 from account_lifecycle import AccountLifecycleService
 from account_lifecycle_api import register_lifecycle_api
 from account_mail import AccountMail
+from request_security import install_security
 
 load_dotenv()
 
@@ -455,6 +456,8 @@ def load_user(user_id):
     try:
         identifier, version = user_id.split(":", 1)
         identifier, version = int(identifier), int(version)
+        if not 1 <= identifier <= 9223372036854775807 or not 1 <= version <= 2147483647:
+            raise ValueError()
         user = db.session.get(User, identifier)
         if (user is not None and user.is_active and account_role(user.role) in USER_ROLES
                 and version == user.auth_version
@@ -514,7 +517,7 @@ require_auth = roles_required()
 
 @app.after_request
 def account_cache_headers(response):
-    if request.path.startswith(("/api/auth/", "/api/admin/")):
+    if request.path.startswith(("/api/auth/", "/api/admin/", "/api/papers/manage")):
         response.headers["Cache-Control"] = "private, no-store"
         response.vary.add("Cookie")
     return response
@@ -1434,10 +1437,10 @@ def validate_auth_login_payload():
     password = payload.get("password")
     remember = payload.get("remember", False)
 
-    if not isinstance(email, str) or not email.strip():
+    if not isinstance(email, str) or not email.strip() or len(email) > 255:
         raise ValueError("Email is required.")
 
-    if not isinstance(password, str) or not password:
+    if not isinstance(password, str) or not password or len(password) > 512:
         raise ValueError("Password is required.")
 
     if not isinstance(remember, bool):
@@ -1446,10 +1449,14 @@ def validate_auth_login_payload():
     return normalize_email(email), password, remember
 
 
+DUMMY_PASSWORD_HASH = generate_password_hash("unusable-dummy-password")
+
+
 def authenticate_user(email, password):
     user = User.query.filter_by(email=email).first()
 
-    if user and user.check_password(password) and user.is_active and account_role(user.role) in USER_ROLES:
+    valid = check_password_hash(user.password_hash if user else DUMMY_PASSWORD_HASH, password)
+    if user and valid and user.is_active and account_role(user.role) in USER_ROLES:
         return user
 
     return None
@@ -1651,7 +1658,7 @@ def set_user_role_command(email, role):
         raise click.ClickException(str(error)) from error
     except SQLAlchemyError as error:
         db.session.rollback()
-        app.logger.exception("Unable to update user role: %s", error.__class__.__name__)
+        app.logger.error("Unable to update user role: %s", error.__class__.__name__)
         raise click.ClickException("Unable to update the user role.") from error
 
     click.echo(f"Updated {user.username} ({user.email}) to role {user.role}.")
@@ -2050,7 +2057,11 @@ def api_auth_login():
     except ValueError as error:
         return jsonify({"error": str(error)}), 400
 
-    user = authenticate_user(email, password)
+    try:
+        user = authenticate_user(email, password)
+    except SQLAlchemyError:
+        db.session.rollback()
+        return jsonify(error="Unable to sign in right now.", code="AUTH_UNAVAILABLE"), 503
 
     if not user:
         return jsonify({"error": "Invalid email or password.", "code": "INVALID_CREDENTIALS"}), 401
@@ -2079,6 +2090,7 @@ def api_auth_me():
 def api_auth_logout():
     logout_user()
     clear_auth_session()
+    session.pop("csrf_token", None)
     return jsonify({"authenticated": False}), 200
 
 
@@ -2123,24 +2135,8 @@ def register():
     abort(404)
 
 
-@app.route("/login", methods=["GET", "POST"])
+@app.route("/login", methods=["GET"])
 def login():
-    if current_user.is_authenticated:
-        return redirect(get_frontend_home_url())
-
-    if request.method == "GET":
-        return redirect(get_frontend_login_url())
-
-    if request.method == "POST":
-        email = normalize_email(request.form.get("email", ""))
-        password = request.form.get("password", "")
-        remember = request.form.get("remember") == "on"
-
-        user = authenticate_user(email, password)
-
-        if user and establish_login(user, remember=remember):
-            return redirect(get_frontend_home_url())
-
     return redirect(get_frontend_login_url())
 
 
@@ -2153,15 +2149,13 @@ def forgot_password():
 
 
 @app.route("/logout")
-@login_required
 def logout():
-    logout_user()
-    clear_auth_session()
     return redirect(get_frontend_home_url())
 
 
 register_account_api(app, db, User, AccountAuditLog, account_service, roles_required)
 register_lifecycle_api(app, db, Invitation, account_lifecycle, roles_required)
+limiter = install_security(app)
 
 
 delete_paper_with_attachments = register_attachment_api(
@@ -2171,4 +2165,4 @@ delete_paper_with_attachments = register_attachment_api(
 
 
 if __name__ == "__main__":
-    app.run(debug=True)
+    app.run(debug=app.config["APP_ENV"] != "production")

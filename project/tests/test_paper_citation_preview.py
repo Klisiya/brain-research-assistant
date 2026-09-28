@@ -1,3 +1,4 @@
+from csrf_client import csrf_client
 """R1B citation metadata and managed preview regression tests."""
 import os
 from contextlib import closing
@@ -34,7 +35,7 @@ class CitationPreviewTests(unittest.TestCase):
 
     def setUp(self):
         app.config.update(TESTING=True, SECRET_KEY="citation-preview-test")
-        self.client = app.test_client()
+        self.client = csrf_client(app)
         with app.app_context():
             db.create_all()
             for uid, role in ((1, "teacher"), (2, "teacher"), (3, "admin"), (4, "user")):

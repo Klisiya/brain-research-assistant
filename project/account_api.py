@@ -20,7 +20,7 @@ def serialize_account(user):
     }
 
 
-def query_integer(name, default=None, maximum=None):
+def query_integer(name, default=None, maximum=9223372036854775807):
     value = request.args.get(name)
     if value is None:
         return default
@@ -47,6 +47,8 @@ def register_account_api(app, db, User, Audit, service, roles_required):
         @wraps(function)
         def wrapped(*args, **kwargs):
             try:
+                if any(isinstance(value, int) and value > 9223372036854775807 for value in kwargs.values()):
+                    raise AccountError("Invalid identifier.", "VALIDATION_ERROR", 400)
                 return function(*args, **kwargs)
             except AccountError as error:
                 return jsonify({"error": str(error), "code": error.code}), error.status
@@ -136,14 +138,16 @@ def register_account_api(app, db, User, Audit, service, roles_required):
         if actor_id is not None:
             query = query.filter_by(actor_user_id=actor_id)
         if target_id is not None:
-            query = query.filter_by(target_user_id=target_id)
+            query = query.filter_by(target_user_id=target_id).filter(~Audit.action.in_(["invitation_created", "invitation_revoked"]))
         logs, pagination = paginated(query.order_by(Audit.created_at.desc(), Audit.id.desc()))
         def person(user):
             return {"id": user.id, "username": user.username} if user is not None else None
         return jsonify({"logs": [{
-            "id": entry.id, "actor": person(entry.actor), "target": person(entry.target),
+            "id": entry.id, "actor": person(entry.actor), "target": None if entry.action in {"invitation_created", "invitation_revoked"} else person(entry.target),
             "action": entry.action, "createdAt": entry.created_at.isoformat(),
             "details": {key: value for key, value in entry.details.items()
-                        if key in {"oldRole", "newRole", "oldStatus", "newStatus", "invitationId"}},
+                        if (key in {"oldRole", "newRole"} and isinstance(value, str) and value in {"student", "teacher", "admin", "user"})
+                        or (key in {"oldStatus", "newStatus"} and isinstance(value, str) and value in {"active", "disabled"})
+                        or (key == "invitationId" and type(value) is int and value > 0)},
         } for entry in logs], "pagination": pagination,
             "filters": {"action": action, "actorId": actor_id, "targetId": target_id}})

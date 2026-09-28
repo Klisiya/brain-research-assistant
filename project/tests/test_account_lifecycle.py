@@ -1,3 +1,4 @@
+from csrf_client import csrf_client
 """Invitation/password contracts and atomicity using isolated databases only."""
 from datetime import timedelta
 from contextlib import closing
@@ -29,7 +30,7 @@ class LifecycleTests(unittest.TestCase):
     def setUp(self):
         self.messages = []
         app.config.update(TESTING=True, SECRET_KEY="isolated-lifecycle-session", ACCOUNT_MAIL_TEST_SINK=lambda *args: self.messages.append(args))
-        self.client = app.test_client(); self.admin = app.test_client()
+        self.client = csrf_client(app); self.admin = csrf_client(app)
         with app.app_context():
             self.assertEqual(db.engine.url.database, ":memory:")
             db.create_all()
@@ -139,7 +140,7 @@ class LifecycleTests(unittest.TestCase):
         self.login(self.client,2,True);remember=self.client.get_cookie("remember_token").value
         self.forgot();self.assertEqual(self.reset().status_code,200)
         self.assertEqual(self.client.get("/api/auth/me").status_code,401)
-        remembered=app.test_client();remembered.set_cookie("remember_token",remember)
+        remembered=csrf_client(app);remembered.set_cookie("remember_token",remember)
         self.assertEqual(remembered.get("/api/auth/me").status_code,401)
         self.assertEqual(self.login(self.client,2).status_code,401)
         self.assertEqual(self.login(self.client,2,password=NEW_PASSWORD).status_code,200)
@@ -151,10 +152,10 @@ class LifecycleTests(unittest.TestCase):
         self.assertEqual(self.change().status_code,401);self.login(self.client,2)
         self.code(self.change(current=""),"CURRENT_PASSWORD_INVALID");self.code(self.change(current="wrong"),"CURRENT_PASSWORD_INVALID")
     def test_change_revokes_all_sessions_and_resets(self):
-        self.login(self.client,2,True);other=app.test_client();self.login(other,2,True);remember=other.get_cookie("remember_token").value
+        self.login(self.client,2,True);other=csrf_client(app);self.login(other,2,True);remember=other.get_cookie("remember_token").value
         self.forgot();token=self.token();self.assertEqual(self.change().status_code,200)
         for client in [self.client,other]:self.assertEqual(client.get("/api/auth/me").status_code,401)
-        remembered=app.test_client();remembered.set_cookie("remember_token",remember);self.assertEqual(remembered.get("/api/auth/me").status_code,401)
+        remembered=csrf_client(app);remembered.set_cookie("remember_token",remember);self.assertEqual(remembered.get("/api/auth/me").status_code,401)
         self.code(self.reset(token),"RESET_TOKEN_REVOKED");self.assertEqual(self.login(self.client,2).status_code,401);self.assertEqual(self.login(self.client,2,password=NEW_PASSWORD).status_code,200)
     def test_admin_send_reset(self):
         self.assertEqual(self.admin.post("/api/admin/users/2/password-reset").status_code,200);self.assertEqual(len(self.messages),1)

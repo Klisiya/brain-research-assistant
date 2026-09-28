@@ -1,3 +1,4 @@
+import { apiFetch } from './request'
 import type { AuthMePayload, AuthUser, UserRole } from '../types/auth'
 
 const USER_ROLES: readonly UserRole[] = ['student', 'teacher', 'admin']
@@ -26,7 +27,7 @@ function isAuthMePayload(value: unknown): value is AuthMePayload {
 }
 
 export async function fetchAuthMe({ signal }: { signal?: AbortSignal } = {}) {
-  const response = await fetch('/api/auth/me', {
+  const response = await apiFetch('/api/auth/me', {
     credentials: 'include',
     signal,
   })
@@ -50,8 +51,8 @@ export class AuthLoginError extends Error {}
 
 export async function login(email: string, password: string, remember: boolean): Promise<AuthUser> {
   try {
-  const response = await fetch('/api/auth/login', { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email, password, remember }) })
-  if (!response.ok) throw new AuthLoginError(response.status === 401 ? 'Invalid email or password.' : 'Unable to sign in right now. Please try again.')
+  const response = await apiFetch('/api/auth/login', { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email, password, remember }) })
+  if (!response.ok) throw new AuthLoginError(response.status === 401 ? 'Invalid email or password.' : response.status === 429 ? 'Too many sign-in attempts. Please try again later.' : 'Unable to sign in right now. Please try again.')
   const payload: unknown = await response.json()
   if (!isAuthMePayload(payload) || !payload.authenticated) throw new AuthLoginError('Unable to sign in right now. Please try again.')
   return payload.user
@@ -61,6 +62,6 @@ export async function login(email: string, password: string, remember: boolean):
   }
 }
 export async function logout() {
-  const response = await fetch('/api/auth/logout', { method: 'POST', credentials: 'include' })
+  const response = await apiFetch('/api/auth/logout', { method: 'POST', credentials: 'include' })
   if (!response.ok) throw new Error('Unable to sign out. Please try again.')
 }

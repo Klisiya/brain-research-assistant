@@ -36,3 +36,9 @@
 
 .admin-user-dialog input { width:100%; padding:12px; border:1px solid rgba(125,211,252,.22); border-radius:12px; background:#0b1426; color:#e2e8f0; font:inherit; }
 .admin-user-dialog form { display:grid; gap:14px; }
+
+.admin-users-page a { color: #bae6fd; text-underline-offset: 3px; }
+.admin-import-form { display: grid; gap: 12px; justify-items: start; }
+.admin-import-form .admin-actions { align-items: center; min-width: 0; }
+.admin-import-form span { overflow-wrap: anywhere; min-width: 0; }
+.admin-filters input { min-width: 0; width: 100%; }

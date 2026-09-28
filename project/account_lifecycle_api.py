@@ -1,25 +1,27 @@
 """Invitation and password HTTP contracts."""
 from functools import wraps
 from flask import jsonify, request
-from urllib.parse import urlparse
+from account_recovery import RecoveryDelivery
+from account_import import read_import
+from account_lifecycle import email_address
 from flask_login import current_user
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from account_service import AccountError
 from account_api import paginated
 
-FORGOT_MESSAGE = "If an account exists for this email, a reset link has been sent."
+FORGOT_MESSAGE = "If an eligible account exists, a reset link will be sent. If no email arrives, try again later."
 
 
 def register_lifecycle_api(app, db, Invitation, service, roles_required):
+    recovery = RecoveryDelivery(app, service)
+    app.extensions["account_recovery"] = recovery
+
     def guarded(fn):
         @wraps(fn)
         def call(*args, **kwargs):
             try:
-                origin = request.headers.get("Origin")
-                frontend = urlparse(app.config.get("FRONTEND_URL", "http://127.0.0.1:5173"))
-                allowed = {request.host_url.rstrip("/"), f"{frontend.scheme}://{frontend.netloc}"}
-                if request.method != "GET" and ((origin and origin not in allowed) or request.headers.get("Sec-Fetch-Site") == "cross-site"):
-                    raise AccountError("Request origin is not allowed.", "CSRF_ORIGIN_DENIED", 403)
+                if any(isinstance(value, int) and value > 9223372036854775807 for value in kwargs.values()):
+                    raise AccountError("Invalid identifier.", "VALIDATION_ERROR", 400)
                 return fn(*args, **kwargs)
             except AccountError as error:
                 return jsonify(error=str(error), code=error.code), error.status
@@ -78,10 +80,11 @@ def register_lifecycle_api(app, db, Invitation, service, roles_required):
     @guarded
     def forgot():
         data = payload()
-        try: service.request_reset(email=data.get("email"))
-        except (AccountError, SQLAlchemyError):
-            # Delivery/configuration failures must not disclose whether an account exists.
-            app.logger.warning("Password recovery request could not be delivered.")
+        try:
+            email = email_address(data.get("email"))
+        except AccountError:
+            return jsonify(message=FORGOT_MESSAGE)
+        recovery.submit(email)
         return jsonify(message=FORGOT_MESSAGE)
 
     @app.route("/api/admin/users/<int:user_id>/password-reset", methods=["POST"])
@@ -105,3 +108,40 @@ def register_lifecycle_api(app, db, Invitation, service, roles_required):
         data = payload()
         service.change_password(current_user.id, current_user.auth_version, data.get("currentPassword"), password(data))
         return jsonify(message="Password changed. Please sign in again.")
+
+    @app.route("/api/auth/invitation-details", methods=["POST"])
+    @guarded
+    def invitation_details():
+        data = payload()
+        with service.transaction() as tx:
+            entry = service.credential(tx, Invitation, data.get("token"), "INVITATION")
+            return jsonify(username=entry.suggested_username or "")
+
+    @app.route("/api/admin/users/import", methods=["POST"])
+    @roles_required("admin")
+    @guarded
+    def import_users():
+        rows = read_import()
+        results, seen = [], set()
+        uid, version = current_user.id, current_user.auth_version
+        for number, row in enumerate(rows, 2):
+            result = {"row": number, "status": "failed"}
+            try:
+                if len(row) != 3:
+                    raise AccountError("Expected three columns.", "MALFORMED_ROW", 400)
+                email, username, role = row
+                email = email_address(email)
+                if email in seen:
+                    raise AccountError("Duplicate email in this CSV.", "DUPLICATE_EMAIL", 409)
+                seen.add(email)
+                entry = service.invite(email, role.strip(), uid, version, username=username)
+                result.update(status="invited", invitationId=entry.id)
+            except AccountError as error:
+                result.update(code=error.code, error=str(error))
+            except IntegrityError:
+                result.update(code="ACCOUNT_CONFLICT", error="An account or invitation already exists.")
+            except SQLAlchemyError:
+                result.update(code="ACCOUNT_UNAVAILABLE", error="Account service is temporarily unavailable.")
+            results.append(result)
+        invited = sum(row["status"] == "invited" for row in results)
+        return jsonify(results=results, invited=invited, failed=len(results)-invited)

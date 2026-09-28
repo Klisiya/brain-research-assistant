@@ -1,8 +1,10 @@
+import { apiFetch } from './request'
 import type { UserRole } from '../types/auth'
 import { sessionFetch } from './session'
 export type Invitation = { id: number; email: string; role: UserRole; createdAt: string; expiresAt: string; status: 'Pending' | 'Accepted' | 'Expired' | 'Revoked' }
 export type InvitationList = { invitations: Invitation[]; pagination: { page: number; totalPages: number; total: number; perPage: number } }
 const errors: Record<string, string> = {
+  RATE_LIMITED: 'Too many requests. Please wait before trying again.', RECOVERY_BUSY: 'Please try again later.', CSRF_MISSING: 'Refresh the page and try again.', CSRF_INVALID: 'Refresh the page and try again.',
   INVITATION_INVALID: 'This invitation link is invalid.', INVITATION_EXPIRED: 'This invitation has expired. Ask an administrator for a new invitation.',
   INVITATION_USED: 'This invitation has already been accepted.', INVITATION_REVOKED: 'This invitation was revoked.',
   INVITATION_PENDING: 'A pending invitation already exists for this email.', EMAIL_ALREADY_EXISTS: 'An account already uses this email.',
@@ -18,7 +20,7 @@ export async function lifecycleRequest(path: string, data?: Record<string, unkno
   const init: RequestInit = { method: data === undefined ? 'GET' : 'POST', signal }
   if (data !== undefined) { init.headers = { 'Content-Type': 'application/json' }; init.body = JSON.stringify(data) }
   const response = path.startsWith('/api/admin/') || path === '/api/auth/change-password'
-    ? await sessionFetch(path, init) : await fetch(path, { ...init, credentials: 'include' })
+    ? await sessionFetch(path, init) : await apiFetch(path, { ...init, credentials: 'include' })
   const payload: unknown = await response.json().catch(() => null)
   if (!response.ok) {
     const code = typeof payload === 'object' && payload !== null && 'code' in payload && typeof payload.code === 'string' ? payload.code : ''

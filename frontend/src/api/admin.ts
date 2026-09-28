@@ -7,6 +7,7 @@ export type Pagination = { page: number; perPage: number; total: number; totalPa
 export type AdminUsersResponse = { users: AdminUser[]; pagination: Pagination; filters: { q: string; role: UserRole | null; status: 'active' | 'disabled' | null; sort: string } }
 export type AccountAuditEntry = { id: number; actor: { id: number; username: string } | null; target: { id: number; username: string } | null; action: string; createdAt: string; details: Partial<Record<'oldRole' | 'newRole' | 'oldStatus' | 'newStatus', string>> & { invitationId?: number } }
 const messages: Record<string, string> = {
+  IMPORT_INVALID: 'Use a UTF-8 CSV with email, username (or display_name), role columns and 1 to 100 rows. Password columns are not allowed.', REQUEST_TOO_LARGE: 'CSV files must be no larger than 128 KiB.',
   AUTH_REQUIRED: 'Your session has expired. Please sign in again.',
   ACCESS_DENIED: 'You do not have permission to manage accounts.',
   FORBIDDEN: 'You do not have permission to manage accounts.',
@@ -57,3 +58,17 @@ export const changeUserRole = (id: number, role: UserRole) => userRequest(`users
 export const disableUser = (id: number) => userRequest(`users/${id}/disable`, { method: 'POST' })
 export const enableUser = (id: number) => userRequest(`users/${id}/enable`, { method: 'POST' })
 export function adminErrorMessage(error: unknown) { return error instanceof AdminApiError ? error.message : 'Account service could not be reached. Please try again.' }
+
+export type ImportResult = { row: number; status: 'invited' | 'failed'; invitationId?: number; code?: string; error?: string }
+export async function importUsers(file: File): Promise<{ results: ImportResult[]; invited: number; failed: number }> {
+  const data = new FormData(); data.append('file', file)
+  const payload = await request('users/import', { method: 'POST', body: data })
+  if (!record(payload) || !Array.isArray(payload.results) || !payload.results.every(row => record(row) && Number.isSafeInteger(row.row) && ['invited', 'failed'].includes(String(row.status)) && (row.error === undefined || typeof row.error === 'string')) || typeof payload.invited !== 'number' || typeof payload.failed !== 'number') throw new AdminApiError(502, null)
+  return payload as { results: ImportResult[]; invited: number; failed: number }
+}
+function person(value: unknown) { return value === null || (record(value) && Number.isSafeInteger(value.id) && typeof value.username === 'string') }
+export async function fetchAudit(params: URLSearchParams, signal?: AbortSignal): Promise<{ logs: AccountAuditEntry[]; pagination: Pagination }> {
+  const payload = await request(`audit-logs?${params}`, { signal })
+  if (!record(payload) || !Array.isArray(payload.logs) || !payload.logs.every(log => record(log) && Number.isSafeInteger(log.id) && person(log.actor) && person(log.target) && typeof log.action === 'string' && typeof log.createdAt === 'string' && record(log.details)) || !isPagination(payload.pagination)) throw new AdminApiError(502, null)
+  return payload as { logs: AccountAuditEntry[]; pagination: Pagination }
+}

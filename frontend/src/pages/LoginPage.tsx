@@ -31,6 +31,10 @@ function getLoginReturnPath(value: unknown) {
     && typeof value.from === 'string'
     && value.from.startsWith('/')
     && !value.from.startsWith('//')
+    && !value.from.includes('\\')
+    && !Array.from(value.from).some(char => char.charCodeAt(0) < 32 || char.charCodeAt(0) === 127)
+    && new URL(value.from, window.location.origin).origin === window.location.origin
+    && new URL(value.from, window.location.origin).pathname !== '/login'
   ) {
     return value.from
   }
