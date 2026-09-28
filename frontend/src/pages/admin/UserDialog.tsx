@@ -1,3 +1,4 @@
+import { sendPasswordReset } from '../../api/account-lifecycle'
 import { useEffect, useRef, useState } from 'react'
 import { AdminApiError, adminErrorMessage, changeUserRole, disableUser, enableUser, fetchAdminUser, type AdminUser } from '../../api/admin'
 import { useAuth } from '../../auth/useAuth'
@@ -62,6 +63,7 @@ export default function UserDialog({ id, onClose, onChanged }: { id: number; onC
         <div className="admin-actions"><button disabled={busy || role === user.role} onClick={() => void mutate('role')}>{busy ? 'Saving...' : 'Save Role'}</button>
         {user.isActive ? <button className="admin-danger" disabled={busy} onClick={() => { setError(null); setConfirmDisable(true) }}>Disable Account</button> : <button disabled={busy} onClick={() => void mutate('enable')}>Enable Account</button>}</div>
       </>}
+      <button disabled={busy || !user.isActive} onClick={async () => { setBusy(true); setError(null); try { await sendPasswordReset(user.id); setNotice('Password reset link sent.') } catch (reason) { setError(reason instanceof Error ? reason.message : 'Unable to send reset link.') } finally { setBusy(false) } }}>Send Password Reset</button>
       <p role="status">{notice}</p>
     </> : null}
   </dialog>

@@ -76,10 +76,6 @@ function LoginPage() {
     }
   }
 
-  const handleForgotPassword = () => {
-    setStatus({ type: 'info', message: 'Coming soon.' })
-  }
-
   const handlePasswordChange = (nextPassword: string) => {
     setPassword(nextPassword)
 
@@ -195,9 +191,9 @@ function LoginPage() {
                   <span>Remember me</span>
                 </label>
 
-                <button className="forgot-password-button" disabled={isSubmitting} type="button" onClick={handleForgotPassword}>
+                <Link className="forgot-password-button" to="/forgot-password">
                   Forgot password?
-                </button>
+                </Link>
               </div>
 
               <button className="login-submit" disabled={isSubmitting} type="submit">

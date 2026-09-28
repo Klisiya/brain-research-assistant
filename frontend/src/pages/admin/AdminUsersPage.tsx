@@ -3,6 +3,7 @@ import { useSearchParams } from 'react-router-dom'
 import { AdminApiError, adminErrorMessage, fetchAdminUsers, type AdminUsersResponse, type UserFilters } from '../../api/admin'
 import { useAuth } from '../../auth/useAuth'
 import UserDialog from './UserDialog'
+import InvitationsPanel from './InvitationsPanel'
 import { readUserFilters, userFilterParams } from './user-filters'
 import './AdminUsersPage.css'
 function SearchForm({ query, onSearch }: { query: string; onSearch: (q: string) => void }) {
@@ -60,6 +61,7 @@ export default function AdminUsersPage() {
       </> : null}
       {payload ? <nav className="admin-pagination" aria-label="Users pagination"><button disabled={payload.pagination.page <= 1} onClick={() => update({ page: filters.page - 1 })}>Previous</button><span>Page {payload.pagination.totalPages === 0 ? 0 : payload.pagination.page} of {payload.pagination.totalPages}</span><button disabled={payload.pagination.page >= payload.pagination.totalPages} onClick={() => update({ page: filters.page + 1 })}>Next</button></nav> : null}
     </section>
+    <InvitationsPanel />
     {selectedId !== null ? <UserDialog key={selectedId} id={selectedId} onClose={() => setSelectedId(null)} onChanged={() => setRevision(value => value + 1)} /> : null}
   </div>
 }

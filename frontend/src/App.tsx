@@ -18,6 +18,7 @@ import PaperEditorPage from './pages/PaperEditorPage'
 import PaperManagementPage from './pages/PaperManagementPage'
 import PapersPage from './pages/PapersPage'
 import AdminUsersPage from './pages/admin/AdminUsersPage'
+import AccountCredentialPage from './pages/AccountCredentialPage'
 import './App.css'
 
 function HomePage() {
@@ -56,6 +57,10 @@ function App() {
       <Route element={<AboutPage />} path="/about" />
       <Route element={<ContactPage />} path="/contact" />
       <Route element={<LoginPage />} path="/login" />
+      <Route path="/forgot-password" element={<AccountCredentialPage mode="forgot" />} />
+      <Route path="/reset-password" element={<AccountCredentialPage mode="reset" />} />
+      <Route path="/accept-invitation" element={<AccountCredentialPage mode="accept" />} />
+      <Route path="/change-password" element={<PapersManagementGuard allowedRoles={['student', 'teacher', 'admin']}>{() => <AccountCredentialPage mode="change" />}</PapersManagementGuard>} />
       <Route element={<PapersPage />} path="/papers" />
       <Route element={<PaperDetailPage />} path="/papers/:slug" />
       <Route

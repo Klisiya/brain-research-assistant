@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 
 
 ACCOUNT_ROLES = {"student", "teacher", "admin"}
-AUDIT_ACTIONS = {"role_changed", "account_disabled", "account_enabled"}
+AUDIT_ACTIONS = {"role_changed", "account_disabled", "account_enabled", "invitation_created", "invitation_revoked", "invitation_accepted", "password_reset_requested", "password_reset_completed", "password_changed"}
 
 
 def account_role(role):

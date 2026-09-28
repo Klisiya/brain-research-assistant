@@ -325,6 +325,7 @@ function Navbar() {
                     Manage Papers
                   </Link>
                 ) : null}
+                <Link className="account-menu-action" role="menuitem" to="/change-password" onClick={() => setIsAccountMenuOpen(false)}>Change Password</Link>
                 <button className="account-menu-action" disabled={isSigningOut}
                   onClick={handleSignOut} role="menuitem" type="button">
                   {isSigningOut ? 'Signing Out...' : 'Sign Out'}

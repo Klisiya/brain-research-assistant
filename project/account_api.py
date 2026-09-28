@@ -144,6 +144,6 @@ def register_account_api(app, db, User, Audit, service, roles_required):
             "id": entry.id, "actor": person(entry.actor), "target": person(entry.target),
             "action": entry.action, "createdAt": entry.created_at.isoformat(),
             "details": {key: value for key, value in entry.details.items()
-                        if key in {"oldRole", "newRole", "oldStatus", "newStatus"}},
+                        if key in {"oldRole", "newRole", "oldStatus", "newStatus", "invitationId"}},
         } for entry in logs], "pagination": pagination,
             "filters": {"action": action, "actorId": actor_id, "targetId": target_id}})

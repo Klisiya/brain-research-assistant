@@ -27,6 +27,10 @@ from werkzeug.security import check_password_hash, generate_password_hash
 from attachment_api import register_attachment_api
 from account_service import ACCOUNT_ROLES, AccountError, AccountService, account_role
 from account_api import register_account_api
+from account_credentials import define_credentials
+from account_lifecycle import AccountLifecycleService
+from account_lifecycle_api import register_lifecycle_api
+from account_mail import AccountMail
 
 load_dotenv()
 
@@ -324,6 +328,17 @@ class AccountAuditLog(db.Model):
 
 
 account_service = AccountService(db, User, AccountAuditLog)
+Invitation, PasswordResetToken = define_credentials(db)
+app.config.update(
+    FRONTEND_URL=os.getenv("FRONTEND_URL", DEFAULT_FRONTEND_URL),
+    ACCOUNT_MAIL_MODE=os.getenv("ACCOUNT_MAIL_MODE", "disabled"),
+    ACCOUNT_MAIL_FROM=os.getenv("ACCOUNT_MAIL_FROM"),
+    ACCOUNT_SMTP_HOST=os.getenv("ACCOUNT_SMTP_HOST"),
+    ACCOUNT_SMTP_PORT=int(os.getenv("ACCOUNT_SMTP_PORT", "587")),
+    ACCOUNT_SMTP_USER=os.getenv("ACCOUNT_SMTP_USER"),
+    ACCOUNT_SMTP_PASSWORD=os.getenv("ACCOUNT_SMTP_PASSWORD"),
+)
+account_lifecycle = AccountLifecycleService(db, User, AccountAuditLog, Invitation, PasswordResetToken, AccountMail(app), app)
 
 
 class Paper(db.Model):
@@ -2146,6 +2161,7 @@ def logout():
 
 
 register_account_api(app, db, User, AccountAuditLog, account_service, roles_required)
+register_lifecycle_api(app, db, Invitation, account_lifecycle, roles_required)
 
 
 delete_paper_with_attachments = register_attachment_api(

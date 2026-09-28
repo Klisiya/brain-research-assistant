@@ -5,7 +5,7 @@ export type AdminUser = AuthUser & { createdAt: string | null; lastLoginAt: stri
 export type UserFilters = { q: string; role: UserRole | ''; status: 'active' | 'disabled' | ''; page: number }
 export type Pagination = { page: number; perPage: number; total: number; totalPages: number }
 export type AdminUsersResponse = { users: AdminUser[]; pagination: Pagination; filters: { q: string; role: UserRole | null; status: 'active' | 'disabled' | null; sort: string } }
-export type AccountAuditEntry = { id: number; actor: { id: number; username: string } | null; target: { id: number; username: string } | null; action: string; createdAt: string; details: Partial<Record<'oldRole' | 'newRole' | 'oldStatus' | 'newStatus', string>> }
+export type AccountAuditEntry = { id: number; actor: { id: number; username: string } | null; target: { id: number; username: string } | null; action: string; createdAt: string; details: Partial<Record<'oldRole' | 'newRole' | 'oldStatus' | 'newStatus', string>> & { invitationId?: number } }
 const messages: Record<string, string> = {
   AUTH_REQUIRED: 'Your session has expired. Please sign in again.',
   ACCESS_DENIED: 'You do not have permission to manage accounts.',
