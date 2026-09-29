@@ -7,7 +7,7 @@ from flask import session
 from flask.testing import FlaskClient
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 import test_attachments as fixtures
-from app import app, db, Paper, PaperAttachment, FileAsset, AttachmentFileCleanup
+from app import app, db, User, Paper, PaperAttachment, FileAsset, AttachmentFileCleanup
 from attachment_files import AttachmentError
 
 
@@ -199,3 +199,40 @@ class SharedAssetTests(unittest.TestCase):
     def test_shared_validator_rejects_unknown_types(self):
         for kind in ["exe", "zip", None, []]:
             with self.assertRaises(AttachmentError): self.service.validate_upload(None, kind)
+
+    def test_anonymous_shared_management_denied_before_storage_write(self):
+        with app.test_request_context():
+            with self.assertRaises(AttachmentError) as denied:
+                self.service.save("paper", db.session.get(Paper, 1), BytesIO(fixtures.pdf()), "pdf")
+            self.assertEqual(denied.exception.status, 403)
+        self.assertFalse(self.files())
+
+    def test_demoted_owner_cannot_manage_or_preview_through_shared_adapter(self):
+        items = {pid: self.create(paper_id=pid) for pid in [1, 3, 4]}
+        before = self.files()
+        for role in ["student", "user"]:
+            with app.app_context():
+                db.session.get(User, 1).role = role
+                db.session.commit()
+            with self.subTest(role=role), app.test_request_context():
+                session.update(_user_id="1:1", auth_version=1, _fresh=True)
+                for pid, item in items.items():
+                    paper = db.session.get(Paper, pid)
+                    relation = db.session.get(PaperAttachment, item["id"])
+                    with self.assertRaises(AttachmentError) as denied:
+                        self.service.save("paper", paper, BytesIO(fixtures.pdf("denied")), "pdf")
+                    self.assertEqual(denied.exception.status, 403)
+                    if pid != 1:
+                        with self.assertRaises(AttachmentError) as denied:
+                            self.service.open("paper", paper, relation)
+                        self.assertEqual(denied.exception.status, 403)
+                    else:
+                        for access in ["public", "authenticated"]:
+                            relation.access_level = access
+                            with self.service.open("paper", paper, relation) as stream:
+                                self.assertEqual(stream.read(), fixtures.pdf())
+                        relation.access_level = "staff"
+                        with self.assertRaises(AttachmentError):
+                            self.service.open("paper", paper, relation)
+                db.session.rollback()
+            self.assertEqual(self.files(), before)

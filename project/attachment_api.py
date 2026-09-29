@@ -47,9 +47,14 @@ def register_attachment_api(app, db, Paper, Attachment, Cleanup, Asset, roles_re
             response.vary.add("Cookie")
         return response
 
+    def can_manage_resources(paper):
+        return (current_user.is_authenticated
+                and current_user.role in {"teacher", "admin"}
+                and can_manage_paper(paper))
+
     def can_read_paper(paper, item):
         if paper.status != "published":
-            return current_user.is_authenticated and can_manage_paper(paper)
+            return can_manage_resources(paper)
         if item.access_level == "public":
             return True
         if not current_user.is_authenticated:
@@ -57,7 +62,7 @@ def register_attachment_api(app, db, Paper, Attachment, Cleanup, Asset, roles_re
         return item.access_level == "authenticated" or current_user.role in {"teacher", "admin"}
 
     assets = FileAssetService(db, Asset, Cleanup, storage, app.logger)
-    assets.register_resource("paper", Attachment, "paper_id", can_read=can_read_paper, can_manage=can_manage_paper)
+    assets.register_resource("paper", Attachment, "paper_id", can_read=can_read_paper, can_manage=can_manage_resources)
     app.extensions["file_asset_service"] = assets
     queue_cleanup = assets.queue_cleanup
     drain_cleanup = assets.drain_cleanup
