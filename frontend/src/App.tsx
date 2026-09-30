@@ -4,6 +4,7 @@ import BrainSection from './components/BrainSection'
 import AITutorSection from './components/AITutorSection'
 import Footer from './components/Footer'
 import Hero from './components/Hero'
+import HomepageIntro from './components/HomepageIntro'
 import ModulesSection from './components/ModulesSection'
 import Navbar from './components/Navbar'
 import PapersManagementGuard from './components/auth/PapersManagementGuard'
@@ -41,6 +42,7 @@ function HomePage() {
 
   return (
     <div className="app-shell">
+      <HomepageIntro />
       <Navbar />
       <Hero />
       <BrainSection />
