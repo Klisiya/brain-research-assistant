@@ -712,7 +712,7 @@ class AttachmentTests(unittest.TestCase):
             self.assertIn("paper_attachments", inspector.get_table_names())
             self.assertEqual({fk["referred_table"] for fk in inspector.get_foreign_keys("paper_attachments")}, {"papers", "user", "file_assets"})
             self.assertIn("uq_attachment_primary", {item["name"] for item in inspector.get_indexes("paper_attachments")})
-            self.assertEqual(db.session.execute(text("SELECT version_num FROM alembic_version")).scalar(), "e4b7610ad932")
+            self.assertEqual(db.session.execute(text("SELECT version_num FROM alembic_version")).scalar(), "f6a940c27b18")
             db.session.remove()
             downgrade(directory=migrations, revision="8cadd5a4f419")
             self.assertNotIn("paper_attachments", inspect(db.engine).get_table_names())

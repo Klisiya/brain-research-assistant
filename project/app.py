@@ -33,6 +33,9 @@ from account_lifecycle import AccountLifecycleService
 from account_lifecycle_api import register_lifecycle_api
 from account_mail import AccountMail
 from request_security import install_security
+from course_models import define_course_models
+from course_authorization import CourseAuthorization
+from course_api import register_course_api
 
 load_dotenv()
 
@@ -403,6 +406,8 @@ class Paper(db.Model):
 
 
 FileAsset = define_file_asset(db)
+Course, CourseModule, CourseStaff, CourseResource, ModuleResource = define_course_models(db)
+course_authorization = CourseAuthorization(Course, CourseModule, CourseStaff)
 
 
 class PaperAttachment(db.Model):
@@ -2168,6 +2173,9 @@ delete_paper_with_attachments = register_attachment_api(
     app, db, Paper, PaperAttachment, AttachmentFileCleanup, FileAsset, roles_required,
     can_manage_paper, paper_not_found_response,
 )
+
+register_course_api(app, db, Course, CourseModule, CourseStaff, CourseResource, ModuleResource,
+                    course_authorization, roles_required)
 
 
 if __name__ == "__main__":

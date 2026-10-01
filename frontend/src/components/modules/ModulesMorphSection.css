@@ -292,3 +292,10 @@
     display: none;
   }
 }
+.modules-read-state { display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 1rem; padding: 4rem 1.5rem; }
+.modules-read-state h2 { color: #e1f5ff; font-size: clamp(2rem, 4vw, 3.5rem); }
+.modules-read-state p { color: #b9cddd; text-align: center; }
+.modules-read-state button { padding: .7rem 1.1rem; color: #d7f5ff; border: 1px solid #438397; border-radius: .7rem; background: #112b40; cursor: pointer; }
+.modules-skeleton-grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 1rem; width: min(100%, 1000px); }
+.module-skeleton { aspect-ratio: 2 / 3; border: 1px solid #244355; border-radius: 1rem; background: linear-gradient(140deg, #162d43, #0b1728); }
+@media (max-width: 600px) { .modules-skeleton-grid { grid-template-columns: repeat(4, 1fr); gap: .6rem; } }

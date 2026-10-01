@@ -1,13 +1,17 @@
+import { useRef } from 'react'
 import type {
   FocusEvent,
   KeyboardEvent,
-  PointerEvent,
+  MouseEvent,
   RefCallback,
 } from 'react'
+import { Link } from 'react-router-dom'
+import { modulePath } from '../../api/courses'
 import type { LearningModule } from '../../data/modules'
 import './MorphModuleCard.css'
 
 type MorphModuleCardProps = {
+  courseSlug: string
   isFlipped: boolean
   module: LearningModule
   onClose: (moduleId: string) => void
@@ -20,6 +24,7 @@ function getModuleLabel(number: number) {
 }
 
 function MorphModuleCard({
+  courseSlug,
   isFlipped,
   module,
   onClose,
@@ -27,14 +32,12 @@ function MorphModuleCard({
   positionerRef,
 }: MorphModuleCardProps) {
   const moduleLabel = getModuleLabel(module.number)
-
-  const handlePointerUp = (event: PointerEvent<HTMLElement>) => {
-    if (event.pointerType === 'mouse') {
-      return
+  const touchPointer = useRef(false)
+  const handleClick = (event: MouseEvent<HTMLAnchorElement>) => {
+    if (touchPointer.current && event.detail > 0 && !isFlipped) {
+      event.preventDefault()
+      onToggle(module.slug)
     }
-
-    event.currentTarget.focus({ preventScroll: true })
-    onToggle(module.id)
   }
 
   const handleKeyDown = (event: KeyboardEvent<HTMLElement>) => {
@@ -42,19 +45,19 @@ function MorphModuleCard({
       return
     }
 
-    if (event.key === 'Enter' || event.key === ' ') {
+    if (event.key === ' ') {
       event.preventDefault()
-      onToggle(module.id)
+      onToggle(module.slug)
     }
 
     if (event.key === 'Escape') {
-      onClose(module.id)
+      onClose(module.slug)
     }
   }
 
   const handleBlur = (event: FocusEvent<HTMLElement>) => {
     if (!event.currentTarget.contains(event.relatedTarget)) {
-      onClose(module.id)
+      onClose(module.slug)
     }
   }
 
@@ -63,18 +66,17 @@ function MorphModuleCard({
       className={`module-card-positioner morph-module-positioner${isFlipped ? ' is-active' : ''}`}
       ref={positionerRef}
     >
-      <article
-        aria-expanded={isFlipped}
-        aria-label={`${moduleLabel}: ${module.title}. Activate to read the course description.`}
+      <Link
+        to={modulePath(courseSlug, module.slug)}
+        aria-label={`${moduleLabel}: ${module.title}. Open module.`}
         className={`morph-module-card${isFlipped ? ' is-flipped' : ''}`}
         onBlur={handleBlur}
         onKeyDown={handleKeyDown}
-        onPointerUp={handlePointerUp}
-        role="button"
-        tabIndex={0}
+        onPointerDown={event => { touchPointer.current = event.pointerType !== 'mouse' }}
+        onClick={handleClick}
       >
         <div className="module-card-flipper morph-module-flipper">
-          <div aria-hidden={isFlipped} className="morph-module-face morph-module-front">
+          <div aria-hidden="true" className="morph-module-face morph-module-front">
             <div
               aria-hidden="true"
               className={`morph-module-visual ${module.coverVariant}`}
@@ -85,7 +87,7 @@ function MorphModuleCard({
             </div>
           </div>
 
-          <div aria-hidden={!isFlipped} className="morph-module-face morph-module-back">
+          <div aria-hidden="true" className="morph-module-face morph-module-back">
             <div className="morph-module-back-heading">
               <span>{moduleLabel}</span>
               <h3>{module.title}</h3>
@@ -99,7 +101,7 @@ function MorphModuleCard({
             <p>{module.description}</p>
           </div>
         </div>
-      </article>
+      </Link>
     </div>
   )
 }

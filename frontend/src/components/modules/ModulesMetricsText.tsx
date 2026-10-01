@@ -1,10 +1,12 @@
 type ModulesMetricsTextProps = {
+  courseTitle: string
   moduleCount: number
   thematicAreaCount: number
   totalHours: number
 }
 
 function ModulesMetricsText({
+  courseTitle,
   moduleCount,
   thematicAreaCount,
   totalHours,
@@ -12,7 +14,7 @@ function ModulesMetricsText({
   return (
     <div className="modules-metrics">
       <span className="modules-metrics-eyebrow">
-        Frontiers in Brain Science and Brain-Inspired Intelligence
+        {courseTitle}
       </span>
       <h2 id="modules-morph-heading">
         <strong>{moduleCount}</strong> Learning Modules

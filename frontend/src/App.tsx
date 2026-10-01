@@ -11,6 +11,7 @@ import PapersManagementGuard from './components/auth/PapersManagementGuard'
 import AboutPage from './pages/AboutPage'
 import BrainRegionPage from './pages/BrainRegionPage'
 import ContactPage from './pages/ContactPage'
+import CoursePage from './pages/CoursePage'
 import InnovationHubPage from './pages/InnovationHubPage'
 import LoginPage from './pages/LoginPage'
 import NotFoundPage from './pages/NotFoundPage'
@@ -59,6 +60,8 @@ function App() {
       <Route element={<HomePage />} path="/" />
       <Route element={<AboutPage />} path="/about" />
       <Route element={<ContactPage />} path="/contact" />
+      <Route element={<CoursePage />} path="/course/:courseSlug" />
+      <Route element={<CoursePage />} path="/course/:courseSlug/modules/:moduleSlug" />
       <Route element={<LoginPage />} path="/login" />
       <Route path="/forgot-password" element={<AccountCredentialPage key="forgot" mode="forgot" />} />
       <Route path="/reset-password" element={<AccountCredentialPage key="reset" mode="reset" />} />

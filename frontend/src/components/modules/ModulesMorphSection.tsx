@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react'
-import { learningModules } from '../../data/modules'
+import type { LearningModule } from '../../data/modules'
 import ModulesMetricsText from './ModulesMetricsText'
 import MorphModuleCard from './MorphModuleCard'
 import './ModulesMorphSection.css'
@@ -35,14 +35,6 @@ const SCROLL_SMOOTHING_DURATION = 260
 const INTRO_TOTAL_DURATION = (
   INTRO_SCATTER_DURATION + INTRO_RIBBON_DURATION + INTRO_CIRCLE_DURATION
 )
-
-const totalHours = learningModules.reduce(
-  (sum, learningModule) => sum + learningModule.durationHours,
-  0,
-)
-const thematicAreaCount = new Set(
-  learningModules.map((learningModule) => learningModule.category),
-).size
 
 const clamp = (value: number, minimum = 0, maximum = 1) => (
   Math.min(Math.max(value, minimum), maximum)
@@ -190,7 +182,15 @@ function getArcBrowseTarget(
   }
 }
 
-function ModulesMorphSection() {
+function ModulesMorphSection({ modules: learningModules, courseSlug, courseTitle }: { modules: LearningModule[]; courseSlug: string; courseTitle: string }) {
+  const totalHours = learningModules.reduce(
+    (sum, learningModule) => sum + learningModule.durationHours,
+    0,
+  )
+  const thematicAreaCount = new Set(
+    learningModules.map((learningModule) => learningModule.category),
+  ).size
+
   const [activeModuleId, setActiveModuleId] = useState<string | null>(null)
   const sectionRef = useRef<HTMLElement>(null)
   const stageRef = useRef<HTMLDivElement>(null)
@@ -547,7 +547,7 @@ function ModulesMorphSection() {
         window.cancelAnimationFrame(scrollAnimationFrameId)
       }
     }
-  }, [])
+  }, [learningModules])
 
   const toggleModule = (moduleId: string) => {
     setActiveModuleId((currentModuleId) => (
@@ -590,6 +590,7 @@ function ModulesMorphSection() {
 
           <div className="modules-stage-inner">
             <ModulesMetricsText
+              courseTitle={courseTitle}
               moduleCount={learningModules.length}
               thematicAreaCount={thematicAreaCount}
               totalHours={totalHours}
@@ -598,9 +599,10 @@ function ModulesMorphSection() {
             <div className="modules-card-field" aria-label="Interactive learning module cards">
               {learningModules.map((learningModule, index) => (
                 <MorphModuleCard
-                  isFlipped={activeModuleId === learningModule.id}
-                  key={learningModule.id}
+                  isFlipped={activeModuleId === learningModule.slug}
+                  key={learningModule.slug}
                   module={learningModule}
+                  courseSlug={courseSlug}
                   onClose={closeModule}
                   onToggle={toggleModule}
                   positionerRef={(element) => {

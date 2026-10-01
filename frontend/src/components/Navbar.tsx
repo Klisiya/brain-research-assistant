@@ -1,6 +1,7 @@
 import { useEffect, useLayoutEffect, useRef, useState, type FocusEvent, type FormEvent } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../auth/useAuth'
+import { coursePath, PRIMARY_COURSE_SLUG } from '../api/courses'
 import './Navbar.css'
 
 type DropdownItem = { label: string; href?: string }
@@ -13,8 +14,8 @@ const navItems: NavItem[] = [
   { id: 'home', label: 'Home', icon: '\u2302', href: '/' },
   {
     id: 'learning', label: 'Learning Center', dropdown: [
-      { label: 'Course Overview', href: '/#overview' },
-      { label: 'Learning Units', href: '/#modules' },
+      { label: 'Course Overview', href: coursePath(PRIMARY_COURSE_SLUG) },
+      { label: 'Learning Units', href: `${coursePath(PRIMARY_COURSE_SLUG)}#modules` },
       { label: 'Paper Library', href: '/papers' },
       { label: 'AI Tutor', href: '/#ai-section' },
       { label: 'Knowledge Quiz' },
@@ -49,7 +50,7 @@ const rightNavItems = navItems.slice(3)
 function isNavItemActive(itemId: NavId, pathname: string) {
   switch (itemId) {
     case 'home': return pathname === '/'
-    case 'learning': return pathname === '/papers' || pathname.startsWith('/papers/')
+    case 'learning': return pathname === '/papers' || pathname.startsWith('/papers/') || pathname.startsWith('/course/')
     case 'research': return pathname.startsWith('/brain-region/')
     case 'innovation': return pathname === '/innovation-hub'
     case 'more': return pathname === '/about' || pathname === '/contact'
@@ -267,7 +268,7 @@ function Navbar() {
         </button>
         <div className="dropdown-menu">
           {item.dropdown.map((dropdownItem) => dropdownItem.href ? (
-            <Link key={dropdownItem.label} onClick={() => setOpenMenu(null)} to={dropdownItem.href}>
+            <Link aria-current={dropdownItem.href === `${location.pathname}${location.hash}` ? 'page' : undefined} key={dropdownItem.label} onClick={() => setOpenMenu(null)} to={dropdownItem.href}>
               {dropdownItem.label}
             </Link>
           ) : (
