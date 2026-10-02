@@ -2,6 +2,7 @@ import { useEffect, useLayoutEffect, useRef, useState, type FocusEvent, type For
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../auth/useAuth'
 import { coursePath, PRIMARY_COURSE_SLUG } from '../api/courses'
+import { searchPath } from '../api/search'
 import './Navbar.css'
 
 type DropdownItem = { label: string; href?: string }
@@ -218,7 +219,11 @@ function Navbar() {
     const nextTarget = event.relatedTarget
     if (!(nextTarget instanceof Node) || !event.currentTarget.contains(nextTarget)) setOpenMenu(null)
   }
-  const handleSearchSubmit = (event: FormEvent<HTMLFormElement>) => event.preventDefault()
+  const handleSearchSubmit = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+    const query = searchTerm.trim()
+    if (query) navigate(searchPath(query))
+  }
   const handleSearchButtonClick = () => {
     if (!isSearchOpen) setSearchExpansionKey(location.key)
   }
@@ -297,7 +302,7 @@ function Navbar() {
               onSubmit={handleSearchSubmit} role="search">
               <input aria-hidden={!isSearchOpen} aria-label="Search scientific topics"
                 id="navbar-search-input" onChange={(event) => setSearchTerm(event.target.value)}
-                placeholder="Search scientific topics..." ref={searchInputRef}
+                maxLength={200} placeholder="Search scientific topics..." ref={searchInputRef}
                 tabIndex={isSearchOpen ? 0 : -1} type="search" value={searchTerm} />
               <button aria-controls="navbar-search-input" aria-expanded={isSearchOpen}
                 aria-label={isSearchOpen ? 'Search' : 'Open search'}

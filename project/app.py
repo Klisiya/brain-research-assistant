@@ -39,6 +39,7 @@ from course_api import register_course_api
 from research_models import define_research_models
 from research_authorization import ResearchAuthorization
 from research_api import register_research_api
+from search_api import register_search_api
 
 load_dotenv()
 
@@ -2184,6 +2185,7 @@ register_course_api(app, db, Course, CourseModule, CourseStaff, CourseResource, 
 register_research_api(app, db, ResearchArea, ResearchAreaStaff, ResearchAreaPaper, ResearchAreaModule,
                       ResearchAreaResource, User, Paper, Course, CourseModule, research_authorization,
                       roles_required, BRAIN_REGIONS, serialize_paper)
+register_search_api(app, db, Paper, Course, CourseModule, ResearchArea, limiter)
 
 
 if __name__ == "__main__":

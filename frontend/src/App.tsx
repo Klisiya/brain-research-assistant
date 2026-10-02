@@ -14,6 +14,7 @@ import ContactPage from './pages/ContactPage'
 import CoursePage from './pages/CoursePage'
 import ResearchAreaPage from './pages/ResearchAreaPage'
 import ResearchManagementPage from './pages/ResearchManagementPage'
+import SearchPage from './pages/SearchPage'
 import InnovationHubPage from './pages/InnovationHubPage'
 import LoginPage from './pages/LoginPage'
 import NotFoundPage from './pages/NotFoundPage'
@@ -61,6 +62,7 @@ function App() {
     <Routes>
       <Route element={<HomePage />} path="/" />
       <Route element={<AboutPage />} path="/about" />
+      <Route element={<SearchPage />} path="/search" />
       <Route element={<ContactPage />} path="/contact" />
       <Route element={<CoursePage />} path="/course/:courseSlug" />
       <Route element={<CoursePage />} path="/course/:courseSlug/modules/:moduleSlug" />
