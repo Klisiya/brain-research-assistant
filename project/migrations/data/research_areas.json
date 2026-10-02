@@ -1,0 +1,15 @@
+{
+  "areas": [
+    {"code":"RA-01","slug":"neuroscience","name":"Neuroscience","overview":"Explore neural structure and function through brain anatomy, foundational learning, and published research.","subtopics":["Neural structure and function","Brain anatomy","Foundational course content","Neuroscience research"],"brainRegionSlugs":["frontal-lobe","parietal-lobe","temporal-lobe","occipital-lobe","cerebellum","brainstem"],"sortOrder":1},
+    {"code":"RA-02","slug":"cognitive-science","name":"Cognitive Science","overview":"Explore perception, memory, attention, and cognition through related learning modules and published papers.","subtopics":["Perception","Memory","Attention","Cognition"],"brainRegionSlugs":[],"sortOrder":2},
+    {"code":"RA-03","slug":"brain-computer-interfaces","name":"Brain-Computer Interfaces","overview":"Explore brain signals, interfaces, applications, and technical learning resources.","subtopics":["Brain signals","Interface technologies","Applications","Technical learning resources"],"brainRegionSlugs":[],"sortOrder":3},
+    {"code":"RA-04","slug":"brain-inspired-computing","name":"Brain-Inspired Computing","overview":"Explore brain-inspired computation and neuromorphic technologies through research and technical applications.","subtopics":["Brain-inspired computation","Neuromorphic technologies","Computational research","Technical applications"],"brainRegionSlugs":[],"sortOrder":4},
+    {"code":"RA-05","slug":"artificial-intelligence","name":"Artificial Intelligence","overview":"Explore the bidirectional integration of artificial intelligence and brain science through course content and research resources.","subtopics":["AI and brain science","Bidirectional integration","Related course content","Research resources"],"brainRegionSlugs":[],"sortOrder":5},
+    {"code":"RA-06","slug":"brain-disorders","name":"Brain Disorders","overview":"Explore disease mechanisms and clinical research through the clinical learning modules and published papers.","subtopics":["Disease mechanisms","Clinical research","Clinical learning modules","Brain disorder research"],"brainRegionSlugs":[],"sortOrder":6}
+  ],
+  "moduleLinks": {
+    "artificial-intelligence":["brain-science-ai-bidirectional-integration"],
+    "brain-disorders":["clinical-frontiers-brain-disorders-one","clinical-frontiers-brain-disorders-two","clinical-frontiers-brain-disorders-three","clinical-frontiers-brain-disorders-four"]
+  },
+  "courseSlug":"brain-science-and-brain-inspired-intelligence"
+}

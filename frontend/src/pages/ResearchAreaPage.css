@@ -1,0 +1,46 @@
+.research-page { background: #07101f; color: #e5f2fc; min-height: 100vh; }
+.research-main { position: relative; z-index: 1; width: min(1160px, calc(100% - 64px)); margin: 0 auto; padding: 150px 0 90px; }
+.research-page a { color: inherit; }
+.research-breadcrumb { display: flex; gap: 12px; flex-wrap: wrap; font-size: .85rem; color: #afc5d8; margin-bottom: 38px; }
+.research-breadcrumb a { text-decoration: none; }
+.research-header { position: relative; max-width: 950px; margin-bottom: 42px; border-left: 2px solid var(--research-accent,#7dd3ed); padding-left: 28px; }
+.research-header h1, .research-status h1 { font-size: clamp(2.4rem,5vw,4.5rem); letter-spacing: -.035em; line-height: 1.12; margin: 18px 0; overflow-wrap: anywhere; }
+.research-header > p:last-child { color: #b7cbdd; line-height: 1.9; font-size: 1.13rem; }
+.research-eyebrow { color: var(--research-accent,#8cdbf3); font-size: .75rem; text-transform: uppercase; letter-spacing: .12em; line-height: 1.8; }
+.research-accent-neuroscience { --research-accent: #79d3ef; }
+.research-accent-cognitive-science { --research-accent: #b2b8ff; }
+.research-accent-brain-computer-interfaces { --research-accent: #7adfd2; }
+.research-accent-brain-inspired-computing { --research-accent: #b4ccff; }
+.research-accent-artificial-intelligence { --research-accent: #a2beff; }
+.research-accent-brain-disorders { --research-accent: #aacbda; }
+.research-glass { border: 1px solid #81bed62b; border-radius: 22px; background: linear-gradient(135deg,#1a344bbb,#0b172be8); box-shadow: 0 16px 55px #0002; }
+.research-area-grid { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 24px; }
+.research-area-card { padding: 30px; display: flex; flex-direction: column; gap: 20px; text-decoration: none; border-top: 2px solid var(--research-accent); }
+.research-area-card h2 { margin: 0; font-size: 1.6rem; line-height: 1.25; }
+.research-area-card p { margin: 0; line-height: 1.8; color: #abc2d5; flex: 1; }
+.research-area-card > span:last-child { color: var(--research-accent); font-size: .85rem; }
+.research-page h2 { font-size: clamp(1.5rem,2.2vw,2rem); margin: 0 0 24px; }
+.research-subtopics { padding: 30px; }
+.research-subtopics ul { display: flex; flex-wrap: wrap; gap: 12px; list-style: none; padding: 0; margin: 0; }
+.research-subtopics li { border: 1px solid #84cce72b; padding: 10px 16px; border-radius: 30px; color: #b0dced; font-size: .85rem; }
+.research-section { margin-top: 48px; }
+.research-content-grid { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 20px; }
+.research-content-card { padding: 26px; text-decoration: none; display: flex; flex-direction: column; gap: 12px; }
+.research-content-card h3 { margin: 0; font-size: 1.35rem; line-height: 1.35; }
+.research-content-card p { margin: 0; line-height: 1.6; color: #adc2d5; }
+.research-content-card > span:last-child { color: #99d8ed; margin-top: auto; font-size: .85rem; }
+.research-course-name { font-size: .8rem; }
+.research-empty { border-left: 1px solid #87c5df44; padding: 12px 20px; color: #a5bbcf; line-height: 1.8; }
+.research-resource-list { padding: 24px 44px; }
+.research-resource-list li { padding: 12px 0; }
+.research-resource-list p { color: #adc2d5; line-height: 1.8; }
+.research-resource-list small { display: block; color: #9bb8cb; margin-top: 7px; }
+.research-external { font-size: .7rem; }
+.research-anatomy-links { display: flex; flex-wrap: wrap; gap: 12px; }
+.research-anatomy-links a { text-decoration: none; padding: 16px 22px; }
+.research-page a:focus-visible, .research-page button:focus-visible { outline: 2px solid #92dfff; outline-offset: 5px; }
+.research-status { padding: 36px; min-height: 320px; }
+.research-status a { display: inline-block; margin: 20px; }
+.research-page button { padding: 10px 18px; border-radius: 10px; border: 1px solid #52899e; background: #15334a; color: #d5f3ff; cursor: pointer; }
+@media (max-width:1000px) { .research-area-grid { grid-template-columns: repeat(2,minmax(0,1fr)); } .research-main { padding-top: 160px; } }
+@media (max-width:600px) { .research-main { width: calc(100% - 36px); padding: 135px 0 70px; } .research-area-grid,.research-content-grid { grid-template-columns: minmax(0,1fr); } .research-header { padding-left: 18px; } .research-header h1 { font-size: 2.45rem; } .research-header > p:last-child { font-size: 1rem; } .research-subtopics,.research-area-card,.research-content-card { padding: 24px; } }

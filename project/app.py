@@ -36,6 +36,9 @@ from request_security import install_security
 from course_models import define_course_models
 from course_authorization import CourseAuthorization
 from course_api import register_course_api
+from research_models import define_research_models
+from research_authorization import ResearchAuthorization
+from research_api import register_research_api
 
 load_dotenv()
 
@@ -408,6 +411,8 @@ class Paper(db.Model):
 FileAsset = define_file_asset(db)
 Course, CourseModule, CourseStaff, CourseResource, ModuleResource = define_course_models(db)
 course_authorization = CourseAuthorization(Course, CourseModule, CourseStaff)
+ResearchArea, ResearchAreaStaff, ResearchAreaPaper, ResearchAreaModule, ResearchAreaResource = define_research_models(db)
+research_authorization = ResearchAuthorization(ResearchArea, ResearchAreaStaff)
 
 
 class PaperAttachment(db.Model):
@@ -2176,6 +2181,9 @@ delete_paper_with_attachments = register_attachment_api(
 
 register_course_api(app, db, Course, CourseModule, CourseStaff, CourseResource, ModuleResource,
                     course_authorization, roles_required)
+register_research_api(app, db, ResearchArea, ResearchAreaStaff, ResearchAreaPaper, ResearchAreaModule,
+                      ResearchAreaResource, User, Paper, Course, CourseModule, research_authorization,
+                      roles_required, BRAIN_REGIONS, serialize_paper)
 
 
 if __name__ == "__main__":

@@ -12,6 +12,8 @@ import AboutPage from './pages/AboutPage'
 import BrainRegionPage from './pages/BrainRegionPage'
 import ContactPage from './pages/ContactPage'
 import CoursePage from './pages/CoursePage'
+import ResearchAreaPage from './pages/ResearchAreaPage'
+import ResearchManagementPage from './pages/ResearchManagementPage'
 import InnovationHubPage from './pages/InnovationHubPage'
 import LoginPage from './pages/LoginPage'
 import NotFoundPage from './pages/NotFoundPage'
@@ -62,6 +64,10 @@ function App() {
       <Route element={<ContactPage />} path="/contact" />
       <Route element={<CoursePage />} path="/course/:courseSlug" />
       <Route element={<CoursePage />} path="/course/:courseSlug/modules/:moduleSlug" />
+      <Route element={<ResearchAreaPage />} path="/research" />
+      <Route element={<ResearchAreaPage />} path="/research/:slug" />
+      <Route element={<PapersManagementGuard>{user => <ResearchManagementPage currentUser={user} />}</PapersManagementGuard>} path="/manage/research-areas" />
+      <Route element={<PapersManagementGuard>{user => <ResearchManagementPage currentUser={user} />}</PapersManagementGuard>} path="/manage/research-areas/:areaId" />
       <Route element={<LoginPage />} path="/login" />
       <Route path="/forgot-password" element={<AccountCredentialPage key="forgot" mode="forgot" />} />
       <Route path="/reset-password" element={<AccountCredentialPage key="reset" mode="reset" />} />

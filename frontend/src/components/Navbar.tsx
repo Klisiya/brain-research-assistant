@@ -23,9 +23,9 @@ const navItems: NavItem[] = [
   },
   {
     id: 'research', label: 'Research Areas', dropdown: [
-      { label: 'Neuroscience' }, { label: 'Cognitive Science' },
-      { label: 'Brain-Computer Interfaces' }, { label: 'Brain-Inspired Computing' },
-      { label: 'Artificial Intelligence' }, { label: 'Brain Disorders' },
+      { label: 'Neuroscience', href: '/research/neuroscience' }, { label: 'Cognitive Science', href: '/research/cognitive-science' },
+      { label: 'Brain-Computer Interfaces', href: '/research/brain-computer-interfaces' }, { label: 'Brain-Inspired Computing', href: '/research/brain-inspired-computing' },
+      { label: 'Artificial Intelligence', href: '/research/artificial-intelligence' }, { label: 'Brain Disorders', href: '/research/brain-disorders' },
     ],
   },
   {
@@ -51,7 +51,7 @@ function isNavItemActive(itemId: NavId, pathname: string) {
   switch (itemId) {
     case 'home': return pathname === '/'
     case 'learning': return pathname === '/papers' || pathname.startsWith('/papers/') || pathname.startsWith('/course/')
-    case 'research': return pathname.startsWith('/brain-region/')
+    case 'research': return pathname === '/research' || pathname.startsWith('/research/') || pathname.startsWith('/brain-region/')
     case 'innovation': return pathname === '/innovation-hub'
     case 'more': return pathname === '/about' || pathname === '/contact'
   }
@@ -326,6 +326,7 @@ function Navbar() {
                     Manage Papers
                   </Link>
                 ) : null}
+                {(authState.user.role === 'teacher' || authState.user.role === 'admin') && <Link className="account-menu-action" role="menuitem" to="/manage/research-areas" onClick={() => setIsAccountMenuOpen(false)}>Manage Research Areas</Link>}
                 <Link className="account-menu-action" role="menuitem" to="/change-password" onClick={() => setIsAccountMenuOpen(false)}>Change Password</Link>
                 <button className="account-menu-action" disabled={isSigningOut}
                   onClick={handleSignOut} role="menuitem" type="button">
