@@ -9,6 +9,8 @@ import PageParticleBackground from '../components/PageParticleBackground'
 import '../components/modules/MorphModuleCard.css'
 import './CoursePage.css'
 import { getReadings } from '../api/courseManagement'
+import { useLearningCourse, type LearningController } from '../hooks/useLearningCourse'
+import { CourseLearning, ResourceLearning } from '../components/learning/LearningControls'
 
 function Readings({ url }: { url: string }) {
   const reader = useCallback((signal: AbortSignal) => getReadings(url,signal),[url])
@@ -21,7 +23,7 @@ function Readings({ url }: { url: string }) {
   })}</>
 }
 
-function Resources({ url }: { url: string }) {
+function Resources({ url, learning, moduleSlug }: { url: string; learning: LearningController; moduleSlug?: string }) {
   const { state: auth } = useAuth()
   const reader = useCallback((signal: AbortSignal) => getResources(url, signal), [url])
   const state = useCourseRead(`${url}:${auth.status}:${auth.user?.id ?? ''}`, reader)
@@ -32,6 +34,7 @@ function Resources({ url }: { url: string }) {
         {resource.externalUrl ? <a href={resource.externalUrl} target="_blank" rel="noopener noreferrer">{resource.displayName}<span> ↗</span></a> : <a href={resource.downloadUrl ?? undefined}>{resource.displayName}</a>}
         <small>{resource.attachmentType.replaceAll('_', ' ')} · Version {resource.version}</small>
         {resource.description && <p>{resource.description}</p>}
+        <ResourceLearning learning={learning} resourceId={resource.id} version={resource.version} moduleSlug={moduleSlug} />
       </li>)}
     </ul>}
   </section>
@@ -40,6 +43,7 @@ function Resources({ url }: { url: string }) {
 export default function CoursePage() {
   const { courseSlug = '', moduleSlug } = useParams()
   const location = useLocation()
+  const learning = useLearningCourse(courseSlug)
   const reader = useCallback((signal: AbortSignal): Promise<CourseDetail | ModuleDetail> => moduleSlug ? getModule(courseSlug, moduleSlug, signal) : getCourse(courseSlug, signal), [courseSlug, moduleSlug])
   const state = useCourseRead(courseApiPath(courseSlug, moduleSlug), reader)
   useEffect(() => {
@@ -77,10 +81,11 @@ export default function CoursePage() {
           <p className="course-description">{detail ? detail.module.description : course.description}</p>
           <div className="course-stats">{detail ? <span><strong>{detail.module.durationHours}</strong> Estimated hours</span> : <><span><strong>{course.moduleCount}</strong> Learning modules</span><span><strong>{course.totalHours}</strong> Estimated hours</span></>}</div>
         </header>
+        <CourseLearning learning={learning} moduleSlug={moduleSlug} returnPath={location.pathname} />
         {detail ? <>
           <section className="course-focus course-glass"><h2>Learning Focus</h2><p>{detail.module.learningFocus}</p></section>
           <Readings key={`readings:${course.slug}:${detail.module.slug}`} url={`${courseApiPath(course.slug,detail.module.slug)}/papers`} />
-          <Resources key={courseApiPath(course.slug, detail.module.slug)} url={`${courseApiPath(course.slug, detail.module.slug)}/resources`} />
+          <Resources key={courseApiPath(course.slug, detail.module.slug)} url={`${courseApiPath(course.slug, detail.module.slug)}/resources`} learning={learning} moduleSlug={detail.module.slug} />
           <Link className="course-back" to={`${coursePath(course.slug)}#modules`}>Explore all modules →</Link>
         </> : overview && <>
           <section className="course-focus course-glass"><h2>Fields of Study</h2><ul className="course-categories">{course.categories.map(category => <li key={category}>{category}</li>)}</ul></section>
@@ -91,7 +96,7 @@ export default function CoursePage() {
               <div className="course-module-copy"><span className="course-eyebrow">Module {String(module.number).padStart(2, '0')} · {module.durationHours} Hours</span><h3>{module.title}</h3><p lang="zh" className="course-title-zh">{module.titleZh}</p><span className="course-category">{module.category}</span><p>{module.description}</p><div className="course-module-focus"><strong>Learning focus</strong><p>{module.learningFocus}</p></div><span className="course-open">Explore module →</span></div>
             </Link>)}</div>}
           </section>
-          <Resources key={courseApiPath(course.slug)} url={`${courseApiPath(course.slug)}/resources`} />
+          <Resources key={courseApiPath(course.slug)} url={`${courseApiPath(course.slug)}/resources`} learning={learning} />
         </>}
       </>}
     </main><Footer />

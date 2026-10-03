@@ -42,6 +42,8 @@ from research_api import register_research_api
 from search_api import register_search_api
 from module_readings import define_module_paper
 from course_management import register_course_management
+from learning_models import define_learning_models
+from learning_api import register_learning_api
 
 load_dotenv()
 
@@ -414,6 +416,7 @@ class Paper(db.Model):
 FileAsset = define_file_asset(db)
 Course, CourseModule, CourseStaff, CourseResource, ModuleResource = define_course_models(db)
 CourseModulePaper = define_module_paper(db)
+Enrollment, ModuleProgress, CourseResourceProgress, ModuleResourceProgress = define_learning_models(db)
 course_authorization = CourseAuthorization(Course, CourseModule, CourseStaff)
 ResearchArea, ResearchAreaStaff, ResearchAreaPaper, ResearchAreaModule, ResearchAreaResource = define_research_models(db)
 research_authorization = ResearchAuthorization(ResearchArea, ResearchAreaStaff)
@@ -2211,6 +2214,9 @@ register_research_api(app, db, ResearchArea, ResearchAreaStaff, ResearchAreaPape
                       ResearchAreaResource, User, Paper, Course, CourseModule, research_authorization,
                       roles_required, BRAIN_REGIONS, serialize_paper, can_manage_paper, course_authorization.can_manage_module)
 register_search_api(app, db, Paper, Course, CourseModule, ResearchArea, limiter)
+register_learning_api(app, db, User, Course, CourseModule, CourseResource, ModuleResource,
+                      Enrollment, ModuleProgress, CourseResourceProgress, ModuleResourceProgress,
+                      course_authorization, roles_required)
 
 
 if __name__ == "__main__":
