@@ -4,6 +4,7 @@ import { fetchManagedPaperPreview, fetchPaperBySlug, PaperApiError, PaperNotFoun
 import PaperResources from '../components/papers/PaperResources'
 import BookmarkControl from '../components/learning/BookmarkControl'
 import PaperReadingControls from '../components/learning/PaperReadingControls'
+import { GuidedNotesPanel, ConceptHighlightsPanel } from '../components/learning/PaperAnnotations'
 import { usePaperReading } from '../hooks/usePaperReading'
 import Footer from '../components/Footer'
 import Navbar from '../components/Navbar'
@@ -365,8 +366,9 @@ function PaperDetailPage({ preview = false }: { preview?: boolean }) {
                     <span>Resource Tools</span>
                     <h2>Reading Workspace</h2>
                     {!preview && <PaperReadingControls state={reading} slug={paper.slug} />}
+                    {!preview && <><GuidedNotesPanel slug={paper.slug} /><ConceptHighlightsPanel slug={paper.slug} /></>}
                     <div className="paper-coming-soon-grid">
-                      {['Guided Notes', 'Concept Highlights', 'Knowledge Check'].map((tool) => (
+                      {(preview ? ['Guided Notes', 'Concept Highlights', 'Knowledge Check'] : ['Knowledge Check']).map((tool) => (
                         <div aria-disabled="true" className="paper-coming-soon-card" key={tool}>
                           <strong>{tool}</strong>
                           <span>Coming Soon</span>

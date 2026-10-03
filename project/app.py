@@ -46,6 +46,8 @@ from learning_models import define_learning_models
 from learning_api import register_learning_api
 from reading_models import define_reading_models
 from reading_api import register_reading_api
+from annotation_models import define_annotation_models
+from annotation_api import register_annotation_api
 
 load_dotenv()
 
@@ -420,6 +422,7 @@ Course, CourseModule, CourseStaff, CourseResource, ModuleResource = define_cours
 CourseModulePaper = define_module_paper(db)
 Enrollment, ModuleProgress, CourseResourceProgress, ModuleResourceProgress = define_learning_models(db)
 Bookmark, PaperReadingProgress, PaperAttachmentProgress = define_reading_models(db)
+GuidedNote, ConceptHighlight = define_annotation_models(db)
 course_authorization = CourseAuthorization(Course, CourseModule, CourseStaff)
 ResearchArea, ResearchAreaStaff, ResearchAreaPaper, ResearchAreaModule, ResearchAreaResource = define_research_models(db)
 research_authorization = ResearchAuthorization(ResearchArea, ResearchAreaStaff)
@@ -2222,6 +2225,7 @@ register_learning_api(app, db, User, Course, CourseModule, CourseResource, Modul
                       course_authorization, roles_required)
 register_reading_api(app, db, User, Paper, PaperAttachment, Course, CourseModule, ResearchArea,
                      Bookmark, PaperReadingProgress, PaperAttachmentProgress, roles_required)
+register_annotation_api(app, db, User, Paper, PaperAttachment, GuidedNote, ConceptHighlight, roles_required)
 
 
 if __name__ == "__main__":
