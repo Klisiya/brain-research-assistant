@@ -11,6 +11,7 @@ import './CoursePage.css'
 import { getReadings } from '../api/courseManagement'
 import { useLearningCourse, type LearningController } from '../hooks/useLearningCourse'
 import { CourseLearning, ResourceLearning } from '../components/learning/LearningControls'
+import BookmarkControl from '../components/learning/BookmarkControl'
 
 function Readings({ url }: { url: string }) {
   const reader = useCallback((signal: AbortSignal) => getReadings(url,signal),[url])
@@ -79,6 +80,7 @@ export default function CoursePage() {
           <h1>{detail ? detail.module.title : course.title}</h1>
           {(detail?.module.titleZh || course.titleZh) && <p lang="zh" className="course-title-zh">{detail ? detail.module.titleZh : course.titleZh}</p>}
           <p className="course-description">{detail ? detail.module.description : course.description}</p>
+          <BookmarkControl targetType={detail ? 'module' : 'course'} targetId={detail ? detail.module.id : course.id} />
           <div className="course-stats">{detail ? <span><strong>{detail.module.durationHours}</strong> Estimated hours</span> : <><span><strong>{course.moduleCount}</strong> Learning modules</span><span><strong>{course.totalHours}</strong> Estimated hours</span></>}</div>
         </header>
         <CourseLearning learning={learning} moduleSlug={moduleSlug} returnPath={location.pathname} />

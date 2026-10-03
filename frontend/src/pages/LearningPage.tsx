@@ -5,6 +5,7 @@ import { getEnrollments, statusLabel } from '../api/learning'
 import { coursePath, modulePath, PRIMARY_COURSE_SLUG } from '../api/courses'
 import { useCourseRead } from '../hooks/useCourseRead'
 import { StudyProgress } from '../components/learning/LearningControls'
+import PaperReadingSummary from '../components/learning/PaperReadingSummary'
 import Navbar from '../components/Navbar'
 import Footer from '../components/Footer'
 import PageParticleBackground from '../components/PageParticleBackground'
@@ -24,6 +25,7 @@ function LearningContent({ account, detailed }: { account: number; detailed: boo
           <h3>Current learning resources</h3>{e.resources.length ? <ul>{e.resources.map(r => <li key={`${r.kind}:${r.resourceId}`}><Link to={r.moduleSlug ? modulePath(e.course.slug, r.moduleSlug) : coursePath(e.course.slug)}>{r.displayName}</Link> · Version {r.version} · {statusLabel(r.status)}{r.history.some(h => h.selfCompletedAt) && <p>Earlier completed versions: {r.history.filter(h => h.selfCompletedAt).map(h => h.version).join(', ')}</p>}</li>)}</ul> : <p>No accessible learning resources are available.</p>}</>}
       </>}
     </article>)}
+    {detailed && <PaperReadingSummary />}
     <Link to={detailed ? '/my-learning' : '/progress'}>{detailed ? 'My Learning' : 'View Progress'}</Link>
   </>
 }

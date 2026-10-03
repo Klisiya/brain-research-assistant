@@ -2,6 +2,9 @@ import { useEffect, useState } from 'react'
 import { Link, useLocation, useParams } from 'react-router-dom'
 import { fetchManagedPaperPreview, fetchPaperBySlug, PaperApiError, PaperNotFoundError } from '../api/papers'
 import PaperResources from '../components/papers/PaperResources'
+import BookmarkControl from '../components/learning/BookmarkControl'
+import PaperReadingControls from '../components/learning/PaperReadingControls'
+import { usePaperReading } from '../hooks/usePaperReading'
 import Footer from '../components/Footer'
 import Navbar from '../components/Navbar'
 import PageParticleBackground from '../components/PageParticleBackground'
@@ -256,6 +259,7 @@ function PaperDetailPage({ preview = false }: { preview?: boolean }) {
     ? formatPublishedDate(paper.publishedAt)
     : null
   const externalSourceUrl = paper ? getExternalSourceUrl(paper.externalUrl) : null
+  const reading = usePaperReading(!preview && paper ? paper.slug : '')
   const citation = paper ? getCitation(paper) : ''
   const doiUrl = paper ? getDoiUrl(paper.doi) : null
 
@@ -313,6 +317,7 @@ function PaperDetailPage({ preview = false }: { preview?: boolean }) {
                     : 'Author information unavailable'}
                 </p>
                 <p className="paper-detail-publication">{getPublicationDetails(paper)}</p>
+                {!preview && <BookmarkControl targetType="paper" targetId={paper.id} />}
 
                 <dl className="paper-detail-meta">
                   <div>
@@ -354,11 +359,12 @@ function PaperDetailPage({ preview = false }: { preview?: boolean }) {
                     )}
                   </section>
 
-                  <PaperResources key={`${preview}:${paper.id}`} paperId={paper.id} slug={paper.slug} managed={preview} />
+                  <PaperResources key={`${preview}:${paper.id}`} paperId={paper.id} slug={paper.slug} managed={preview} reading={!preview ? reading : undefined} />
 
                   <section className="paper-detail-block">
                     <span>Resource Tools</span>
                     <h2>Reading Workspace</h2>
+                    {!preview && <PaperReadingControls state={reading} slug={paper.slug} />}
                     <div className="paper-coming-soon-grid">
                       {['Guided Notes', 'Concept Highlights', 'Knowledge Check'].map((tool) => (
                         <div aria-disabled="true" className="paper-coming-soon-card" key={tool}>

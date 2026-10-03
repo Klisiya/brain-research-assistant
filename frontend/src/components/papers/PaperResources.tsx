@@ -6,6 +6,8 @@ import { useAuth } from '../../auth/useAuth'
 import type { PaperAttachment } from '../../types/paper'
 import { ACCESS_LABELS, ATTACHMENT_LABELS, attachmentError, externalResourceUrl, formatFileSize } from './attachmentPresentation'
 import './PaperResources.css'
+import PaperReadingControls from '../learning/PaperReadingControls'
+import type { PaperReadingController } from '../../hooks/usePaperReading'
 type ResourceActionError = { message: string; signIn: boolean }
 function ResourceFileActions({ attachment, onError }: { attachment: PaperAttachment; onError: (error: ResourceActionError) => void }) {
   const [busy, setBusy] = useState(false), [error, setError] = useState<string | null>(null), [signIn, setSignIn] = useState(false)
@@ -45,7 +47,7 @@ function ResourceFileActions({ attachment, onError }: { attachment: PaperAttachm
     {signIn ? <Link state={{ from: location.pathname }} to="/login">Sign In</Link> : null}
   </div>
 }
-function ResourceCard({ item, onError }: { item: PaperAttachment; onError: (error: ResourceActionError) => void }) {
+function ResourceCard({ item, onError, reading, slug }: { item: PaperAttachment; onError: (error: ResourceActionError) => void; reading?: PaperReadingController; slug: string }) {
   const external = externalResourceUrl(item.externalUrl)
   return <li className="resource-card">
     <div className="resource-card-copy">
@@ -54,9 +56,10 @@ function ResourceCard({ item, onError }: { item: PaperAttachment; onError: (erro
     </div>
     {item.attachmentType === 'external_link' ? external ? <div className="resource-actions"><a href={external} target="_blank" rel="noopener noreferrer" aria-label={`Open ${item.displayName} (external resource, opens in a new tab)`}>Open Resource ↗</a></div> : <p>Resource link unavailable.</p>
       : item.downloadUrl ? <ResourceFileActions attachment={item} onError={onError} /> : <p>File unavailable.</p>}
+    {reading && item.attachmentType !== 'cover' && <PaperReadingControls state={reading} slug={slug} attachment={{ id: item.id, version: item.version, displayName: item.displayName }} />}
   </li>
 }
-export default function PaperResources({ paperId, slug, managed = false }: { paperId: number; slug: string; managed?: boolean }) {
+export default function PaperResources({ paperId, slug, managed = false, reading }: { paperId: number; slug: string; managed?: boolean; reading?: PaperReadingController }) {
   const { state } = useAuth()
   const location = useLocation()
   const [actionError, setActionError] = useState<ResourceActionError | null>(null)
@@ -86,8 +89,8 @@ export default function PaperResources({ paperId, slug, managed = false }: { pap
     {managed ? <p>Management preview · Resources for this paper, including unpublished content.</p> : null}
     {!current ? <p role="status" aria-busy="true">Loading resources...</p> : current.error ? <div role="alert"><p>{current.error}</p><button onClick={() => setVersion(value => value + 1)} type="button">Retry Resources</button></div>
       : current.items?.length ? <>
-        {files.length ? <ul className="resource-list">{files.map(item => <ResourceCard item={item} key={item.id} onError={setActionError} />)}</ul> : null}
-        {covers.length ? <div className="resource-covers"><h3>Cover Artwork</h3><ul className="resource-list">{covers.map(item => <ResourceCard item={item} key={item.id} onError={setActionError} />)}</ul></div> : null}
+        {files.length ? <ul className="resource-list">{files.map(item => <ResourceCard item={item} key={item.id} onError={setActionError} reading={reading} slug={slug} />)}</ul> : null}
+        {covers.length ? <div className="resource-covers"><h3>Cover Artwork</h3><ul className="resource-list">{covers.map(item => <ResourceCard item={item} key={item.id} onError={setActionError} slug={slug} />)}</ul></div> : null}
       </> : <p className="resource-empty">No resources are available for this paper.</p>}
   </section>
 }

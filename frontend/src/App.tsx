@@ -17,6 +17,7 @@ import ResearchManagementPage from './pages/ResearchManagementPage'
 import SearchPage from './pages/SearchPage'
 import CourseManagementPage from './pages/CourseManagementPage'
 import LearningPage from './pages/LearningPage'
+import BookmarksPage from './pages/BookmarksPage'
 import InnovationHubPage from './pages/InnovationHubPage'
 import LoginPage from './pages/LoginPage'
 import NotFoundPage from './pages/NotFoundPage'
@@ -67,6 +68,7 @@ function App() {
       <Route element={<SearchPage />} path="/search" />
       <Route element={<LearningPage />} path="/my-learning" />
       <Route element={<LearningPage detailed />} path="/progress" />
+      <Route element={<BookmarksPage />} path="/bookmarks" />
       <Route element={<PapersManagementGuard>{user => <CourseManagementPage currentUser={user} />}</PapersManagementGuard>} path="/manage/courses" />
       <Route element={<PapersManagementGuard>{user => <CourseManagementPage currentUser={user} />}</PapersManagementGuard>} path="/manage/courses/:courseId" />
       <Route element={<ContactPage />} path="/contact" />

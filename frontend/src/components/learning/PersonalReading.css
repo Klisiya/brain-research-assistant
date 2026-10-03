@@ -1,0 +1,20 @@
+.personal-controls { margin: 1rem 0; min-width: 0; overflow-wrap: anywhere; }
+.personal-controls p, .bookmark-card p { line-height: 1.6; }
+.personal-controls button, .personal-actions button, .bookmark-card button, .personal-reading-summary button { padding: .65rem .9rem; border: 1px solid #537994; border-radius: .5rem; background: #0d2236; color: #e5f3ff; cursor: pointer; font: inherit; }
+.personal-controls button:disabled, .bookmark-card button:disabled { cursor: wait; opacity: .6; }
+.personal-controls button:focus-visible, .personal-actions button:focus-visible, .bookmark-card button:focus-visible { outline: 2px solid #8ed8ff; outline-offset: 3px; }
+.personal-actions { display: flex; flex-wrap: wrap; gap: .65rem; }
+.personal-state { color: #c9e8fa; font-weight: 600; }
+.personal-status-message { display: block; min-height: 1.25em; margin-top: .4rem; font-size: .85rem; color: #b2c9da; }
+.bookmark-control .personal-status-message:empty { display: none; }
+.paper-reading-controls { border-top: 1px solid #29475f; padding-top: 1rem; }
+.resource-card .paper-reading-controls { flex-basis: 100%; width: 100%; margin-bottom: 0; }
+.bookmark-filters { margin: 1.5rem 0; }
+.bookmark-filters button[aria-pressed="true"] { background: #284964; border-color: #9cd3f0; }
+.bookmark-grid { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 1rem; }
+.bookmark-card { margin: 0; overflow-wrap: anywhere; }
+.bookmark-card button { display: block; margin-top: 1rem; }
+.personal-reading-summary li { display: flex; flex-direction: column; gap: .45rem; padding: 1rem 0; border-bottom: 1px solid #29475f; overflow-wrap: anywhere; }
+.personal-reading-summary time { color: #a8bfd0; font-size: .9rem; }
+.personal-reading-summary ul { padding: 0; list-style: none; }
+@media (max-width: 700px) { .bookmark-grid { grid-template-columns: minmax(0,1fr); } }
