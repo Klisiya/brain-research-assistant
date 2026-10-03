@@ -10,7 +10,7 @@ from storage import StorageWriteError
 from research_content import bootstrap_research
 
 
-def register_research_api(app, db, Area, Staff, PaperLink, ModuleLink, Resource, User, Paper, Course, Module, auth, roles_required, brain_regions, serialize_paper):
+def register_research_api(app, db, Area, Staff, PaperLink, ModuleLink, Resource, User, Paper, Course, Module, auth, roles_required, brain_regions, serialize_paper, can_manage_paper, can_manage_module):
     assets = app.extensions['file_asset_service']
     assets.register_resource('research_area',Resource,'research_area_id',can_read=auth.can_read,can_manage=auth.can_manage)
 
@@ -90,12 +90,18 @@ def register_research_api(app, db, Area, Staff, PaperLink, ModuleLink, Resource,
         papers = PaperLink.query.filter_by(research_area_id=area.id).order_by(PaperLink.sort_order,PaperLink.id).all()
         modules = ModuleLink.query.filter_by(research_area_id=area.id).order_by(ModuleLink.sort_order,ModuleLink.id).all()
         resources = Resource.query.filter_by(research_area_id=area.id).order_by(Resource.sort_order,Resource.id).all()
-        return dict(area=metadata(area,manage),papers=[dict(relationId=r.id,sortOrder=r.sort_order,paper=serialize_paper(r.paper),**({'status':r.paper.status} if manage else {})) for r in papers if manage or r.paper.status=='published'],
+        result = dict(area=metadata(area,manage),papers=[dict(relationId=r.id,sortOrder=r.sort_order,paper=serialize_paper(r.paper) if r.paper.status=='published' or can_manage_paper(r.paper) else None,**({'status':r.paper.status} if manage else {})) for r in papers if manage or r.paper.status=='published'],
             modules=[dict(relationId=r.id,sortOrder=r.sort_order,course=dict(id=r.module.course.id,slug=r.module.course.slug,title=r.module.course.title),
                 module=dict(id=r.module.id,slug=r.module.slug,title=r.module.title,titleZh=r.module.title_zh,number=r.module.number,durationHours=r.module.duration_hours),
                 **({'status':r.module.status,'courseStatus':r.module.course.status} if manage else {})) for r in modules if manage or (r.module.status=='published' and r.module.course.status=='published')],
             resources=[resource_json(r,area,manage) for r in resources if manage or (r.asset.asset_type!='cover' and auth.can_read(area,r))],
             brainRegions=[dict(slug=s,name=brain_regions[s]['name']) for s in area.brain_region_slugs if s in brain_regions],hubContent=[])
+        if manage:
+            for item, relation in zip(result['modules'], modules):
+                if (relation.module.status!='published' or relation.module.course.status!='published') and not can_manage_module(relation.module):
+                    item['course'] = None
+                    item['module'] = None
+        return result
 
     @app.get('/api/research-areas')
     @guarded

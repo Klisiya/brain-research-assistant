@@ -8,6 +8,18 @@ import Footer from '../components/Footer'
 import PageParticleBackground from '../components/PageParticleBackground'
 import '../components/modules/MorphModuleCard.css'
 import './CoursePage.css'
+import { getReadings } from '../api/courseManagement'
+
+function Readings({ url }: { url: string }) {
+  const reader = useCallback((signal: AbortSignal) => getReadings(url,signal),[url])
+  const state = useCourseRead(url,reader)
+  if (state.loading) return <p role="status">Loading module readings…</p>
+  if (state.error) return <section className="course-resources course-glass"><h2>Module readings</h2><p role="alert">Readings are unavailable.</p><button type="button" onClick={state.retry}>Retry readings</button></section>
+  return <>{(['required','recommended'] as const).map(kind=>{
+    const rows=state.data?.filter(r=>r.readingType===kind&&r.paper)??[]
+    return rows.length>0&&<section className="course-resources course-glass" key={kind}><h2>{kind==='required'?'Required Reading':'Recommended Reading'}</h2><ul>{rows.map(r=><li key={r.relationId}><Link to={`/papers/${encodeURIComponent(r.paper!.slug)}`}>{r.paper!.title}</Link>{r.paper!.authors.length>0&&<p>{r.paper!.authors.join(', ')}</p>}</li>)}</ul></section>
+  })}</>
+}
 
 function Resources({ url }: { url: string }) {
   const { state: auth } = useAuth()
@@ -67,6 +79,7 @@ export default function CoursePage() {
         </header>
         {detail ? <>
           <section className="course-focus course-glass"><h2>Learning Focus</h2><p>{detail.module.learningFocus}</p></section>
+          <Readings key={`readings:${course.slug}:${detail.module.slug}`} url={`${courseApiPath(course.slug,detail.module.slug)}/papers`} />
           <Resources key={courseApiPath(course.slug, detail.module.slug)} url={`${courseApiPath(course.slug, detail.module.slug)}/resources`} />
           <Link className="course-back" to={`${coursePath(course.slug)}#modules`}>Explore all modules →</Link>
         </> : overview && <>

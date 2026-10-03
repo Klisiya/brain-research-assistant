@@ -3,8 +3,8 @@ import { CourseReadError } from './courses'
 
 export const researchPath = (slug: string) => `/research/${encodeURIComponent(slug)}`
 export type ResearchArea = { id: number; code: string; slug: string; name: string; overview: string; subtopics: string[]; brainRegionSlugs: string[]; sortOrder: number; status?: string; updatedAt?: string }
-export type ResearchPaper = { relationId: number; sortOrder: number; paper: { id: number; slug: string; title: string; authors: string[] }; status?: string }
-export type ResearchModule = { relationId: number; sortOrder: number; course: { id: number; slug: string; title: string }; module: { id: number; slug: string; title: string; titleZh: string; number: number; durationHours: number }; status?: string; courseStatus?: string }
+export type ResearchPaper = { relationId: number; sortOrder: number; paper: { id: number; slug: string; title: string; authors: string[] } | null; status?: string }
+export type ResearchModule = { relationId: number; sortOrder: number; course: { id: number; slug: string; title: string } | null; module: { id: number; slug: string; title: string; titleZh: string; number: number; durationHours: number } | null; status?: string; courseStatus?: string }
 export type ResearchResource = { id: number; displayName: string; description: string | null; attachmentType: string; accessLevel: string; version: number; sortOrder: number; externalUrl: string | null; downloadUrl: string | null }
 export type ResearchDetail = { area: ResearchArea; papers: ResearchPaper[]; modules: ResearchModule[]; resources: ResearchResource[]; brainRegions: { slug: string; name: string }[]; hubContent: unknown[] }
 export type Editor = { id: number; username: string; email: string }

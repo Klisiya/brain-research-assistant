@@ -7,9 +7,10 @@ from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import selectinload
 from attachment_files import AttachmentError, safe_filename
 from course_content import bootstrap_course
+from module_readings import reading_rows
 
 
-def register_course_api(app, db, Course, Module, Staff, CourseResource, ModuleResource, auth, roles_required):
+def register_course_api(app, db, Course, Module, Staff, CourseResource, ModuleResource, auth, roles_required, ModulePaper):
     assets = app.extensions["file_asset_service"]
     assets.register_resource("course", CourseResource, "course_id",
                              can_read=lambda parent, relation: isinstance(parent, Course) and auth.can_read_resource(parent, relation),
@@ -103,6 +104,12 @@ def register_course_api(app, db, Course, Module, Staff, CourseResource, ModuleRe
         course = published_course(slug)
         return jsonify(course=serialize_course(course), module=serialize_module(published_module(course, module_slug)))
 
+    @app.get('/api/courses/<slug>/modules/<module_slug>/papers')
+    @guarded
+    def api_module_papers(slug, module_slug):
+        module = published_module(published_course(slug), module_slug)
+        return jsonify(readings=reading_rows(ModulePaper,module.id))
+
     @app.get("/api/courses/manage")
     @roles_required("teacher", "admin")
     @guarded
@@ -143,7 +150,7 @@ def register_course_api(app, db, Course, Module, Staff, CourseResource, ModuleRe
         model = CourseResource if kind == "course" else ModuleResource
         items = []
         for relation in query.options(selectinload(model.asset)).order_by(model.sort_order, model.id).all():
-            if not auth.can_read_resource(parent, relation):
+            if relation.asset.asset_type == 'cover' or not auth.can_read_resource(parent, relation):
                 continue
             asset = relation.asset
             items.append({"id": relation.id, "displayName": relation.display_name, "description": relation.description,

@@ -34,6 +34,11 @@ export async function getCourse(slug: string, signal: AbortSignal): Promise<Cour
   if (!record(course) || !Array.isArray(course.modules) || !course.modules.every(isModule) || !isCourse(course)) throw new CourseReadError(503)
   return course as CourseDetail
 }
+export async function getCourses(signal: AbortSignal): Promise<Course[]> {
+  const body = await read('/api/courses',signal)
+  if (!Array.isArray(body.courses) || !body.courses.every(isCourse)) throw new CourseReadError(503)
+  return body.courses
+}
 export async function getModule(course: string, module: string, signal: AbortSignal): Promise<ModuleDetail> {
   const body = await read(courseApiPath(course, module), signal)
   if (!isCourse(body.course) || !isModule(body.module)) throw new CourseReadError(503)

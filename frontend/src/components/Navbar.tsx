@@ -332,6 +332,7 @@ function Navbar() {
                   </Link>
                 ) : null}
                 {(authState.user.role === 'teacher' || authState.user.role === 'admin') && <Link className="account-menu-action" role="menuitem" to="/manage/research-areas" onClick={() => setIsAccountMenuOpen(false)}>Manage Research Areas</Link>}
+                {(authState.user.role === 'teacher' || authState.user.role === 'admin') && <Link className="account-menu-action" role="menuitem" to="/manage/courses" onClick={() => setIsAccountMenuOpen(false)}>Manage Courses</Link>}
                 <Link className="account-menu-action" role="menuitem" to="/change-password" onClick={() => setIsAccountMenuOpen(false)}>Change Password</Link>
                 <button className="account-menu-action" disabled={isSigningOut}
                   onClick={handleSignOut} role="menuitem" type="button">

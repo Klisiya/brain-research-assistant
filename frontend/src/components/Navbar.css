@@ -54,6 +54,8 @@
   box-shadow: none;
 }
 
+.navbar-half:has(.dropdown.is-open) { z-index: 3; }
+
 .navbar-half-left {
   flex: 0 1 42%;
   justify-content: flex-end;

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 import {
   PAPER_DIFFICULTIES,
   PAPER_PUBLICATION_TYPES,
@@ -12,6 +12,7 @@ import type {
 } from '../../types/paper'
 
 type PaperFiltersProps = {
+  moduleFilter?: ReactNode
   author: string
   availableAuthors: readonly string[]
   availableTopics: readonly string[]
@@ -35,6 +36,7 @@ type PaperFiltersProps = {
 }
 
 function PaperFilters({
+  moduleFilter,
   author,
   availableAuthors,
   availableTopics,
@@ -68,6 +70,7 @@ function PaperFilters({
   return (
     <section aria-label="Paper search and filters" className="paper-filters">
       <div className="paper-filter-grid">
+        {moduleFilter}
         <label className="paper-search-field">
           <span>Search library</span>
           <input

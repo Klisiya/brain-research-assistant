@@ -29,6 +29,8 @@ export type PaperPagination = {
 }
 
 export type PaperApiFilters = {
+  course: string | null
+  module: string | null
   q: string
   topic: string | null
   author: string | null
@@ -74,6 +76,9 @@ export type ManagedPaperListResponse = {
 }
 
 type FetchPapersOptions = {
+  course?: string
+  module?: string
+  resourceCategory?: PaperResourceCategory
   author?: string
   difficulty?: PaperDifficulty
   page?: number
@@ -232,6 +237,8 @@ function isApiFilters(value: unknown): value is PaperApiFilters {
   if (!isRecord(value)) return false
 
   return typeof value.q === 'string'
+    && isNullableString(value.course)
+    && isNullableString(value.module)
     && isNullableString(value.topic)
     && isNullableString(value.author)
     && isNullableFiniteNumber(value.year)
@@ -350,6 +357,9 @@ async function requestManagedPaper(
 }
 
 export async function fetchPapers({
+  course,
+  module,
+  resourceCategory,
   author,
   difficulty,
   page = 1,
@@ -371,6 +381,9 @@ export async function fetchPapers({
   })
 
   if (author) searchParams.set('author', author)
+  if (course) searchParams.set('course', course)
+  if (module) searchParams.set('module', module)
+  if (resourceCategory) searchParams.set('resourceCategory', resourceCategory)
   if (difficulty) searchParams.set('difficulty', difficulty)
   if (publicationType) searchParams.set('publicationType', publicationType)
   if (topic) searchParams.set('topic', topic)

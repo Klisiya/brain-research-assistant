@@ -6,12 +6,14 @@ import Navbar from '../components/Navbar'
 import PageParticleBackground from '../components/PageParticleBackground'
 import PaperCard from '../components/papers/PaperCard'
 import PaperFilters from '../components/papers/PaperFilters'
+import PaperModuleFilter from '../components/papers/PaperModuleFilter'
 import PapersHero from '../components/papers/PapersHero'
 import PapersTabs from '../components/papers/PapersTabs'
 import ReadingProgressPanel from '../components/papers/ReadingProgressPanel'
 import type {
   PaperDifficulty,
   PaperPublicationType,
+  PaperResourceCategory,
   PaperSort,
   PaperView,
 } from '../types/paper'
@@ -30,6 +32,9 @@ const PAPER_SORTS: readonly PaperSort[] = [
 ]
 
 type PaperQueryState = {
+  course: string
+  module: string
+  resourceCategory: PaperResourceCategory | null
   q: string
   topic: string
   author: string
@@ -52,6 +57,9 @@ function readPaperQuery(searchParams: URLSearchParams): PaperQueryState {
   const requestedView = searchParams.get('view')
 
   return {
+    course: searchParams.get('course')?.trim() ?? '',
+    module: searchParams.get('module')?.trim() ?? '',
+    resourceCategory: ['Foundational','Recommended','Course Resource','Emerging Research'].includes(searchParams.get('resourceCategory')??'') ? searchParams.get('resourceCategory') as PaperResourceCategory : null,
     q: searchParams.get('q')?.trim() ?? '',
     topic: searchParams.get('topic')?.trim() ?? '',
     author: searchParams.get('author')?.trim() ?? '',
@@ -77,6 +85,9 @@ function readPaperQuery(searchParams: URLSearchParams): PaperQueryState {
 
 function buildPaperSearchParams(query: PaperQueryState) {
   const params = new URLSearchParams({ page: String(query.page), sort: query.sort })
+  if (query.course) params.set('course',query.course)
+  if (query.module) params.set('module',query.module)
+  if (query.resourceCategory) params.set('resourceCategory',query.resourceCategory)
   if (query.q) params.set('q', query.q)
   if (query.topic) params.set('topic', query.topic)
   if (query.author) params.set('author', query.author)
@@ -179,6 +190,9 @@ function PapersPage() {
     const controller = new AbortController()
 
     fetchPapers({
+      course: query.course || undefined,
+      module: query.module || undefined,
+      resourceCategory: query.resourceCategory ?? undefined,
       author: query.author || undefined,
       difficulty: query.difficulty === 'all' ? undefined : query.difficulty,
       page: query.view === 'progress' ? 1 : query.page,
@@ -195,6 +209,7 @@ function PapersPage() {
         setRequestState({ key: requestKey, payload: nextPayload, error: null })
         if (query.view !== 'progress' && nextPayload.pagination.page !== query.page) {
           setSearchParams(buildPaperSearchParams({
+            course: query.course, module: query.module, resourceCategory: query.resourceCategory,
             q: query.q,
             topic: query.topic,
             author: query.author,
@@ -218,10 +233,11 @@ function PapersPage() {
       })
 
     return () => controller.abort()
-  }, [query.author, query.difficulty, query.page, query.publicationType, query.q,
+  }, [query.course, query.module, query.resourceCategory, query.author, query.difficulty, query.page, query.publicationType, query.q,
     query.sort, query.topic, query.view, query.year, requestKey, setSearchParams])
 
   const hasActiveFilters = Boolean(query.q)
+    || Boolean(query.course) || Boolean(query.module) || Boolean(query.resourceCategory)
     || Boolean(query.topic)
     || Boolean(query.author)
     || query.difficulty !== 'all'
@@ -230,6 +246,7 @@ function PapersPage() {
 
   const clearFilters = () => {
     updateQuery({
+      course: '', module: '', resourceCategory: null,
       q: '', topic: '', author: '', difficulty: 'all', publicationType: 'all', year: null,
     })
   }
@@ -279,6 +296,7 @@ function PapersPage() {
         ) : (
           <>
             <PaperFilters
+              moduleFilter={<PaperModuleFilter course={query.course} module={query.module} onChange={(course,module)=>updateQuery({course,module})} />}
               author={query.author}
               availableAuthors={availableAuthors}
               availableTopics={availableTopics}

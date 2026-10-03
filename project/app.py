@@ -40,6 +40,8 @@ from research_models import define_research_models
 from research_authorization import ResearchAuthorization
 from research_api import register_research_api
 from search_api import register_search_api
+from module_readings import define_module_paper
+from course_management import register_course_management
 
 load_dotenv()
 
@@ -411,6 +413,7 @@ class Paper(db.Model):
 
 FileAsset = define_file_asset(db)
 Course, CourseModule, CourseStaff, CourseResource, ModuleResource = define_course_models(db)
+CourseModulePaper = define_module_paper(db)
 course_authorization = CourseAuthorization(Course, CourseModule, CourseStaff)
 ResearchArea, ResearchAreaStaff, ResearchAreaPaper, ResearchAreaModule, ResearchAreaResource = define_research_models(db)
 research_authorization = ResearchAuthorization(ResearchArea, ResearchAreaStaff)
@@ -1211,6 +1214,14 @@ def parse_paper_list_filters(*, management=False):
     featured_raw = request.args.get("featured")
     featured = None
 
+    course_slug = request.args.get('course') or None
+    module_slug = request.args.get('module') or None
+    for name, value in [('course', course_slug), ('module', module_slug)]:
+        if value is not None and (len(request.args.getlist(name)) != 1 or len(value) > 220 or not re.fullmatch(r'[a-z0-9]+(?:-[a-z0-9]+)*', value)):
+            raise PaperValidationError('Invalid course/module slug.', name)
+    if module_slug and not course_slug:
+        raise PaperValidationError('course is required with module.', 'course')
+
     if difficulty is not None:
         difficulty = validate_paper_enum(difficulty, "difficulty", PAPER_DIFFICULTIES)
 
@@ -1244,6 +1255,8 @@ def parse_paper_list_filters(*, management=False):
             "publicationType": publication_type,
             "resourceCategory": resource_category,
             "featured": featured,
+            "course": course_slug,
+            "module": module_slug,
         }
     )
     return filters
@@ -1420,6 +1433,8 @@ def commit_paper_database_changes():
 
 def public_paper_filter_response(filters):
     return {
+        "course": filters["course"],
+        "module": filters["module"],
         "q": filters["q"],
         "topic": filters["topic"],
         "author": filters["author"],
@@ -1790,6 +1805,14 @@ def api_papers():
 
     query = Paper.query.filter_by(status="published")
     published_papers = query.all()
+
+    if filters['course']:
+        readings = db.session.query(CourseModulePaper.id).join(CourseModule, CourseModule.id == CourseModulePaper.module_id).join(Course, Course.id == CourseModule.course_id).filter(
+            CourseModulePaper.paper_id == Paper.id, Course.slug == filters['course'],
+            Course.status == 'published', CourseModule.status == 'published')
+        if filters['module']:
+            readings = readings.filter(CourseModule.slug == filters['module'])
+        query = query.filter(readings.exists())
 
     if filters["difficulty"] is not None:
         query = query.filter_by(difficulty=filters["difficulty"])
@@ -2181,10 +2204,12 @@ delete_paper_with_attachments = register_attachment_api(
 )
 
 register_course_api(app, db, Course, CourseModule, CourseStaff, CourseResource, ModuleResource,
-                    course_authorization, roles_required)
+                    course_authorization, roles_required, CourseModulePaper)
+register_course_management(app, db, Course, CourseModule, CourseStaff, CourseModulePaper, CourseResource,
+                           ModuleResource, User, Paper, course_authorization, roles_required, can_manage_paper)
 register_research_api(app, db, ResearchArea, ResearchAreaStaff, ResearchAreaPaper, ResearchAreaModule,
                       ResearchAreaResource, User, Paper, Course, CourseModule, research_authorization,
-                      roles_required, BRAIN_REGIONS, serialize_paper)
+                      roles_required, BRAIN_REGIONS, serialize_paper, can_manage_paper, course_authorization.can_manage_module)
 register_search_api(app, db, Paper, Course, CourseModule, ResearchArea, limiter)
 
 
