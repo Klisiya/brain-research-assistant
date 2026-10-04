@@ -470,7 +470,7 @@ class PaperAttachment(db.Model):
 
     paper = db.relationship("Paper", back_populates="attachments")
     uploaded_by = db.relationship("User", foreign_keys=[uploaded_by_id])
-    __mapper_args__ = {"version_id_col": version, "version_id_generator": False}
+    __mapper_args__ = {"version_id_col": updated_at, "version_id_generator": False}
 
 
 class AttachmentFileCleanup(db.Model):

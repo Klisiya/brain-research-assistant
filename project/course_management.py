@@ -3,7 +3,7 @@ from datetime import datetime
 from functools import wraps
 from flask import g, jsonify, request
 from flask_login import current_user
-from sqlalchemy import update
+from sqlalchemy import select, text, update
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from werkzeug.exceptions import BadRequest, RequestEntityTooLarge
 from attachment_files import AttachmentError
@@ -22,7 +22,15 @@ def register_course_management(app, db, Course, Module, Staff, Link, CourseResou
         @wraps(view)
         def wrapped(*args, **kwargs):
             g.course_new_keys = []
-            try: return view(*args, **kwargs)
+            try:
+                if request.method != 'GET':
+                    uid, version = current_user.id, current_user.auth_version
+                    db.session.rollback()
+                    if db.engine.dialect.name == 'sqlite': db.session.execute(text('BEGIN IMMEDIATE'))
+                    user = db.session.scalar(select(User).where(User.id == uid).with_for_update())
+                    if user is None or not user.is_active or user.auth_version != version:
+                        fail('Authentication required.','AUTH_REQUIRED',401)
+                return view(*args, **kwargs)
             except RequestEntityTooLarge:
                 db.session.rollback(); assets.compensate(g.course_new_keys)
                 return jsonify(error='Request is too large.',code='FILE_TOO_LARGE'),413
@@ -50,11 +58,11 @@ def register_course_management(app, db, Course, Module, Staff, Link, CourseResou
         return value
 
     def managed(course_id, module_id=None):
-        course = db.session.get(Course, course_id)
+        course = db.session.scalar(select(Course).where(Course.id == course_id).with_for_update())
         if course is None: fail('Course not found.','COURSE_NOT_FOUND',404)
         if not auth.can_manage_course(course): fail('Course management is not allowed.','COURSE_MANAGE_FORBIDDEN',403)
         if module_id is None: return course
-        module = Module.query.filter_by(id=module_id,course_id=course_id).first()
+        module = Module.query.filter_by(id=module_id,course_id=course_id).with_for_update().first()
         if module is None: fail('Module not found.','MODULE_NOT_FOUND',404)
         return module
 

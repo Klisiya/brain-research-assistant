@@ -155,7 +155,7 @@ class LearningTests(unittest.TestCase):
             self.resource_action(public['id'],kind)
             self.assertEqual(next(r for r in self.state()['resources'] if r['kind']==kind and r['resourceId']==public['id'])['selfCompletedAt'],stamp)
             self.login(1)
-            self.assertEqual(self.client.patch(target+f"/resources/{public['id']}",json={'displayName':'Version two','expectedVersion':1}).status_code,200)
+            self.assertEqual(self.client.put(target+f"/resources/{public['id']}",data={'expectedVersion':'1','expectedUpdatedAt':public['updatedAt'],'file':(BytesIO(fixtures.pdf('new content')),'new.pdf')},content_type='multipart/form-data').status_code,200)
             self.login(4)
             item=next(r for r in self.state()['resources'] if r['kind']==kind and r['resourceId']==public['id'])
             self.assertEqual(item['version'],2);self.assertEqual(item['status'],'not_started');self.assertEqual(item['history'][0]['selfCompletedAt'],stamp)
@@ -169,7 +169,7 @@ class LearningTests(unittest.TestCase):
             self.login(1); item=self.resource(target).json['resources'][-1]
             self.login(4); self.enroll(); self.resource_action(item['id'],kind)
             self.login(1)
-            self.assertEqual(self.client.delete(target+f"/resources/{item['id']}",json={'expectedVersion':1}).status_code,200)
+            self.assertEqual(self.client.delete(target+f"/resources/{item['id']}",json={'expectedVersion':1,'expectedUpdatedAt':item['updatedAt']}).status_code,200)
             with app.app_context():
                 old=Progress.query.one();self.assertIsNone(old.resource_id);self.assertEqual(old.relation_id_at_recording,item['id']);self.assertIsNotNone(old.self_completed_at)
                 self.assertEqual(FileAsset.query.count(),0)
@@ -179,7 +179,7 @@ class LearningTests(unittest.TestCase):
             self.assertEqual(state['status'],'not_started');self.assertEqual(state['history'],[])
             self.resource_action(new['id'],kind)
             with app.app_context():self.assertEqual(Progress.query.count(),2)
-            self.login(1);self.client.delete(target+f"/resources/{new['id']}",json={'expectedVersion':1})
+            self.login(1);self.client.delete(target+f"/resources/{new['id']}",json={'expectedVersion':1,'expectedUpdatedAt':new['updatedAt']})
 
     def test_shared_asset_relations_do_not_share_progress_and_cross_course_denied(self):
         self.login(1); item=self.resource().json['resources'][0]

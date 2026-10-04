@@ -212,9 +212,11 @@ class CourseManagementTests(unittest.TestCase):
                 self.login(uid);self.assertEqual(len(self.get(public+'/resources').json['resources']),total)
                 self.assertEqual(self.get(public+f"/resources/{items[-1]['id']}/download").status_code,200 if uid in [1,3] else 403)
             self.login(1);row=items[0]
-            self.assertEqual(self.client.patch(base+f"/resources/{row['id']}",json={'expectedVersion':1,'displayName':'Changed'}).status_code,200)
-            self.assertEqual(self.client.delete(base+f"/resources/{row['id']}",json={'expectedVersion':1}).status_code,409)
-            self.assertEqual(self.client.delete(base+f"/resources/{row['id']}",json={'expectedVersion':2}).status_code,200)
+            self.assertEqual(self.client.patch(base+f"/resources/{row['id']}",json={'expectedVersion':1,'expectedUpdatedAt':row['updatedAt'],'displayName':'Changed'}).status_code,200)
+            self.assertEqual(self.client.delete(base+f"/resources/{row['id']}",json={'expectedVersion':1,'expectedUpdatedAt':row['updatedAt']}).status_code,409)
+            fresh=next(r for r in self.get(base+'/resources/manage').json['resources'] if r['id']==row['id'])
+            self.assertEqual(fresh['version'],1)
+            self.assertEqual(self.client.delete(base+f"/resources/{row['id']}",json={'expectedVersion':1,'expectedUpdatedAt':fresh['updatedAt']}).status_code,200)
         self.login(2);self.assertEqual(self.resource().status_code,403)
 
     def test_resource_links_order_validation_and_draft_download(self):
@@ -240,9 +242,10 @@ class CourseManagementTests(unittest.TestCase):
         with app.app_context():
             resource=db.session.get(CourseResource,row['id']);aid=resource.asset_id
             db.session.add(ModuleResource(module_id=1,asset_id=aid,display_name='Shared',access_level='public'));db.session.commit()
-        self.assertEqual(self.client.delete(self.base+f"/resources/{row['id']}",json={'expectedVersion':1}).status_code,200)
+        self.assertEqual(self.client.delete(self.base+f"/resources/{row['id']}",json={'expectedVersion':1,'expectedUpdatedAt':row['updatedAt']}).status_code,200)
         with app.app_context():self.assertIsNotNone(db.session.get(FileAsset,aid))
-        self.assertTrue(self.files());self.assertEqual(self.client.delete(self.module+'/resources/1',json={'expectedVersion':1}).status_code,200)
+        shared=self.get(self.module+'/resources/manage').json['resources'][0]
+        self.assertTrue(self.files());self.assertEqual(self.client.delete(self.module+'/resources/1',json={'expectedVersion':1,'expectedUpdatedAt':shared['updatedAt']}).status_code,200)
         self.assertFalse(self.files())
 
     def test_database_failure_rolls_back_content(self):

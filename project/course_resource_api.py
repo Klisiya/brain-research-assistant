@@ -1,5 +1,6 @@
 """Course resource mutations through the existing shared FileAsset service."""
 from types import SimpleNamespace
+from datetime import datetime
 from flask import g, jsonify, request, send_file, url_for
 from flask_login import current_user
 from sqlalchemy import delete, update
@@ -16,7 +17,19 @@ def register_course_resource_writes(app,db,CourseResource,ModuleResource,assets,
         a=row.asset
         return dict(id=row.id,displayName=row.display_name,description=row.description,attachmentType=a.asset_type,
             mimeType=a.mime_type,fileSize=a.file_size,accessLevel=row.access_level,version=row.version,sortOrder=row.sort_order,
-            externalUrl=a.external_url,downloadUrl=None if a.asset_type=='external_link' else url_for('course_resource_managed_download',course_id=course_id,module_id=module_id,resource_id=row.id))
+            updatedAt=row.updated_at.isoformat(),externalUrl=a.external_url,downloadUrl=None if a.asset_type=='external_link' else url_for('course_resource_managed_download',course_id=course_id,module_id=module_id,resource_id=row.id))
+
+    def current_token(data, row):
+        expected = data.pop('expectedVersion', None)
+        if isinstance(expected,str) and expected.isascii() and expected.isdecimal(): expected=int(expected)
+        integer(expected,1)
+        stamp = data.pop('expectedUpdatedAt', None)
+        if not isinstance(stamp,str): fail('The resource edit timestamp is required.')
+        if expected != row.version or stamp != row.updated_at.isoformat():
+            fail('Resource changed. Reload before editing.','COURSE_STALE',409)
+
+    def existing_metadata(row):
+        return SimpleNamespace(attachment_type=row.asset.asset_type,display_name=row.display_name,description=row.description,access_level=row.access_level,sort_order=row.sort_order,external_url=row.asset.external_url)
 
     @app.route('/api/courses/<int:course_id>/resources/manage',methods=['GET','POST'],defaults={'module_id':None})
     @app.route('/api/courses/<int:course_id>/modules/<int:module_id>/resources/manage',methods=['GET','POST'])
@@ -46,22 +59,58 @@ def register_course_resource_writes(app,db,CourseResource,ModuleResource,assets,
     @guarded
     def course_resource_edit(course_id,module_id,resource_id):
         kind,parent,Model,field=context(course_id,module_id)
-        row=Model.query.filter_by(id=resource_id,**{field:parent.id}).first()
+        row=Model.query.filter_by(id=resource_id,**{field:parent.id}).with_for_update().first()
         if row is None: fail('Resource not found.','RESOURCE_NOT_FOUND',404)
-        data=body({'expectedVersion','displayName','description','accessLevel','sortOrder'} if request.method=='PATCH' else {'expectedVersion'},{'expectedVersion'})
-        expected=integer(data.pop('expectedVersion'),1)
-        predicate=(Model.id==row.id,Model.version==expected)
+        data=body({'expectedVersion','expectedUpdatedAt','displayName','description','accessLevel','sortOrder'} if request.method=='PATCH' else {'expectedVersion','expectedUpdatedAt'},{'expectedVersion','expectedUpdatedAt'})
+        current_token(data,row)
+        predicate=(Model.id==row.id,Model.version==row.version,Model.updated_at==row.updated_at)
         if request.method=='DELETE':
             key,asset_id=row.asset.storage_key,row.asset_id
             changed=db.session.execute(delete(Model).where(*predicate),execution_options={'synchronize_session':False})
         else:
-            existing=SimpleNamespace(attachment_type=row.asset.asset_type,display_name=row.display_name,description=row.description,access_level=row.access_level,sort_order=row.sort_order,external_url=row.asset.external_url)
+            existing=existing_metadata(row)
             values=validate_metadata(data,existing=existing,link=row.asset.asset_type=='external_link');integer(values['sort_order'])
-            changed=db.session.execute(update(Model).where(*predicate).values(**{k:values[k] for k in ['display_name','description','access_level','sort_order']},version=Model.version+1),execution_options={'synchronize_session':False})
+            changed=db.session.execute(update(Model).where(*predicate).values(**{k:values[k] for k in ['display_name','description','access_level','sort_order']},updated_at=datetime.utcnow()),execution_options={'synchronize_session':False})
         if changed.rowcount!=1: fail('Resource changed. Reload before editing.','COURSE_STALE',409)
         if request.method=='DELETE': assets.retire_unreferenced([asset_id])
         commit()
         return jsonify(saved=True,cleanupPending=bool(assets.drain_cleanup([key] if key else [])) if request.method=='DELETE' else False)
+
+    @app.put('/api/courses/<int:course_id>/resources/<int:resource_id>',defaults={'module_id':None})
+    @app.put('/api/courses/<int:course_id>/modules/<int:module_id>/resources/<int:resource_id>')
+    @roles_required('teacher','admin')
+    @guarded
+    def course_resource_replace(course_id,module_id,resource_id):
+        kind,parent,Model,field=context(course_id,module_id)
+        row=Model.query.filter_by(id=resource_id,**{field:parent.id}).with_for_update().first()
+        if row is None: fail('Resource not found.','RESOURCE_NOT_FOUND',404)
+        link=row.asset.asset_type=='external_link'
+        if link:
+            data=body({'expectedVersion','expectedUpdatedAt','externalUrl'},{'expectedVersion','expectedUpdatedAt','externalUrl'})
+        else:
+            if request.mimetype!='multipart/form-data' or set(request.files)!={'file'} or len(request.files.getlist('file'))!=1 or set(request.form)!={'expectedVersion','expectedUpdatedAt'} or any(len(request.form.getlist(k))!=1 for k in request.form): fail('Exactly one file and the resource edit token are required.')
+            data=request.form.to_dict()
+        current_token(data,row)
+        values=validate_metadata(data,existing=existing_metadata(row),link=link)
+        old=row.asset
+        if link:
+            changed=values['external_url']!=old.external_url
+        else:
+            info,extension=assets.validate_upload(request.files['file'],old.asset_type,app.config['ATTACHMENT_FILE_LIMITS'])
+            changed=info['sha256']!=old.sha256
+            if changed:
+                key=assets.save(kind,parent,request.files['file'].stream,extension,replacing=True);g.course_new_keys.append(key)
+                values.update(info,storage_key=key)
+        if changed:
+            old_id,old_key=old.id,old.storage_key
+            row.asset=assets.create(kind,parent,values,current_user.id)
+            row.version+=1
+            row.updated_at=datetime.utcnow()
+            assets.retire_unreferenced([old_id])
+        commit()
+        result=dict(saved=True,resource=metadata(row,course_id,module_id))
+        if changed: result['cleanupPending']=bool(assets.drain_cleanup([old_key] if old_key else []))
+        return jsonify(result)
 
     @app.put('/api/courses/<int:course_id>/resources/order',defaults={'module_id':None})
     @app.put('/api/courses/<int:course_id>/modules/<int:module_id>/resources/order')
@@ -73,7 +122,8 @@ def register_course_resource_writes(app,db,CourseResource,ModuleResource,assets,
         rows=Model.query.filter_by(**{field:parent.id}).all();mapping={r.id:r for r in rows}
         if set(ids)!=set(mapping): fail('Resources changed. Reload before sorting.','COURSE_STALE',409)
         for order,identity in enumerate(ids):
-            db.session.execute(update(Model).where(Model.id==identity).values(sort_order=order,version=Model.version+1))
+            if mapping[identity].sort_order != order:
+                db.session.execute(update(Model).where(Model.id==identity).values(sort_order=order,updated_at=datetime.utcnow()))
         commit();return jsonify(saved=True)
 
     @app.get('/api/courses/<int:course_id>/resources/<int:resource_id>/manage-download',defaults={'module_id':None})

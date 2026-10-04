@@ -285,13 +285,17 @@ def register_attachment_api(app, db, Paper, Attachment, Cleanup, Asset, roles_re
         old_key, old_asset_id = item.storage_key, item.asset_id
         if not link:
             values.update(save_upload(paper, values, existing=item))
-        item.asset = assets.create("paper", paper, values, current_user.id)
+        content_changed = not link or values['external_url'] != item.external_url
+        if content_changed:
+            item.asset = assets.create("paper", paper, values, current_user.id)
         for name, value in values.items():
             setattr(item, name, value)
-        item.version += 1
+        if content_changed:
+            item.version += 1
         item.uploaded_by_id = current_user.id
-        assets.retire_unreferenced([old_asset_id])
-        if old_asset_id is None and old_key:
+        if content_changed:
+            assets.retire_unreferenced([old_asset_id])
+        if content_changed and old_asset_id is None and old_key:
             queue_cleanup(old_key)
         commit()
         result = {"attachment": serialize(item, paper, managed=True)}

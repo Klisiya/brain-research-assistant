@@ -30,7 +30,7 @@ export default function AttachmentForm({ existing, link, busy, primaryTypes, onS
   }
   return <form className="resource-form" onSubmit={submit} aria-label={existing ? 'Replace resource' : link ? 'Add external link' : 'Upload resource'}>
     <h3>{existing ? `Update ${existing.displayName}` : link ? 'Add External Link' : 'Upload File'}</h3>
-    {existing ? <p id={`${id}-replace-help`}>Replace updates the current resource to version {existing.version + 1}. {link ? 'Edit the link and its metadata below.' : 'Choose a new file of the same type to update the file and its metadata.'}</p> : null}
+    {existing ? <p id={`${id}-replace-help`}>{link ? 'Changing the link target creates a new content version. Metadata edits keep the current version.' : `Choose a new file of the same type to update the resource to version ${existing.version + 1}.`}</p> : null}
     <fieldset disabled={busy}>
       <div className="resource-form-grid">
         {!link ? <>
