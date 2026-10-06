@@ -99,7 +99,7 @@ class CourseManagementTests(unittest.TestCase):
         for base in [self.base,self.module]:
             for field in ['slug','number','title','titleZh','durationHours','course_id','userId']:
                 self.assertEqual(self.content(base,**{field:'alter'}).status_code,400)
-            for data in [{'description':''},{'description':'x'*6001},{'status':'hidden'}]:
+            for data in [{'description':None},{'description':123},{'description':'x'*6001},{'status':'hidden'}]:
                 self.assertEqual(self.content(base,**data).status_code,400)
         self.assertEqual(self.content(self.module,category='x'*151).status_code,400)
         self.assertEqual(self.get(self.base+'/modules/13/manage').status_code,404)

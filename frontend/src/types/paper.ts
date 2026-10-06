@@ -38,9 +38,9 @@ export type Paper = {
   issue?: string | null
   pages?: string | null
   publisher?: string | null
-  publicationType: PaperPublicationType
+  publicationType: PaperPublicationType | ''
   topics: string[]
-  difficulty: PaperDifficulty
+  difficulty: PaperDifficulty | ''
   estimatedReadingMinutes: number
   abstract: string
   learningObjectives: string[]
@@ -48,7 +48,7 @@ export type Paper = {
   featured: boolean
   openAccess: boolean
   externalUrl: string | null
-  resourceCategory: PaperResourceCategory
+  resourceCategory: PaperResourceCategory | ''
   createdAt: string
   updatedAt: string
   publishedAt: string | null

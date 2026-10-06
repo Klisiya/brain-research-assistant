@@ -43,7 +43,7 @@ function PaperManagementTable({ papers }: { papers: readonly ManagedPaper[] }) {
             {papers.map((paper) => (
               <tr key={paper.id}>
                 <td>
-                  <strong>{paper.title}</strong>
+                  <strong>{paper.title || 'Untitled paper'}</strong>
                   <span>{paper.slug}</span>
                 </td>
                 <td><PaperStatusBadge status={paper.status} /></td>
@@ -64,7 +64,7 @@ function PaperManagementTable({ papers }: { papers: readonly ManagedPaper[] }) {
               <PaperStatusBadge status={paper.status} />
               <span>{paper.publicationType}</span>
             </div>
-            <h2>{paper.title}</h2>
+            <h2>{paper.title || 'Untitled paper'}</h2>
             <dl>
               <div><dt>Updated</dt><dd>{formatUpdatedAt(paper.updatedAt)}</dd></div>
               <div><dt>Created by</dt><dd>{paper.createdBy?.username || 'System'}</dd></div>

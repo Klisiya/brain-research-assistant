@@ -82,7 +82,7 @@ def register_course_management(app, db, Course, Module, Staff, Link, CourseResou
         for key,value in data.items():
             if key == 'status':
                 if value not in ['draft','published','archived']: fail('Invalid publication status.')
-            elif not isinstance(value,str) or not value.strip() or len(value.strip()) > (150 if key=='category' else 6000):
+            elif not isinstance(value,str) or len(value.strip()) > (150 if key=='category' else 6000):
                 fail('Invalid content length.')
             values[fields[key]] = value.strip() if isinstance(value,str) else value
         if not values: fail('No editable fields supplied.')

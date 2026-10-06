@@ -306,12 +306,12 @@ function PaperDetailPage({ preview = false }: { preview?: boolean }) {
             <article>
               <header className="paper-detail-hero">
                 <div className="paper-detail-badges">
-                  <span>{paper.publicationType}</span>
-                  <span>{paper.difficulty}</span>
-                  <span>{paper.resourceCategory}</span>
+                  {paper.publicationType && <span>{paper.publicationType}</span>}
+                  {paper.difficulty && <span>{paper.difficulty}</span>}
+                  {paper.resourceCategory && <span>{paper.resourceCategory}</span>}
                 </div>
                 <p className="paper-detail-eyebrow">Research Library</p>
-                <h1>{paper.title}</h1>
+                <h1>{paper.title || 'Untitled paper'}</h1>
                 <p className="paper-detail-authors">
                   {paper.authors.length > 0
                     ? paper.authors.join(', ')
@@ -323,7 +323,7 @@ function PaperDetailPage({ preview = false }: { preview?: boolean }) {
                 <dl className="paper-detail-meta">
                   <div>
                     <dt>Reading time</dt>
-                    <dd>{paper.estimatedReadingMinutes} min</dd>
+                    <dd>{paper.estimatedReadingMinutes > 0 ? `${paper.estimatedReadingMinutes} min` : 'Not specified'}</dd>
                   </div>
                   <div>
                     <dt>Access</dt>

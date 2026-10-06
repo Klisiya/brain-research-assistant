@@ -14,11 +14,6 @@ function Hero() {
           <span className="hero-title-line hero-title-surround">Brain-Inspired Intelligence</span>
         </h1>
 
-        <p>
-          Explore neuroscience, cognitive science, brain-computer interfaces,
-          brain-inspired Intelligence, and artificial intelligence through an immersive
-          learning experience.
-        </p>
       </header>
     </>
   )

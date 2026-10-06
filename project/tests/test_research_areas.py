@@ -50,13 +50,14 @@ class ResearchTests(unittest.TestCase):
         self.login(1)
         return self.client.post(self.url+'/resources',data={'displayName':'Research resource','attachmentType':kind,'accessLevel':access,'file':(BytesIO(fixtures.pdf() if kind=='pdf' else fixtures.png()),'fixture.pdf' if kind=='pdf' else 'cover.png','application/pdf' if kind=='pdf' else 'image/png')},content_type='multipart/form-data')
 
-    def test_exact_six_codes_slugs_order_and_distinct_content(self):
+    def test_exact_six_identities_order_and_legitimate_empty_content(self):
         areas=self.get('/api/research-areas').json['areas']
         self.assertEqual([a['slug'] for a in areas],SLUGS)
         self.assertEqual([a['code'] for a in areas],[f'RA-{i:02}' for i in range(1,7)])
         self.assertEqual([a['sortOrder'] for a in areas],list(range(1,7)))
-        self.assertEqual(len(set(a['overview'] for a in areas)),6)
-        self.assertEqual(len(set(tuple(a['subtopics']) for a in areas)),6)
+        self.assertEqual(len(set(a['name'] for a in areas)),6)
+        self.assertEqual([a['overview'] for a in areas], [''] * 6)
+        self.assertEqual([a['subtopics'] for a in areas], [[] for _ in range(6)])
         with app.app_context(): self.assertEqual(Area.query.count(),6);self.assertEqual(PaperLink.query.count(),0)
 
     def test_canonical_links_only_five_and_anatomy_existing(self):

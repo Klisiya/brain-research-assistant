@@ -22,7 +22,7 @@ export default function BookmarksPage() {
       : state.error ? <section className="learning-panel"><p role="alert">Bookmarks are unavailable.</p><button type="button" onClick={state.retry}>Retry bookmarks</button></section>
       : !rows.length ? <section className="learning-panel"><h2>No bookmarks yet</h2><p>{filter === 'all' ? 'Save a published paper, course, module, or research area to find it here.' : 'No saved items of this type.'}</p></section>
       : <div className="bookmark-grid">{rows.map(row => <article className="learning-panel bookmark-card" key={row.id}><span>{filters.find(f => f.value === row.targetType)?.label}</span>
-        {row.available ? <><h2>{row.target.title}</h2>{row.targetType === 'paper' && <p>{[row.target.authors?.join(', '),row.target.year,row.target.journal].filter(Boolean).join(' · ') || 'Publication details unavailable'}</p>}
+        {row.available ? <><h2>{row.target.title || filters.find(f => f.value === row.targetType)?.label}</h2>{row.targetType === 'paper' && <p>{[row.target.authors?.join(', '),row.target.year,row.target.journal].filter(Boolean).join(' · ') || 'Publication details unavailable'}</p>}
           {row.target.titleZh && <p lang="zh">{row.target.titleZh}</p>}{row.targetType === 'module' && <p>Module {row.target.number} · {row.target.courseTitle}</p>}
           {row.targetType === 'research_area' && <p>{row.target.code} · {row.target.overview}</p>}{row.target.description && <p>{row.target.description}</p>}
           <Link to={bookmarkPath(row.targetType,row.target)}>Open</Link></> : <><h2>Unavailable {row.targetType.replace('_',' ')}</h2><p>This saved item is no longer publicly available.</p></>}

@@ -34,3 +34,16 @@ htmlcov/
 /frontend/temp/
 /frontend/tmp/
 /frontend/backup/
+
+# Local planning, review artifacts and private assets.
+/AGENTS.md
+/DEVELOPMENT_PLAN.md
+/M1D_0_CONTENT_AUTHORITY_CLEANUP_REPORT.md
+/Brain_Research_Roadmap*.pdf
+/.agents/
+/.codex/
+/output/
+/artifacts/
+/frontend/public/models/brain.glb
+/project/static/models/brain.glb
+/project/static/models/brain.glb.gz

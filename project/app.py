@@ -48,6 +48,7 @@ from reading_models import define_reading_models
 from reading_api import register_reading_api
 from annotation_models import define_annotation_models
 from annotation_api import register_annotation_api
+from content_authority import register_content_authority_cli
 
 load_dotenv()
 
@@ -84,6 +85,7 @@ with app.app_context():
                 cursor.close()
 
 migrate = Migrate(app, db)
+register_content_authority_cli(app, db)
 
 login_manager = LoginManager(app)
 login_manager.login_view = "login"
@@ -1585,98 +1587,6 @@ def cache_static_response(response):
     return response
 
 
-DEMO_PAPERS = [
-    {
-        "slug": "demo-foundations-of-neural-communication",
-        "title": "Demo Resource: Foundations of Neural Communication",
-        "authors": ["Brain Research Tutor Education Team"],
-        "year": 2024,
-        "journal": "Demo Brain Science Learning Series",
-        "publicationType": "Learning Resource",
-        "topics": ["Neuroscience", "Neural Communication"],
-        "difficulty": "Beginner",
-        "estimatedReadingMinutes": 18,
-        "abstract": "A demonstration learning summary about neural signaling, prepared for local development and interface testing.",
-        "learningObjectives": [
-            "Describe the basic roles of electrical and chemical signaling.",
-            "Identify key terms used when discussing synaptic communication.",
-        ],
-        "keywords": ["demo", "neurons", "synapses"],
-        "featured": True,
-        "openAccess": True,
-        "externalUrl": None,
-        "resourceCategory": "Foundational",
-        "status": "published",
-    },
-    {
-        "slug": "demo-memory-systems-review",
-        "title": "Demo Resource: Memory Systems Review",
-        "authors": ["Brain Research Tutor Education Team"],
-        "year": 2023,
-        "journal": "Demo Cognitive Science Reviews",
-        "publicationType": "Review",
-        "topics": ["Memory", "Cognition"],
-        "difficulty": "Intermediate",
-        "estimatedReadingMinutes": 27,
-        "abstract": "A demonstration review outline for testing structured paper metadata without reproducing a paid or copyrighted article.",
-        "learningObjectives": [
-            "Compare working, episodic, and semantic memory at a high level.",
-            "Recognize common evidence limits in memory research.",
-        ],
-        "keywords": ["demo", "memory", "cognition"],
-        "featured": False,
-        "openAccess": True,
-        "externalUrl": None,
-        "resourceCategory": "Recommended",
-        "status": "published",
-    },
-    {
-        "slug": "demo-brain-computer-interface-draft",
-        "title": "Demo Draft: Brain-Computer Interface Concepts",
-        "authors": ["Brain Research Tutor Education Team"],
-        "year": 2026,
-        "journal": "Demo Emerging Research Notes",
-        "publicationType": "Research Article",
-        "topics": ["Brain-Computer Interfaces", "Neuroscience"],
-        "difficulty": "Advanced",
-        "estimatedReadingMinutes": 32,
-        "abstract": "A draft demonstration record used to verify that unpublished content remains unavailable through public endpoints.",
-        "learningObjectives": [
-            "Outline a basic signal acquisition and decoding workflow.",
-            "Distinguish educational examples from validated clinical systems.",
-        ],
-        "keywords": ["demo", "BCI", "neural signals"],
-        "featured": False,
-        "openAccess": False,
-        "externalUrl": None,
-        "resourceCategory": "Emerging Research",
-        "status": "draft",
-    },
-    {
-        "slug": "demo-archived-neuroplasticity-guide",
-        "title": "Demo Archived Resource: Neuroplasticity Guide",
-        "authors": ["Brain Research Tutor Education Team"],
-        "year": 2022,
-        "journal": "Demo Course Resource Archive",
-        "publicationType": "Book Chapter",
-        "topics": ["Neuroplasticity", "Learning"],
-        "difficulty": "Intermediate",
-        "estimatedReadingMinutes": 24,
-        "abstract": "An archived demonstration record used to test management filters and public visibility boundaries.",
-        "learningObjectives": [
-            "Define experience-dependent plasticity in a learning context.",
-            "Explain why archived resources should not appear publicly.",
-        ],
-        "keywords": ["demo", "neuroplasticity", "learning"],
-        "featured": False,
-        "openAccess": True,
-        "externalUrl": None,
-        "resourceCategory": "Course Resource",
-        "status": "archived",
-    },
-]
-
-
 @app.cli.command("set-user-role")
 @click.argument("email")
 @click.argument("role")
@@ -1706,64 +1616,9 @@ def set_user_role_command(email, role):
 
 
 @app.cli.command("seed-papers")
-@click.option("--owner-email", help="Email of an existing teacher or admin owner.")
+@click.option("--owner-email", help="Retained for CLI compatibility.")
 def seed_papers_command(owner_email):
-    if owner_email:
-        owner = User.query.filter_by(email=normalize_email(owner_email)).first()
-
-        if owner is None:
-            raise click.ClickException("No existing user matches the supplied owner email.")
-
-        if owner.role not in PAPER_EDITOR_ROLES:
-            raise click.ClickException("The seed owner must have the teacher or admin role.")
-    else:
-        owner = (
-            User.query.filter(User.role.in_(PAPER_EDITOR_ROLES))
-            .order_by(User.id.asc())
-            .first()
-        )
-
-        if owner is None:
-            raise click.ClickException(
-                "No teacher or admin user exists. Use flask set-user-role first."
-            )
-
-    added_count = 0
-    skipped_count = 0
-    now = datetime.utcnow()
-
-    for demo_payload in DEMO_PAPERS:
-        if Paper.query.filter_by(slug=demo_payload["slug"]).first() is not None:
-            skipped_count += 1
-            continue
-
-        try:
-            validated = validate_paper_payload(demo_payload)
-        except PaperValidationError as error:
-            raise click.ClickException(
-                f"Invalid demo paper field {error.field}: {error}"
-            ) from error
-
-        if validated["status"] == "published":
-            validated["published_at"] = now
-
-        db.session.add(
-            Paper(
-                **validated,
-                created_by_id=owner.id,
-                updated_by_id=owner.id,
-            )
-        )
-        added_count += 1
-
-    try:
-        db.session.commit()
-    except SQLAlchemyError as error:
-        db.session.rollback()
-        app.logger.exception("Unable to seed demo papers: %s", error.__class__.__name__)
-        raise click.ClickException("Unable to seed demo papers.") from error
-
-    click.echo(f"Demo papers added: {added_count}; skipped: {skipped_count}.")
+    raise click.ClickException("Demo seeding is disabled. Add only user-provided or confirmed content.")
 
 
 @app.cli.command("init-db")

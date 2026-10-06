@@ -76,26 +76,26 @@ export default function CoursePage() {
       </div> : <>
         <nav className="course-breadcrumb" aria-label="Breadcrumb"><Link to="/">Home</Link><span aria-hidden="true">/</span>{detail ? <><Link to={coursePath(course.slug)}>Course Overview</Link><span aria-hidden="true">/</span><span aria-current="page">Module {detail.module.number}</span></> : <span aria-current="page">Course Overview</span>}</nav>
         <header className="course-header">
-          <p className="course-eyebrow">{detail ? `Module ${String(detail.module.number).padStart(2, '0')} · ${detail.module.category}` : 'Course Overview'}</p>
-          <h1>{detail ? detail.module.title : course.title}</h1>
+          <p className="course-eyebrow">{detail ? `Module ${String(detail.module.number).padStart(2, '0')}${detail.module.category ? ` · ${detail.module.category}` : ''}` : 'Course Overview'}</p>
+          <h1>{detail ? detail.module.title : course.title || 'Course Overview'}</h1>
           {(detail?.module.titleZh || course.titleZh) && <p lang="zh" className="course-title-zh">{detail ? detail.module.titleZh : course.titleZh}</p>}
-          <p className="course-description">{detail ? detail.module.description : course.description}</p>
+          {(detail ? detail.module.description : course.description) && <p className="course-description">{detail ? detail.module.description : course.description}</p>}
           <BookmarkControl targetType={detail ? 'module' : 'course'} targetId={detail ? detail.module.id : course.id} />
           <div className="course-stats">{detail ? <span><strong>{detail.module.durationHours}</strong> Estimated hours</span> : <><span><strong>{course.moduleCount}</strong> Learning modules</span><span><strong>{course.totalHours}</strong> Estimated hours</span></>}</div>
         </header>
         <CourseLearning learning={learning} moduleSlug={moduleSlug} returnPath={location.pathname} />
         {detail ? <>
-          <section className="course-focus course-glass"><h2>Learning Focus</h2><p>{detail.module.learningFocus}</p></section>
+          {detail.module.learningFocus && <section className="course-focus course-glass"><h2>Learning Focus</h2><p>{detail.module.learningFocus}</p></section>}
           <Readings key={`readings:${course.slug}:${detail.module.slug}`} url={`${courseApiPath(course.slug,detail.module.slug)}/papers`} />
           <Resources key={courseApiPath(course.slug, detail.module.slug)} url={`${courseApiPath(course.slug, detail.module.slug)}/resources`} learning={learning} moduleSlug={detail.module.slug} />
           <Link className="course-back" to={`${coursePath(course.slug)}#modules`}>Explore all modules →</Link>
         </> : overview && <>
-          <section className="course-focus course-glass"><h2>Fields of Study</h2><ul className="course-categories">{course.categories.map(category => <li key={category}>{category}</li>)}</ul></section>
+          {course.categories.length > 0 && <section className="course-focus course-glass"><h2>Fields of Study</h2><ul className="course-categories">{course.categories.map(category => <li key={category}>{category}</li>)}</ul></section>}
           <section id="modules" className="course-module-section" aria-labelledby="modules-heading">
             <div className="course-section-heading"><p className="course-eyebrow">The learning journey</p><h2 id="modules-heading">Learning Modules</h2></div>
             {!overview.modules.length ? <p>No modules have been published yet.</p> : <div className="course-module-grid">{overview.modules.map(module => <Link className="course-module-card course-glass" to={modulePath(course.slug, module.slug)} key={module.slug}>
               <div className={`course-module-cover morph-module-visual ${module.coverVariant}`} aria-hidden="true" />
-              <div className="course-module-copy"><span className="course-eyebrow">Module {String(module.number).padStart(2, '0')} · {module.durationHours} Hours</span><h3>{module.title}</h3><p lang="zh" className="course-title-zh">{module.titleZh}</p><span className="course-category">{module.category}</span><p>{module.description}</p><div className="course-module-focus"><strong>Learning focus</strong><p>{module.learningFocus}</p></div><span className="course-open">Explore module →</span></div>
+              <div className="course-module-copy"><span className="course-eyebrow">Module {String(module.number).padStart(2, '0')} · {module.durationHours} Hours</span><h3>{module.title}</h3><p lang="zh" className="course-title-zh">{module.titleZh}</p>{module.category && <span className="course-category">{module.category}</span>}{module.description && <p>{module.description}</p>}{module.learningFocus && <div className="course-module-focus"><strong>Learning focus</strong><p>{module.learningFocus}</p></div>}<span className="course-open">Explore module →</span></div>
             </Link>)}</div>}
           </section>
           <Resources key={courseApiPath(course.slug)} url={`${courseApiPath(course.slug)}/resources`} learning={learning} />

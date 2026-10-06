@@ -188,7 +188,7 @@ function ModulesMorphSection({ modules: learningModules, courseSlug, courseTitle
     0,
   )
   const thematicAreaCount = new Set(
-    learningModules.map((learningModule) => learningModule.category),
+    learningModules.map((learningModule) => learningModule.category).filter(Boolean),
   ).size
 
   const [activeModuleId, setActiveModuleId] = useState<string | null>(null)

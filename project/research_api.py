@@ -132,7 +132,7 @@ def register_research_api(app, db, Area, Staff, PaperLink, ModuleLink, Resource,
         if body['expectedUpdatedAt']!=area.updated_at.isoformat(): fail('This area changed. Refresh before saving.','RESEARCH_STALE',409)
         if 'overview' in body:
             value=body['overview']
-            if not isinstance(value,str) or not value.strip() or len(value.strip())>6000: fail('Overview must contain 1–6000 characters.')
+            if not isinstance(value,str) or len(value.strip())>6000: fail('Overview must contain at most 6000 characters.')
             area.overview=value.strip()
         if 'subtopics' in body: area.subtopics=strings(body['subtopics'],20,200)
         if 'brainRegionSlugs' in body:

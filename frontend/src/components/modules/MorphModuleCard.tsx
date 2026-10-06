@@ -95,10 +95,10 @@ function MorphModuleCard({
 
             <div className="morph-module-back-meta">
               <span>{module.durationHours} Hours</span>
-              <span>{module.category}</span>
+              {module.category && <span>{module.category}</span>}
             </div>
 
-            <p>{module.description}</p>
+            {module.description && <p>{module.description}</p>}
           </div>
         </div>
       </Link>

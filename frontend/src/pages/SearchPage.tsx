@@ -12,10 +12,10 @@ const badges = { papers: 'Paper', courses: 'Course', modules: 'Module', research
 function ResultCard({ item }: { item: SearchResult }) {
   return <li className="global-search-card">
     <p className="global-search-eyebrow">{badges[item.type]}{item.type === 'modules' && ` · Module ${String(item.metadata.number).padStart(2, '0')}`}{item.type === 'research' && ` · ${item.code}`}</p>
-    <h2><Link to={searchResultPath(item)}>{item.title}</Link></h2>
+    <h2><Link to={searchResultPath(item)}>{item.title || badges[item.type]}</Link></h2>
     {(item.type === 'courses' || item.type === 'modules') && item.titleZh && <p className="global-search-secondary" lang="zh">{item.titleZh}</p>}
     {item.type === 'papers' && <p className="global-search-secondary">{[item.metadata.authors.join(', '), item.metadata.year, item.metadata.journal].filter(v => v !== null && v !== '').join(' · ')}</p>}
-    {item.type === 'modules' && <p className="global-search-secondary">{item.metadata.courseTitle} · {item.metadata.category} · {item.metadata.durationHours} Hours</p>}
+    {item.type === 'modules' && <p className="global-search-secondary">{[item.metadata.courseTitle, item.metadata.category, `${item.metadata.durationHours} Hours`].filter(Boolean).join(' · ')}</p>}
     {item.summary && <p className="global-search-summary">{item.summary}</p>}
   </li>
 }

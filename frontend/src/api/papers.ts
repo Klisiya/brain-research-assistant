@@ -191,9 +191,9 @@ function isPaper(value: unknown): value is Paper {
     && (value.issue === undefined || isNullableString(value.issue))
     && (value.pages === undefined || isNullableString(value.pages))
     && (value.publisher === undefined || isNullableString(value.publisher))
-    && PUBLICATION_TYPES.includes(value.publicationType as PaperPublicationType)
+    && (value.publicationType === '' || PUBLICATION_TYPES.includes(value.publicationType as PaperPublicationType))
     && isStringArray(value.topics)
-    && DIFFICULTIES.includes(value.difficulty as PaperDifficulty)
+    && (value.difficulty === '' || DIFFICULTIES.includes(value.difficulty as PaperDifficulty))
     && isFiniteNumber(value.estimatedReadingMinutes)
     && typeof value.abstract === 'string'
     && isStringArray(value.learningObjectives)
@@ -201,7 +201,7 @@ function isPaper(value: unknown): value is Paper {
     && typeof value.featured === 'boolean'
     && typeof value.openAccess === 'boolean'
     && isNullableString(value.externalUrl)
-    && RESOURCE_CATEGORIES.includes(value.resourceCategory as PaperResourceCategory)
+    && (value.resourceCategory === '' || RESOURCE_CATEGORIES.includes(value.resourceCategory as PaperResourceCategory))
     && typeof value.createdAt === 'string'
     && typeof value.updatedAt === 'string'
     && isNullableString(value.publishedAt)

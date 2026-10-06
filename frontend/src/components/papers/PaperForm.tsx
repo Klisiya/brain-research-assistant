@@ -16,7 +16,7 @@ type PaperFormMode = 'create' | 'edit'
 type PaperFormValues = {
   abstract: string
   authors: string
-  difficulty: PaperDifficulty
+  difficulty: PaperDifficulty | ''
   estimatedReadingMinutes: string
   externalUrl: string
   featured: boolean
@@ -29,8 +29,8 @@ type PaperFormValues = {
   keywords: string
   learningObjectives: string
   openAccess: boolean
-  publicationType: PaperPublicationType
-  resourceCategory: PaperResourceCategory
+  publicationType: PaperPublicationType | ''
+  resourceCategory: PaperResourceCategory | ''
   title: string
   topics: string
   year: string
@@ -208,6 +208,11 @@ function validateForm(values: PaperFormValues, status: PaperStatus) {
       errors.externalUrl = 'Enter a valid http or https URL.'
     }
   }
+
+  if (!values.publicationType) errors.publicationType = 'Choose a publication type.'
+  if (!values.difficulty) errors.difficulty = 'Choose a difficulty.'
+  if (!values.resourceCategory) errors.resourceCategory = 'Choose a resource category.'
+  if (!values.publicationType || !values.difficulty || !values.resourceCategory) return { errors, input: null }
 
   const input: PaperWriteInput = {
     abstract,
@@ -418,19 +423,22 @@ function PaperForm({ initialPaper, mode, onSubmit }: PaperFormProps) {
             <div className="paper-form-grid is-three-column">
               <label className="paper-form-field" htmlFor="paper-publicationType">
                 <span>Publication Type</span>
-                <select id="paper-publicationType" onChange={(event) => updateValue('publicationType', event.target.value as PaperPublicationType)} value={values.publicationType}>
+                <select id="paper-publicationType" onChange={(event) => updateValue('publicationType', event.target.value as PaperPublicationType)} required value={values.publicationType}>
+                  <option value="">Not specified</option>
                   {PUBLICATION_TYPES.map((value) => <option key={value}>{value}</option>)}
                 </select>
               </label>
               <label className="paper-form-field" htmlFor="paper-difficulty">
                 <span>Difficulty</span>
-                <select id="paper-difficulty" onChange={(event) => updateValue('difficulty', event.target.value as PaperDifficulty)} value={values.difficulty}>
+                <select id="paper-difficulty" onChange={(event) => updateValue('difficulty', event.target.value as PaperDifficulty)} required value={values.difficulty}>
+                  <option value="">Not specified</option>
                   {DIFFICULTIES.map((value) => <option key={value}>{value}</option>)}
                 </select>
               </label>
               <label className="paper-form-field" htmlFor="paper-resourceCategory">
                 <span>Resource Category</span>
-                <select id="paper-resourceCategory" onChange={(event) => updateValue('resourceCategory', event.target.value as PaperResourceCategory)} value={values.resourceCategory}>
+                <select id="paper-resourceCategory" onChange={(event) => updateValue('resourceCategory', event.target.value as PaperResourceCategory)} required value={values.resourceCategory}>
+                  <option value="">Not specified</option>
                   {RESOURCE_CATEGORIES.map((value) => <option key={value}>{value}</option>)}
                 </select>
               </label>

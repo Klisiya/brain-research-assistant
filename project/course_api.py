@@ -74,7 +74,7 @@ def register_course_api(app, db, Course, Module, Staff, CourseResource, ModuleRe
         modules = [m for m in course.modules if managed or m.status == "published"]
         item = {"id": course.id, "slug": course.slug, "title": course.title, "titleZh": course.title_zh,
                 "description": course.description, "moduleCount": len(modules),
-                "totalHours": sum(m.duration_hours for m in modules), "categories": list(dict.fromkeys(m.category for m in modules))}
+                "totalHours": sum(m.duration_hours for m in modules), "categories": list(dict.fromkeys(m.category for m in modules if m.category))}
         if include_modules:
             item["modules"] = [serialize_module(m, managed) for m in modules]
         if managed:
