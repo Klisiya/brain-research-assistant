@@ -16,8 +16,8 @@ function LearningContent({ account, detailed }: { account: number; detailed: boo
   const reader = useCallback((signal: AbortSignal) => getEnrollments(signal), [])
   const state = useCourseRead(`enrollments:${account}`, reader)
   return <><h1>{detailed ? 'Progress' : 'My Learning'}</h1><p>Your personal, self-reported learning record.</p>
-    {state.loading ? <p role="status">Loading your learning…</p> : state.error ? <section className="learning-panel"><p role="alert">Your learning is unavailable.</p><button type="button" onClick={state.retry}>Retry</button></section> : !state.data?.length ? <section className="learning-panel"><h2>No enrolled courses yet</h2><p>Choose a course and enroll to start recording your learning.</p><Link to={coursePath(PRIMARY_COURSE_SLUG)}>Explore the course</Link></section> : state.data.map(e => <article className="learning-panel" key={e.enrollmentId}>
-      {!e.available ? <><h2>Course unavailable</h2><p>Your enrollment and learning history are preserved. This course is not currently published.</p></> : <>
+    {state.loading ? <p role="status">Loading your learning…</p> : state.error ? <section className="learning-panel"><p role="alert">Your learning is unavailable.</p><button type="button" onClick={state.retry}>Retry</button></section> : !state.data?.length ? <section className="learning-panel"><h2>No learning records yet</h2><p>Start learning to record your progress.</p><Link to={coursePath(PRIMARY_COURSE_SLUG)}>Explore the course</Link></section> : state.data.map(e => <article className="learning-panel" key={e.enrollmentId}>
+      {!e.available ? <><h2>Course unavailable</h2><p>Your learning history is preserved. This course is not currently published.</p></> : <>
         <h2><Link to={coursePath(e.course.slug)}>{e.course.title || 'Course Overview'}</Link></h2><StudyProgress enrollment={e} />
         <p>Last activity: <time dateTime={e.lastActivityAt}>{new Date(e.lastActivityAt).toLocaleString()}</time></p>
         <Link className="learning-continue" to={e.continuePath}>Continue Learning</Link>

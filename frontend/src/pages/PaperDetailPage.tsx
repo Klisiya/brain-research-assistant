@@ -26,12 +26,16 @@ function getReturnPath(state: unknown) {
     && state !== null
     && 'from' in state
     && typeof state.from === 'string'
-    && state.from.startsWith('/papers')
+    && (state.from.startsWith('/papers') || /^\/course\/[^/?#]+\/modules\/[^/?#]+(?:\?paper=\d+)?$/.test(state.from))
   ) {
     return state.from
   }
 
   return '/papers'
+}
+
+function returnLabel(preview: boolean, path: string) {
+  return preview ? 'Back to Papers Management' : path.startsWith('/course/') ? 'Back to Module' : 'Back to Paper Library'
 }
 
 function getPublicationDetails(paper: Paper) {
@@ -193,7 +197,7 @@ function PaperDetailStatus({
           </button>
         )}
         {error === 'session' ? <Link state={{ from: window.location.pathname, managementRequired: true }} to="/login">Sign In</Link> : null}
-        <Link to={returnPath}>{preview ? 'Back to Papers Management' : 'Back to Paper Library'}</Link>
+        <Link to={returnPath}>{returnLabel(preview, returnPath)}</Link>
       </div>
     </section>
   )
@@ -284,7 +288,7 @@ function PaperDetailPage({ preview = false }: { preview?: boolean }) {
         {loading ? (
           <>
             <Link className="paper-detail-back" to={returnPath}>
-              <span aria-hidden="true">←</span> {preview ? 'Back to Papers Management' : 'Back to Paper Library'}
+              <span aria-hidden="true">←</span> {returnLabel(preview, returnPath)}
             </Link>
             <PaperDetailLoadingState />
           </>
@@ -293,7 +297,7 @@ function PaperDetailPage({ preview = false }: { preview?: boolean }) {
         ) : paper ? (
           <>
             <Link className="paper-detail-back" to={returnPath}>
-              <span aria-hidden="true">←</span> {preview ? 'Back to Papers Management' : 'Back to Paper Library'}
+              <span aria-hidden="true">←</span> {returnLabel(preview, returnPath)}
             </Link>
 
             {preview && isPreviewPaper(paper) ? (

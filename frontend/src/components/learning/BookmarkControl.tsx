@@ -3,10 +3,11 @@ import { getBookmarks, removeBookmark, saveBookmark, type BookmarkType } from '.
 import { usePersonalState } from '../../hooks/usePersonalState'
 import './PersonalReading.css'
 
-export default function BookmarkControl({ targetType, targetId }: { targetType: BookmarkType; targetId: number }) {
+export default function BookmarkControl({ targetType, targetId, showSignInPrompt = true }: { targetType: BookmarkType; targetId: number; showSignInPrompt?: boolean }) {
   const state = usePersonalState(`bookmark:${targetType}:${targetId}`, getBookmarks)
   const location = useLocation(), name = targetType.replace('_', ' ')
   const saved = state.data?.find(b => b.targetType === targetType && b.available && b.target.id === targetId)
+  if (state.auth.status === 'anonymous' && !showSignInPrompt) return null
   return <div className="personal-controls bookmark-control" role="group" aria-label={`Bookmark ${name}`}>
     {state.auth.status === 'anonymous' ? <Link to="/login" state={{ from: location.pathname }}>Sign in to save</Link>
       : state.auth.status === 'unavailable' ? <><p role="alert">Sign-in status unavailable.</p><button type="button" onClick={() => void state.refreshAuth()}>Retry sign-in</button></>

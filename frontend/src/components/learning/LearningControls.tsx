@@ -14,11 +14,13 @@ function ActivityControls({ status, busy, action }: { status: LearningStatus; bu
 }
 export function CourseLearning({ learning, moduleSlug, returnPath }: { learning: LearningController; moduleSlug?: string; returnPath: string }) {
   const { auth, data, loading, error, run, busy } = learning
+  const hasProgress = data?.modules.some(module => module.status !== 'not_started')
+    || data?.resources.some(resource => resource.status !== 'not_started' || resource.history.some(version => version.status !== 'not_started'))
   return <section className="learning-panel" aria-label="Your learning">
     <h2>Your learning</h2>
-    {auth.status === 'anonymous' ? <Link to="/login" state={{ from: returnPath }}>Sign in to enroll</Link> : auth.status === 'unavailable' ? <><p role="alert">Sign-in status unavailable.</p><button type="button" onClick={() => void learning.refreshAuth()}>Retry sign-in</button></> : auth.status === 'loading' || loading ? <p role="status">Loading learning state…</p> : error ? <><p role="alert">Learning state is unavailable.</p><button onClick={learning.retry} type="button">Retry learning state</button></> : !data ? <><p>Enroll to save your learning across devices.</p><button disabled={busy} type="button" onClick={() => void run({ type: 'enroll' })}>Enroll</button></> : <>
-      <StudyProgress enrollment={data} /><Link to={data.continuePath}>Continue Learning</Link> · <Link to="/progress">View Progress</Link>
-      {moduleSlug && (() => { const module = data.modules.find(m => m.slug === moduleSlug); return module ? <ActivityControls status={module.status} busy={busy} action={action => void run({ type: 'module', moduleSlug, action })} /> : <p>This module is outside your enrollment completion rule.</p> })()}
+    {auth.status === 'anonymous' ? <Link to="/login" state={{ from: returnPath }}>Sign in to start learning</Link> : auth.status === 'unavailable' ? <><p role="alert">Sign-in status unavailable.</p><button type="button" onClick={() => void learning.refreshAuth()}>Retry sign-in</button></> : auth.status === 'loading' || loading ? <p role="status">Loading learning state…</p> : error ? <><p role="alert">Learning state is unavailable.</p><button onClick={learning.retry} type="button">Retry learning state</button></> : !data ? <><p>Save your learning progress across devices.</p><button disabled={busy} type="button" onClick={() => void run({ type: 'enroll' })}>Start Learning</button></> : <>
+      <StudyProgress enrollment={data} /><Link to={data.continuePath}>{hasProgress ? 'Continue Learning' : 'Start Learning'}</Link> · <Link to="/progress">View Progress</Link>
+      {moduleSlug && (() => { const module = data.modules.find(m => m.slug === moduleSlug); return module ? <ActivityControls status={module.status} busy={busy} action={action => void run({ type: 'module', moduleSlug, action })} /> : <p>This module is outside your saved completion rule.</p> })()}
     </>}
     {learning.errorMessage && <p role="alert">{learning.errorMessage} <button type="button" onClick={learning.retry}>Reload learning state</button></p>}
     <p role="status" aria-live="polite">{learning.message}</p>

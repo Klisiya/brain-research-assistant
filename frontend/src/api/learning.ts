@@ -32,7 +32,11 @@ function enrollment(v: unknown): v is Enrollment {
 async function request(url: string, init: RequestInit): Promise<Record<string, unknown>> {
   const response = await sessionFetch(url, { cache: 'no-store', ...init })
   const body: unknown = await response.json().catch(() => null)
-  if (!response.ok) throw new LearningError(record(body) && typeof body.error === 'string' ? body.error : 'Learning state is unavailable. Please retry.', response.status)
+  if (!response.ok) {
+    const message = record(body) && body.code === 'ENROLLMENT_REQUIRED' ? 'Start Learning to save your learning progress.'
+      : record(body) && typeof body.error === 'string' ? body.error : 'Learning state is unavailable. Please retry.'
+    throw new LearningError(message, response.status)
+  }
   if (!record(body)) throw new LearningError('Invalid learning response.', 503)
   return body
 }

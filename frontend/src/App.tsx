@@ -12,6 +12,7 @@ import AboutPage from './pages/AboutPage'
 import BrainRegionPage from './pages/BrainRegionPage'
 import ContactPage from './pages/ContactPage'
 import CoursePage from './pages/CoursePage'
+import ModuleWorkspacePage from './pages/ModuleWorkspacePage'
 import ResearchAreaPage from './pages/ResearchAreaPage'
 import ResearchManagementPage from './pages/ResearchManagementPage'
 import SearchPage from './pages/SearchPage'
@@ -73,7 +74,7 @@ function App() {
       <Route element={<PapersManagementGuard>{user => <CourseManagementPage currentUser={user} />}</PapersManagementGuard>} path="/manage/courses/:courseId" />
       <Route element={<ContactPage />} path="/contact" />
       <Route element={<CoursePage />} path="/course/:courseSlug" />
-      <Route element={<CoursePage />} path="/course/:courseSlug/modules/:moduleSlug" />
+      <Route element={<ModuleWorkspacePage />} path="/course/:courseSlug/modules/:moduleSlug" />
       <Route element={<ResearchAreaPage />} path="/research" />
       <Route element={<ResearchAreaPage />} path="/research/:slug" />
       <Route element={<PapersManagementGuard>{user => <ResearchManagementPage currentUser={user} />}</PapersManagementGuard>} path="/manage/research-areas" />
