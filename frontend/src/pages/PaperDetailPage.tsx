@@ -8,9 +8,9 @@ import { GuidedNotesPanel, ConceptHighlightsPanel } from '../components/learning
 import { usePaperReading } from '../hooks/usePaperReading'
 import Footer from '../components/Footer'
 import Navbar from '../components/Navbar'
-import PageParticleBackground from '../components/PageParticleBackground'
 import type { Paper, PreviewPaper } from '../types/paper'
 import './PaperDetailPage.css'
+import PaperReadingWorkspace from '../components/papers/PaperReadingWorkspace'
 
 type PaperDetailError = 'not-found' | 'unavailable' | 'forbidden' | 'session'
 
@@ -284,16 +284,18 @@ function PaperDetailPage({ preview = false }: { preview?: boolean }) {
   }
 
   const content = (
-      <main className={`paper-detail-main${preview ? ' is-preview' : ''}`}>
+      <main id="paper-main" tabIndex={-1} className={`paper-detail-main${preview ? ' is-preview' : ' pr-main'}`}>
         {loading ? (
           <>
             <Link className="paper-detail-back" to={returnPath}>
               <span aria-hidden="true">←</span> {returnLabel(preview, returnPath)}
             </Link>
-            <PaperDetailLoadingState />
+            {preview ? <PaperDetailLoadingState /> : <p className="pr-loading" role="status">Loading paper…</p>}
           </>
         ) : error ? (
           <PaperDetailStatus error={error} onRetry={retryPaper} preview={preview} returnPath={returnPath} />
+        ) : paper && !preview ? (
+          <PaperReadingWorkspace key={paper.slug} paper={paper} reading={reading} returnPath={returnPath} citation={citation} publishedDate={publishedDate} onCopyCitation={() => void copyCitation()} copyState={copyState} />
         ) : paper ? (
           <>
             <Link className="paper-detail-back" to={returnPath}>
@@ -444,9 +446,10 @@ function PaperDetailPage({ preview = false }: { preview?: boolean }) {
   if (preview) return content
 
   return (
-    <div className="paper-detail-page">
-      <PageParticleBackground />
-      <Navbar />
+    <div className="paper-detail-page paper-reading-workspace">
+      <a className="pr-skip" href="#paper-main">Skip to reading</a>
+      <div className="pr-global-nav"><Navbar /></div>
+      <nav className="pr-mobile-nav" aria-label="Main navigation"><Link to="/">Brain Research</Link><Link to="/papers">Paper Library</Link></nav>
       {content}
       <Footer />
     </div>
