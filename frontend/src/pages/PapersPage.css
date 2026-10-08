@@ -681,10 +681,6 @@
   outline-offset: 3px;
 }
 
-.papers-page .site-footer {
-  background: linear-gradient(180deg, rgba(2, 6, 23, 0), rgba(2, 6, 23, 0.8) 20%, #020617);
-}
-
 @media (min-width: 1200px) {
   .papers-hero {
     --papers-hero-stage-gutter: 8px;

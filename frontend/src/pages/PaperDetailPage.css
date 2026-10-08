@@ -233,7 +233,6 @@
 .paper-detail-not-found a:focus-visible,
 .paper-detail-retry:focus-visible,
 .paper-detail-source a:focus-visible { outline: 2px solid #7dd3fc; outline-offset: 3px; }
-.paper-detail-page .site-footer { background: linear-gradient(180deg, rgba(2, 6, 23, 0), rgba(2, 6, 23, 0.8) 20%, #020617); }
 
 .paper-detail-loading-label {
   position: absolute;

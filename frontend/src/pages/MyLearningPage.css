@@ -1,0 +1,58 @@
+.my-learning-page { color: #e6f1fc; }
+.app-shell.my-learning-page { min-height: 100dvh; }
+.ml-main { position: relative; z-index: 1; width: min(960px, calc(100% - 80px)); margin: 0 auto; padding: 116px 0 40px; overflow-wrap: anywhere; }
+.ml-main h1 { margin: 0; font-size: clamp(28px, 3vw, 36px); line-height: 1.25; font-weight: 600; letter-spacing: -.025em; }
+.ml-header { margin-bottom: 28px; }
+.ml-header > p { margin: 10px 0 0; color: #b0c1d1; line-height: 1.6; }
+.ml-main h2 { margin: 0 0 12px; font-size: 22px; line-height: 1.4; font-weight: 600; }
+.ml-next { min-width: 0; padding: 28px 32px; background: #0c1929; border-block: 1px solid #30475b; }
+.ml-next > p { line-height: 1.6; }
+.ml-main .ml-eyebrow { margin: 0 0 8px; color: #9bdbe9; font-size: 12px; line-height: 1.6; letter-spacing: .04em; }
+.ml-target > p, .ml-paper-title { max-width: 65ch; font-size: 20px; line-height: 1.55; margin: 0 0 6px; }
+.ml-target > p[lang] { color: #b0c1d1; font-size: 15px; }
+.ml-target > span { display: inline-block; margin: 10px 20px 0 0; color: #b0c1d1; font-size: 14px; }
+.ml-main .ml-note { margin: 10px 0 0; font-size: 14px; line-height: 1.65; color: #b0c1d1; }
+.ml-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 24px; margin-top: 24px; }
+.ml-main a { color: inherit; }
+.ml-main .ml-primary { display: inline-flex; align-items: center; justify-content: center; min-height: 48px; padding: 12px 22px; border: 1px solid #8cdcee; border-radius: 6px; background: #8cdcee; color: #07111f; font-weight: 600; text-decoration: none; line-height: 1.4; }
+.ml-primary:hover { background: #b1edfa; }
+.ml-secondary { display: inline-flex; align-items: center; min-height: 44px; font-size: 14px; }
+.ml-main .ml-progress { margin: 24px 0 0; padding-top: 16px; border-top: 1px solid #30475b; color: #d5e4ed; font-size: 14px; line-height: 1.7; }
+.ml-progress > span { color: #b0c1d1; }
+.ml-records { margin-top: 32px; }
+.ml-main .ml-records > h2 { font-size: 18px; margin-bottom: 8px; }
+.ml-record { display: flex; align-items: center; justify-content: space-between; gap: 20px; padding: 18px 0; border-bottom: 1px solid #30475b; }
+.ml-record > div { min-width: 0; }
+.ml-record a { display: inline-flex; align-items: center; min-height: 44px; padding: 8px 0; line-height: 1.5; }
+.ml-record .ml-eyebrow { margin-bottom: 0; }
+.ml-record .ml-note { margin: 0; }
+.ml-record-hint { flex: none; color: #b0c1d1; font-size: 13px; }
+.ml-shortcuts { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 32px; margin-top: 36px; }
+.ml-shortcuts > a { display: flex; justify-content: space-between; align-items: center; min-height: 80px; gap: 20px; padding: 14px 0; border-block: 1px solid #30475b; text-decoration: none; }
+.ml-shortcuts small { display: block; margin-top: 6px; color: #b0c1d1; font-size: 13px; line-height: 1.5; }
+.ml-shortcuts > a:hover { color: #9bdbe9; }
+.ml-main button { min-height: 44px; padding: 10px 18px; border: 1px solid #51809a; border-radius: 6px; background: #153048; color: #e6f1fc; font: inherit; cursor: pointer; margin-right: 20px; }
+.my-learning-page a:focus-visible, .ml-main button:focus-visible, .ml-main:focus-visible { outline: 2px solid #9ae5ff; outline-offset: 4px; }
+.ml-skip { position: fixed; top: 8px; left: 12px; transform: translateY(-160%); z-index: 2000; padding: 12px; background: #e6f1fc; color: #07111f; }
+.ml-skip:focus { transform: none; }
+.ml-mobile-nav { display: none; position: relative; z-index: 1; }
+@media (max-width: 1000px) {
+  .ml-desktop-nav { display: none; }
+  .ml-mobile-nav { display: flex; justify-content: space-between; align-items: center; gap: 16px; padding: 8px 24px; border-bottom: 1px solid #30475b; }
+  .ml-mobile-nav a { display: inline-flex; align-items: center; min-height: 44px; color: #d5e4ed; font-size: 14px; text-decoration: none; }
+  .ml-main { width: calc(100% - 48px); padding: 32px 0 32px; }
+}
+@media (max-width: 600px) {
+  .ml-mobile-nav { padding-inline: 18px; }
+  .ml-main { width: calc(100% - 36px); padding-top: 24px; }
+  .ml-header { margin-bottom: 20px; }
+  .ml-header > p { font-size: 14px; }
+  .ml-next { padding: 20px 18px; }
+  .ml-target > p, .ml-paper-title { font-size: 18px; }
+  .ml-target > p[lang] { font-size: 14px; }
+  .ml-actions { gap: 8px 20px; margin-top: 20px; }
+  .ml-primary { width: 100%; }
+  .ml-record-hint { display: none; }
+  .ml-shortcuts { grid-template-columns: minmax(0, 1fr); gap: 0; margin-top: 28px; }
+  .ml-shortcuts > a + a { border-top: 0; }
+}

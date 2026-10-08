@@ -221,16 +221,6 @@
   margin-top: 8px;
 }
 
-.brain-region-page .site-footer {
-  background:
-    linear-gradient(
-      180deg,
-      rgba(2, 6, 23, 0),
-      rgba(2, 6, 23, 0.74) 20%,
-      rgba(2, 6, 23, 0.98)
-    );
-}
-
 @media (max-width: 980px) {
   .brain-region-main {
     width: min(100% - 36px, 860px);

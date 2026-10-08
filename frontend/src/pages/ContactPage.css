@@ -200,10 +200,6 @@
   line-height: 1.7;
 }
 
-.contact-react-page .site-footer {
-  background: linear-gradient(180deg, rgba(2, 6, 23, 0), rgba(2, 6, 23, 0.96) 34%);
-}
-
 @media (max-width: 900px) {
   .contact-react-main {
     padding-top: 124px;

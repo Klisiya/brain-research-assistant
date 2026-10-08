@@ -300,7 +300,6 @@
 .confirm-dialog-actions button.is-primary { border-color: rgba(45, 212, 191, 0.26); color: #ccfbf1; background: rgba(13, 148, 136, 0.18); }
 .confirm-dialog-actions button.is-danger { border-color: rgba(248, 113, 113, 0.28); color: #fecaca; background: rgba(127, 29, 29, 0.25); }
 .confirm-dialog-actions button:disabled { cursor: not-allowed; opacity: 0.45; }
-.paper-management-shell .site-footer { position: relative; z-index: 2; background: linear-gradient(180deg, transparent, rgba(2, 6, 23, 0.8) 24%, #020617); }
 
 @keyframes management-skeleton-shimmer {
   from { background-position: 100% 0; }

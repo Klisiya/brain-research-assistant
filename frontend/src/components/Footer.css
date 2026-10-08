@@ -1,16 +1,27 @@
+/* Short pages fill the viewport; long pages keep the footer after their content. */
+#root > :has(.site-footer) {
+  display: flex;
+  flex-direction: column;
+  min-height: 100dvh;
+}
+
+#root > :has(.site-footer) > * {
+  flex-shrink: 0;
+}
+
+#root > :has(.site-footer) > .site-footer,
+#root > .react-login-page > .login-footer-screen {
+  margin-top: auto;
+}
+
+/* Shared original footer design with opaque surfaces. Keep page-specific skins out. */
 .site-footer {
   position: relative;
   z-index: 2;
   margin-top: 0;
   padding: 70px 5vw 28px;
   overflow: hidden;
-  background:
-    linear-gradient(
-      180deg,
-      rgba(2, 6, 23, 0),
-      rgba(2, 6, 23, 0.72) 22%,
-      rgba(2, 6, 23, 0.96)
-    );
+  background: #020617;
   border-top: 1px solid rgba(125, 211, 252, 0.14);
 }
 
@@ -40,7 +51,7 @@
   align-items: center;
 }
 
-.footer-brand h2 {
+.site-footer .footer-brand h2 {
   margin: 0 0 16px;
   color: white;
   font-size: 22px;
@@ -49,8 +60,8 @@
   letter-spacing: -0.5px;
 }
 
-.footer-brand p,
-.footer-note p {
+.site-footer .footer-brand p,
+.site-footer .footer-note p {
   margin: 0 0 12px;
   color: #94a3b8;
   font-size: 13px;
@@ -62,17 +73,11 @@
 }
 
 .footer-note {
+  min-width: 0;
   padding: 20px 22px;
   border-radius: 22px;
-  background:
-    linear-gradient(
-      135deg,
-      rgba(255, 255, 255, 0.06),
-      rgba(255, 255, 255, 0.015)
-    );
+  background: linear-gradient(135deg, #111525, #060a1b);
   border: 1px solid rgba(255, 255, 255, 0.1);
-  backdrop-filter: blur(18px) saturate(160%);
-  -webkit-backdrop-filter: blur(18px) saturate(160%);
 }
 
 .footer-note p:last-child {
@@ -89,7 +94,7 @@
   justify-content: center;
   gap: 20px;
   border-top: 1px solid rgba(148, 163, 184, 0.16);
-  color: #64748b;
+  color: #94a3b8;
   font-size: 12px;
   line-height: 1.6;
   text-align: center;
@@ -111,12 +116,19 @@
     padding: 58px 20px 26px;
   }
 
-  .footer-brand h2 {
+  .site-footer .footer-brand h2 {
     font-size: 20px;
   }
 
   .footer-note {
     padding: 18px;
     border-radius: 18px;
+  }
+}
+
+/* Keep footer text above the Paper workspace's fixed narrow-screen tools button. */
+@media (max-width: 1099px) {
+  .paper-reading-workspace .site-footer {
+    padding-bottom: calc(76px + env(safe-area-inset-bottom, 0px));
   }
 }

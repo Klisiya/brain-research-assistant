@@ -182,10 +182,6 @@
   display: none;
 }
 
-.about-react-page .site-footer {
-  background: linear-gradient(180deg, rgba(2, 6, 23, 0), rgba(2, 6, 23, 0.96) 34%);
-}
-
 @keyframes about-document-enter {
   from { opacity: 0; transform: translateY(10px); }
   to { opacity: 1; transform: translateY(0); }
