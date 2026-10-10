@@ -14,14 +14,19 @@
   margin-top: auto;
 }
 
-/* Shared original footer design with opaque surfaces. Keep page-specific skins out. */
+/* Shared translucent footer surfaces blend into the existing page background. */
 .site-footer {
   position: relative;
   z-index: 2;
   margin-top: 0;
   padding: 70px 5vw 28px;
   overflow: hidden;
-  background: #020617;
+  background: linear-gradient(
+    180deg,
+    rgba(2, 6, 23, 0),
+    rgba(2, 6, 23, 0.72) 22%,
+    rgba(2, 6, 23, 0.96)
+  );
   border-top: 1px solid rgba(125, 211, 252, 0.14);
 }
 
@@ -76,8 +81,14 @@
   min-width: 0;
   padding: 20px 22px;
   border-radius: 22px;
-  background: linear-gradient(135deg, #111525, #060a1b);
+  background: linear-gradient(
+    135deg,
+    rgba(255, 255, 255, 0.06),
+    rgba(255, 255, 255, 0.015)
+  );
   border: 1px solid rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(18px) saturate(160%);
+  -webkit-backdrop-filter: blur(18px) saturate(160%);
 }
 
 .footer-note p:last-child {
