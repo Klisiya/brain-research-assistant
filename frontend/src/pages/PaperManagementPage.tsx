@@ -72,6 +72,7 @@ function PaperManagementPage({ currentUser }: { currentUser: AuthUser }) {
   const payload = currentResult?.payload
   const papers = payload?.papers ?? []
   const totalPages = payload?.pagination.totalPages ?? 0
+  const filtered = Boolean(query || status !== 'all')
 
   return (
     <>
@@ -143,7 +144,7 @@ function PaperManagementPage({ currentUser }: { currentUser: AuthUser }) {
               ? 'Access Denied'
               : currentResult.error === 'session'
                 ? 'Sign In Required'
-                : 'Research Management Unavailable'}
+                : 'Paper Management Unavailable'}
           </h2>
           <p>
             {currentResult.error === 'forbidden'
@@ -163,11 +164,9 @@ function PaperManagementPage({ currentUser }: { currentUser: AuthUser }) {
       ) : papers.length === 0 ? (
         <section className="management-state-panel is-embedded">
           <span>Research Library</span>
-          <h2>{currentUser.role === 'admin' ? 'No papers have been created yet.' : 'No papers yet'}</h2>
+          <h2>{filtered ? 'No matching papers' : 'No papers yet'}</h2>
           <p>
-            {currentUser.role === 'admin'
-              ? 'New research resources will appear here after they are created.'
-              : 'Create your first learning resource for the Brain Research library.'}
+            {filtered ? 'Try another search or change the status filter.' : 'Papers you can manage will appear here.'}
           </p>
           <Link to="/manage/papers/new">Create Paper</Link>
         </section>

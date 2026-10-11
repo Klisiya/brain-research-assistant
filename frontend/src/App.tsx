@@ -30,6 +30,7 @@ import PapersPage from './pages/PapersPage'
 import AdminAuditPage from './pages/admin/AdminAuditPage'
 import AdminUsersPage from './pages/admin/AdminUsersPage'
 import AccountCredentialPage from './pages/AccountCredentialPage'
+import ManagementPage from './pages/ManagementPage'
 import './App.css'
 
 function HomePage() {
@@ -71,6 +72,7 @@ function App() {
       <Route element={<MyLearningPage />} path="/my-learning" />
       <Route element={<ProgressPage />} path="/progress" />
       <Route element={<BookmarksPage />} path="/bookmarks" />
+      <Route element={<PapersManagementGuard>{user => <ManagementPage currentUser={user} />}</PapersManagementGuard>} path="/manage" />
       <Route element={<PapersManagementGuard>{user => <CourseManagementPage currentUser={user} />}</PapersManagementGuard>} path="/manage/courses" />
       <Route element={<PapersManagementGuard>{user => <CourseManagementPage currentUser={user} />}</PapersManagementGuard>} path="/manage/courses/:courseId" />
       <Route element={<ContactPage />} path="/contact" />

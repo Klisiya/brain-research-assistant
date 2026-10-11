@@ -1,10 +1,11 @@
-import { useEffect, useId, useState } from 'react'
+import { useEffect, useId, useRef, useState } from 'react'
 
 type ConfirmDialogProps = {
   busy?: boolean
   confirmLabel: string
   confirmationText?: string
   description: string
+  error?: string | null
   onCancel: () => void
   onConfirm: () => void
   title: string
@@ -16,6 +17,7 @@ function ConfirmDialog({
   confirmLabel,
   confirmationText,
   description,
+  error,
   onCancel,
   onConfirm,
   title,
@@ -24,26 +26,41 @@ function ConfirmDialog({
   const titleId = useId()
   const descriptionId = useId()
   const [confirmation, setConfirmation] = useState('')
+  const dialog = useRef<HTMLDialogElement>(null)
   const canConfirm = !confirmationText || confirmation === confirmationText
+
+  useEffect(() => {
+    const previous = document.activeElement
+    const element = dialog.current
+    element?.showModal()
+    return () => {
+      element?.close()
+      if (previous instanceof HTMLElement && previous.isConnected) previous.focus()
+    }
+  }, [])
 
   useEffect(() => {
     const previousOverflow = document.body.style.overflow
     document.body.style.overflow = 'hidden'
 
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape' && !busy) onCancel()
-    }
-
-    document.addEventListener('keydown', handleKeyDown)
     return () => {
       document.body.style.overflow = previousOverflow
-      document.removeEventListener('keydown', handleKeyDown)
     }
-  }, [busy, onCancel])
+  }, [])
 
   return (
     <div className="confirm-dialog-backdrop">
-      <section
+      <dialog
+        ref={dialog}
+        onCancel={event => { event.preventDefault(); if (!busy) onCancel() }}
+        onKeyDown={event => {
+          if (event.key !== 'Tab') return
+          const controls = Array.from(event.currentTarget.querySelectorAll<HTMLElement>('button:not(:disabled), input:not(:disabled)'))
+          const first = controls[0], last = controls[controls.length - 1]
+          if (!first) { event.preventDefault(); event.currentTarget.focus() }
+          else if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus() }
+          else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus() }
+        }}
         aria-describedby={descriptionId}
         aria-labelledby={titleId}
         aria-modal="true"
@@ -53,6 +70,7 @@ function ConfirmDialog({
         <span>Confirmation Required</span>
         <h2 id={titleId}>{title}</h2>
         <p id={descriptionId}>{description}</p>
+        {error ? <p className="paper-form-summary-error" role="alert">{error}</p> : null}
 
         {confirmationText ? (
           <label className="confirm-dialog-input">
@@ -78,7 +96,7 @@ function ConfirmDialog({
             {busy ? 'Working...' : confirmLabel}
           </button>
         </div>
-      </section>
+      </dialog>
     </div>
   )
 }

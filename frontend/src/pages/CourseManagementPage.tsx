@@ -3,7 +3,8 @@ import { Link, useParams } from 'react-router-dom'
 import { coursePath, modulePath } from '../api/courses'
 import { courseRequest, courseWrite, getReadings, CourseManagementError, type ManagedCourse, type ManagedModule, type CourseStaffMember } from '../api/courseManagement'
 import { fetchPapers } from '../api/papers'
-import { useCourseRead } from '../hooks/useCourseRead'
+import { useManagementRead as useCourseRead } from '../components/management/useManagementRead'
+import ManagementRequestState from '../components/management/ManagementRequestState'
 import { useAuth } from '../auth/useAuth'
 import type { AuthUser } from '../types/auth'
 import CourseResourcesEditor, { type CourseRun } from '../components/courses/CourseResourcesEditor'
@@ -12,7 +13,7 @@ import './CourseManagementPage.css'
 function ContentEditor({ row, base, module, run, busy }: { row: ManagedCourse | ManagedModule; base: string; module?: boolean; run: CourseRun; busy: boolean }) {
   const [description,setDescription]=useState(row.description),[status,setStatus]=useState(row.status),[focus,setFocus]=useState('learningFocus' in row?row.learningFocus:''),[category,setCategory]=useState('category' in row?row.category:'')
   const submit=(e:FormEvent)=>{e.preventDefault();void run(()=>courseWrite(base,'PATCH',{description,status,expectedUpdatedAt:row.updatedAt,...(module?{learningFocus:focus,category}:{})}))}
-  return <section className="course-editor-panel"><h2>{module?'Module content':'Course content'}</h2><form onSubmit={submit}>
+  return <section className="course-editor-panel"><h2>{module?'Module metadata':'Course metadata'}</h2><form onSubmit={submit}>
     <label htmlFor={`${base}-description`}>Description</label><textarea id={`${base}-description`} rows={5} maxLength={6000} value={description} onChange={e=>setDescription(e.target.value)} />
     {module&&<><label htmlFor={`${base}-focus`}>Learning focus</label><textarea id={`${base}-focus`} rows={4} maxLength={6000} value={focus} onChange={e=>setFocus(e.target.value)} /><label>Category<input maxLength={150} value={category} onChange={e=>setCategory(e.target.value)} /></label></>}
     <label htmlFor={`${base}-status`}>Publication status</label><select id={`${base}-status`} value={status} onChange={e=>setStatus(e.target.value)}><option value="draft">Draft</option><option value="published">Published</option><option value="archived">Archived</option></select>
@@ -46,8 +47,8 @@ export default function CourseManagementPage({currentUser}:{currentUser:AuthUser
   const [selected,setSelected]=useState(0),[busy,setBusy]=useState(false),[message,setMessage]=useState(''),[error,setError]=useState('')
   const run:CourseRun=async action=>{setBusy(true);setError('');setMessage('');try{await action();state.retry();setMessage('Changes saved.');return true}catch(e){setError(e instanceof Error?e.message:'Unable to save.');if(e instanceof CourseManagementError&&[401,403].includes(e.status))await refreshAuth();return false}finally{setBusy(false)}}
   const course=state.data?.course,module=course?.modules.find(m=>m.id===selected)??course?.modules[0],base=`/api/courses/${id}`,moduleBase=`${base}/modules/${module?.id}`
-  return <div className="course-management"><header><p>Management · Learning content</p><h1>{course?.title||'Courses'}</h1><Link to="/manage/courses">Assigned courses</Link>{course&&<Link to={coursePath(course.slug)}>View public course</Link>}</header><p role="status" aria-live="polite">{message}</p>{error&&<p role="alert" className="course-editor-error">{error}</p>}<button type="button" onClick={state.retry}>Reload workspace</button>
-    {state.loading?<p role="status">Loading course workspace…</p>:state.error?<section className="course-editor-panel"><h2>{state.error==='not-found'?'Course not found':'Workspace unavailable'}</h2><p>Your account may not have access, or the service is unavailable.</p></section>:course?<>
+  return <div className="course-management"><header><p>Management · Internal course maintenance</p><h1>{course?.title||'Course Maintenance'}</h1><Link to="/manage/courses">Assigned courses</Link>{course&&<Link to={coursePath(course.slug)}>View public course</Link>}</header><p>Existing internal maintenance tools. Teaching content is maintained through the code and data layer.</p><p role="status" aria-live="polite">{message}</p>{error&&<p role="alert" className="course-editor-error">{error}</p>}<button type="button" onClick={state.retry}>Refresh workspace</button>
+    {state.loading?<p role="status">Loading course workspace…</p>:state.error?<ManagementRequestState error={state.error} subject="Course" retry={state.retry} />:course?<>
       <ContentEditor key={`${course.id}:${course.updatedAt}`} row={course} base={base} run={run} busy={busy} /><StaffEditor base={base} admin={currentUser.role==='admin'} run={run} busy={busy} /><CourseResourcesEditor base={base+'/resources'} run={run} busy={busy} title="Course resources" />
       <section className="course-editor-panel"><h2>Learning modules</h2><label htmlFor="managed-module">Module to maintain</label><select id="managed-module" value={module?.id??''} onChange={e=>setSelected(Number(e.target.value))}>{course.modules.map(m=><option key={m.id} value={m.id}>Module {m.number} · {m.title}</option>)}</select>{module&&<><p>{module.title}</p><p lang="zh">{module.titleZh}</p><p>{module.durationHours} Hours</p><Link to={modulePath(course.slug,module.slug)}>View public module</Link></>}</section>
       {module&&<div key={module.id}><ContentEditor key={module.updatedAt} row={module} base={moduleBase} module run={run} busy={busy} /><ReadingsEditor base={moduleBase} run={run} busy={busy} /><CourseResourcesEditor base={moduleBase+'/resources'} run={run} busy={busy} title="Module resources" /></div>}

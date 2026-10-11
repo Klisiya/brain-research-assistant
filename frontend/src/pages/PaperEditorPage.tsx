@@ -213,7 +213,7 @@ function PaperEditorPage({ currentUser }: { currentUser: AuthUser }) {
       </header>
 
       {notice ? <p aria-live="polite" className="paper-editor-notice">{notice}</p> : null}
-      {actionError ? <p className="paper-form-summary-error" role="alert">{actionError}</p> : null}
+      {actionError && !dialog ? <p className="paper-form-summary-error" role="alert">{actionError}</p> : null}
 
       <PaperForm
         initialPaper={paper ?? undefined}
@@ -233,7 +233,7 @@ function PaperEditorPage({ currentUser }: { currentUser: AuthUser }) {
           </div>
           <div>
             {paper.status === 'published' ? (
-              <button onClick={() => setDialog('archive')} type="button">Archive</button>
+              <button onClick={() => { setActionError(null); setDialog('archive') }} type="button">Archive</button>
             ) : null}
             {currentUser.role === 'admin' ? (
               <button className="is-danger" onClick={() => setDialog('delete')} type="button">
@@ -248,6 +248,7 @@ function PaperEditorPage({ currentUser }: { currentUser: AuthUser }) {
         <ConfirmDialog
           busy={isActionPending}
           confirmLabel="Archive Paper"
+          error={actionError}
           description="Archived papers will no longer appear in the public research library."
           onCancel={() => setDialog(null)}
           onConfirm={() => void handleArchive()}
