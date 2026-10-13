@@ -127,7 +127,7 @@ class SearchTests(unittest.TestCase):
         self.populate_boundary()
         response=self.get('Boundary',perPage=20).json
         self.assertEqual(response['total'],53);self.assertEqual(response['totalPages'],3)
-        self.assertEqual(response['counts'],dict(papers=34,courses=1,modules=12,research=6))
+        self.assertEqual(response['counts'],dict(papers=34,courses=1,modules=12,research=6,hub=0))
         all_rows=[]
         for page in [1,2,3]:
             data=self.get('Boundary',perPage=20,page=page).json

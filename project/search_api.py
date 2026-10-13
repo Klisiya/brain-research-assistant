@@ -1,11 +1,12 @@
-"""One public search boundary with no session-dependent content expansion."""
+"""Public catalog search; authenticated Hub results never expand to drafts."""
 from flask import jsonify, request
+from flask_login import current_user
 from sqlalchemy.exc import SQLAlchemyError
 from search_service import SearchService, SearchValidationError, parse_search
 
 
-def register_search_api(app, db, Paper, Course, Module, Area, limiter):
-    service = SearchService(db, Paper, Course, Module, Area)
+def register_search_api(app, db, Paper, Course, Module, Area, limiter, HubEntry=None, HubRevision=None):
+    service = SearchService(db, Paper, Course, Module, Area, HubEntry, HubRevision)
     app.extensions['search_service'] = service
 
     @app.after_request
@@ -20,7 +21,10 @@ def register_search_api(app, db, Paper, Course, Module, Area, limiter):
     @limiter.limit('120/minute', exempt_when=lambda: app.testing)
     def search_public():
         try:
-            return jsonify(service.search(parse_search(request.args)))
+            params = parse_search(request.args)
+            if params['type'] == 'hub' and not current_user.is_authenticated:
+                return jsonify(error='Sign in to search Innovation Hub.', code='AUTH_REQUIRED'), 401
+            return jsonify(service.search(params, include_hub=current_user.is_authenticated))
         except SearchValidationError as error:
             return jsonify(error=str(error), code='SEARCH_VALIDATION_ERROR'), 400
         except (SQLAlchemyError, ValueError) as error:

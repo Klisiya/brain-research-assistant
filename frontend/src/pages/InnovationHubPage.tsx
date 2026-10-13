@@ -2,6 +2,9 @@ import { Link, useSearchParams } from 'react-router-dom'
 import Footer from '../components/Footer'
 import Navbar from '../components/Navbar'
 import PageParticleBackground from '../components/PageParticleBackground'
+import RequireRole from '../components/auth/RequireRole'
+import FacultyWorkspace from '../components/hub/FacultyWorkspace'
+import '../pages/PaperManagementPage.css'
 import './InnovationHubPage.css'
 
 type InnovationView = 'faculty' | 'industry' | 'discussions' | 'collaboration'
@@ -34,7 +37,7 @@ function isInnovationView(value: string | null): value is InnovationView {
   return value !== null && Object.prototype.hasOwnProperty.call(innovationViews, value)
 }
 
-function InnovationHubPage() {
+function InnovationHubPage({ detail = false }: { detail?: boolean }) {
   const [searchParams] = useSearchParams()
   const requestedView = searchParams.get('view')
   const activeView: InnovationView = isInnovationView(requestedView) ? requestedView : 'faculty'
@@ -46,7 +49,8 @@ function InnovationHubPage() {
       <Navbar />
 
       <main className="innovation-hub-main">
-        <section className="innovation-hub-hero">
+        <RequireRole roles={['student', 'teacher', 'admin']}>{user => <div key={`${user.id}:${user.role}`}>
+        {!detail && <><section className="innovation-hub-hero">
           <span className="innovation-hub-eyebrow">Industry ? Academia ? Research</span>
           <h1>Innovation Hub</h1>
           <p>
@@ -65,13 +69,14 @@ function InnovationHubPage() {
               {content.title}
             </Link>
           ))}
-        </nav>
+        </nav></>}
 
-        <section aria-live="polite" className="innovation-view-card">
+        {detail || activeView === 'faculty' ? <FacultyWorkspace user={user} /> : <section aria-live="polite" className="innovation-view-card">
           <span>Selected View</span>
           <h2>{activeContent.title}</h2>
-          <p>{activeContent.description}</p>
-        </section>
+          <p>This workspace is not available yet.</p>
+        </section>}
+        </div>}</RequireRole>
       </main>
 
       <Footer />

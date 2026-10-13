@@ -5,10 +5,11 @@ import { useCourseRead } from '../hooks/useCourseRead'
 import Navbar from '../components/Navbar'
 import Footer from '../components/Footer'
 import PageParticleBackground from '../components/PageParticleBackground'
+import { useAuth } from '../auth/useAuth'
 import './SearchPage.css'
 
-const labels: Record<SearchType, string> = { all: 'All', papers: 'Papers', courses: 'Courses', modules: 'Modules', research: 'Research Areas' }
-const badges = { papers: 'Paper', courses: 'Course', modules: 'Module', research: 'Research Area' }
+const labels: Record<SearchType, string> = { all: 'All', papers: 'Papers', courses: 'Courses', modules: 'Modules', research: 'Research Areas', hub: 'Innovation Hub' }
+const badges = { papers: 'Paper', courses: 'Course', modules: 'Module', research: 'Research Area', hub: 'Faculty Resource' }
 function ResultCard({ item }: { item: SearchResult }) {
   return <li className="global-search-card">
     <p className="global-search-eyebrow">{badges[item.type]}{item.type === 'modules' && ` · Module ${String(item.metadata.number).padStart(2, '0')}`}{item.type === 'research' && ` · ${item.code}`}</p>
@@ -20,12 +21,14 @@ function ResultCard({ item }: { item: SearchResult }) {
   </li>
 }
 export default function SearchPage() {
+  const { state: auth } = useAuth()
   const [url] = useSearchParams(), navigate = useNavigate()
   const { params, invalid } = useMemo(() => parseSearchUrl(url), [url])
   const [draft, setDraft] = useState({ source: params.q, value: params.q })
   const input = draft.source === params.q ? draft.value : params.q
-  const identity = `${invalid}:${params.q}:${params.type}:${params.page}`
-  const reader = useCallback((signal: AbortSignal) => params.q && !invalid ? getSearch(params, signal) : Promise.resolve(null), [params, invalid])
+  const hubDenied = params.type === 'hub' && auth.status !== 'authenticated'
+  const identity = `${auth.status}:${auth.user?.id}:${auth.user?.role}:${invalid}:${params.q}:${params.type}:${params.page}`
+  const reader = useCallback((signal: AbortSignal) => params.q && !invalid && !hubDenied && auth.status !== 'loading' && auth.status !== 'unavailable' ? getSearch(params, signal) : Promise.resolve(null), [params, invalid, hubDenied, auth.status])
   const state = useCourseRead(identity, reader)
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -40,9 +43,12 @@ export default function SearchPage() {
         <label htmlFor="global-search-query">Search published content</label>
         <div><input id="global-search-query" type="search" maxLength={200} placeholder="Search by title, topic, or keyword" value={input} onChange={e => setDraft({ source: params.q, value: e.target.value })} /><button type="submit">Search</button></div>
       </form>
-      <nav className="global-search-filters" aria-label="Search result types">{SEARCH_TYPES.map(type => <Link key={type} to={searchPath(params.q, type)} aria-current={params.type === type ? 'page' : undefined}>{labels[type]}{data && <span> {type === 'all' ? Object.values(data.counts).reduce((a,b) => a+b,0) : data.counts[type]}</span>}</Link>)}</nav>
+      <nav className="global-search-filters" aria-label="Search result types">{SEARCH_TYPES.filter(type => type !== 'hub' || auth.status === 'authenticated').map(type => <Link key={type} to={searchPath(params.q, type)} aria-current={params.type === type ? 'page' : undefined}>{labels[type]}{data && <span> {type === 'all' ? Object.values(data.counts).reduce((a,b) => a+b,0) : data.counts[type]}</span>}</Link>)}</nav>
       <section className="global-search-results" aria-label="Search results" aria-busy={Boolean(params.q && !invalid && state.loading)}>
         {invalid ? <div className="global-search-status" role="alert"><h2>Invalid search parameters</h2><p>Use a query of up to 200 characters, a valid content type, and a positive page number.</p><Link to="/search">Reset search parameters</Link></div>
+          : auth.status === 'loading' ? <p role="status">Checking access…</p>
+          : auth.status === 'unavailable' ? <p role="alert">Authentication check unavailable. Refresh to retry.</p>
+          : hubDenied ? <div className="global-search-status"><h2>Sign in to search Innovation Hub</h2><Link to="/login" state={{ from: `/search?${url}` }}>Sign in</Link></div>
           : !params.q ? <div className="global-search-status"><h2>Search the Brain Research platform</h2><p>Enter a query to explore published content.</p></div>
           : state.loading ? <p className="global-search-status" role="status">Searching published content…</p>
           : state.error ? <div className="global-search-status" role="alert"><h2>Search unavailable</h2><p>We could not load your results. Please try again.</p><button onClick={state.retry} type="button">Retry</button></div>

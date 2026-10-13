@@ -4,7 +4,7 @@ from urllib.parse import quote
 from sqlalchemy import Text, and_, case, cast, exists, func, literal, or_, select, union_all
 from sqlalchemy.orm import joinedload
 
-SEARCH_TYPES = ('all', 'papers', 'courses', 'modules', 'research')
+SEARCH_TYPES = ('all', 'papers', 'courses', 'modules', 'research', 'hub')
 
 
 class SearchValidationError(ValueError):
@@ -30,8 +30,9 @@ def parse_search(args):
 
 
 class SearchService:
-    def __init__(self, db, Paper, Course, Module, Area):
+    def __init__(self, db, Paper, Course, Module, Area, HubEntry=None, HubRevision=None):
         self.db, self.Paper, self.Course, self.Module, self.Area = db, Paper, Course, Module, Area
+        self.HubEntry, self.HubRevision = HubEntry, HubRevision
 
     def text_match(self, column, pattern):
         return func.lower(func.coalesce(cast(column, Text), '')).like(pattern, escape='\\')
@@ -46,7 +47,7 @@ class SearchService:
             raise ValueError('Unsupported search database.')
         return exists(select(1).select_from(values).where(self.text_match(values.c.value, pattern)))
 
-    def providers(self, q):
+    def providers(self, q, include_hub=False):
         P, C, M, A = self.Paper, self.Course, self.Module, self.Area
         escaped = q.lower().replace('\\', '\\\\').replace('%', '\\%').replace('_', '\\_')
         pattern = '%' + escaped + '%'
@@ -66,11 +67,21 @@ class SearchService:
             return query.where(and_(model.status == 'published', match,
                                     visibility if visibility is not None else literal(True)))
 
-        return [candidate('papers', P, [P.title], [P.journal, P.abstract, P.doi], [P.authors, P.keywords, P.topics]),
+        providers = [candidate('papers', P, [P.title], [P.journal, P.abstract, P.doi], [P.authors, P.keywords, P.topics]),
                 candidate('courses', C, [C.title, C.title_zh], [C.description], priority=1),
                 candidate('modules', M, [M.title, M.title_zh], [M.description, M.learning_focus, M.category],
                           visibility=C.status == 'published', parent=C, priority=2),
                 candidate('research', A, [A.name], [A.overview], [A.subtopics], priority=3)]
+        if include_hub and self.HubEntry is not None:
+            E, R = self.HubEntry, self.HubRevision
+            title_match = self.text_match(R.title, pattern)
+            rank = case((func.lower(R.title) == q.lower(), 0), (self.text_match(R.title, escaped+'%'), 1), (title_match, 2), else_=3)
+            providers.append(select(literal('hub').label('kind'), E.id.label('entity_id'),
+                func.lower(R.title).label('title_order'), rank.label('rank'), literal(4).label('type_order'))
+                .join_from(E, R, and_(R.id == E.published_revision_id, R.entry_id == E.id))
+                .where(E.kind == 'faculty', E.archived_at.is_(None), R.state == 'approved',
+                       or_(title_match, self.text_match(R.body, pattern), self.text_match(R.source_name, pattern))))
+        return providers
 
     @staticmethod
     def excerpt(value):
@@ -78,6 +89,10 @@ class SearchService:
         return value if len(value) <= 260 else value[:257].rstrip() + '…'
 
     def serialize(self, kind, row):
+        if kind == 'hub':
+            entry, revision = row
+            return dict(type='hub', key=f'hub:{entry.id}', id=entry.id, title=revision.title,
+                        summary=self.excerpt(revision.body), route=f'/innovation-hub/faculty/{entry.id}', metadata=dict(kind=entry.kind))
         route_slug = lambda slug: quote(slug, safe='')
         common = dict(type=kind, key=f'{kind}:{row.slug}', title=row.name if kind == 'research' else row.title)
         if kind == 'papers':
@@ -94,8 +109,8 @@ class SearchService:
         return dict(common, code=row.code, slug=row.slug, name=row.name, summary=self.excerpt(row.overview),
                     route='/research/' + route_slug(row.slug), metadata={})
 
-    def search(self, params):
-        candidates = union_all(*self.providers(params['q'])).subquery()
+    def search(self, params, include_hub=False):
+        candidates = union_all(*self.providers(params['q'], include_hub)).subquery()
         counts = dict.fromkeys(SEARCH_TYPES[1:], 0)
         for kind, count in self.db.session.execute(select(candidates.c.kind, func.count()).group_by(candidates.c.kind)):
             counts[kind] = count
@@ -116,6 +131,14 @@ class SearchService:
             for entity in self.db.session.execute(statement).scalars():
                 if entity.status == 'published' and (kind != 'modules' or entity.course.status == 'published'):
                     hydrated[(kind, entity.id)] = entity
+        ids = [r['entity_id'] for r in rows if r['kind'] == 'hub']
+        if include_hub and ids:
+            E, R = self.HubEntry, self.HubRevision
+            # Recheck current publication at hydration, including ownership of pointer.
+            for entry, revision in self.db.session.execute(select(E, R).join_from(E, R,
+                and_(R.id == E.published_revision_id, R.entry_id == E.id)).where(
+                E.id.in_(ids), E.kind == 'faculty', E.archived_at.is_(None), R.state == 'approved')):
+                hydrated[('hub', entry.id)] = (entry, revision)
         return dict(items=[self.serialize(r['kind'], hydrated[(r['kind'], r['entity_id'])]) for r in rows
                            if (r['kind'], r['entity_id']) in hydrated],
                     **params, total=total, totalPages=ceil(total / params['perPage']), counts=counts)

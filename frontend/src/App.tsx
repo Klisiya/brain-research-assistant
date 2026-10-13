@@ -21,6 +21,7 @@ import ProgressPage from './pages/ProgressPage'
 import MyLearningPage from './pages/MyLearningPage'
 import BookmarksPage from './pages/BookmarksPage'
 import InnovationHubPage from './pages/InnovationHubPage'
+import FacultyWorkspace from './components/hub/FacultyWorkspace'
 import LoginPage from './pages/LoginPage'
 import NotFoundPage from './pages/NotFoundPage'
 import PaperDetailPage from './pages/PaperDetailPage'
@@ -125,6 +126,10 @@ function App() {
       <Route path="/admin/audit-log" element={<PapersManagementGuard adminOnly>{() => <AdminAuditPage />}</PapersManagementGuard>} />
       <Route path="/admin/users" element={<PapersManagementGuard adminOnly>{() => <AdminUsersPage />}</PapersManagementGuard>} />
       <Route element={<InnovationHubPage />} path="/innovation-hub" />
+      <Route element={<InnovationHubPage detail />} path="/innovation-hub/faculty/:entryId" />
+      <Route element={<PapersManagementGuard>{user => <FacultyWorkspace user={user} managed />}</PapersManagementGuard>} path="/manage/hub" />
+      <Route element={<PapersManagementGuard>{user => <FacultyWorkspace user={user} managed create />}</PapersManagementGuard>} path="/manage/hub/new" />
+      <Route element={<PapersManagementGuard>{user => <FacultyWorkspace user={user} managed />}</PapersManagementGuard>} path="/manage/hub/:entryId" />
       <Route element={<BrainRegionPage />} path="/brain-region/:slug" />
       <Route element={<NotFoundPage />} path="*" />
     </Routes>

@@ -69,6 +69,10 @@ with app.app_context():
     fields=dict(user_id=1,paper_id=1,attachment_id=1,attachment_relation_id_at_recording=1,resource_version=1)
     db.session.add(GuidedNote(**fields,title='Own title',body='Own text',note_type='general'));db.session.add(ConceptHighlight(**fields,highlight_text='Own concept'));db.session.commit()
 ''')
-            c=snapshot();command('-m','flask','db','upgrade','head');self.assertEqual(snapshot(),c)
+            c=snapshot();command('-m','flask','db','upgrade','head');preserved(c)
+            # Later additive stages may add empty tables. Return to R5 before
+            # exercising the R5 nonempty-history downgrade guard.
+            command('-m','flask','db','downgrade','e63a9d20bf17');self.assertEqual(snapshot(),c)
             command('-m','flask','db','downgrade','d42b7c901ea6',success=False);self.assertEqual(snapshot(),c)
+            command('-m','flask','db','upgrade','head');preserved(c)
             command('-m','flask','db','check')
