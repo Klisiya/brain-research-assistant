@@ -23,7 +23,7 @@ const navItems: NavItem[] = [
     ],
   },
   {
-    id: 'research', label: 'Research Areas', dropdown: [
+    id: 'research', label: 'Research Areas', href: '/research', dropdown: [
       { label: 'Neuroscience', href: '/research/neuroscience' }, { label: 'Cognitive Science', href: '/research/cognitive-science' },
       { label: 'Brain-Computer Interfaces', href: '/research/brain-computer-interfaces' }, { label: 'Brain-Inspired Computing', href: '/research/brain-inspired-computing' },
       { label: 'Artificial Intelligence', href: '/research/artificial-intelligence' }, { label: 'Brain Disorders', href: '/research/brain-disorders' },
@@ -265,12 +265,16 @@ function Navbar() {
       <li className={`dropdown${isOpen ? ' is-open' : ''}${isActive ? ' active' : ''}`}
         key={item.id} onBlur={handleDropdownBlur}
         onMouseEnter={() => setOpenMenu(item.id)} onMouseLeave={() => setOpenMenu(null)}>
-        <button aria-current={isActive ? 'page' : undefined} aria-expanded={isOpen}
+        {item.href ? <Link aria-current={isActive ? 'page' : undefined} aria-expanded={isOpen}
+          aria-haspopup="true" className="nav-link nav-trigger"
+          onClick={() => setOpenMenu(null)} onFocus={() => setOpenMenu(item.id)} to={item.href}>
+          {item.label}<span aria-hidden="true" className="nav-caret">&#9662;</span>
+        </Link> : <button aria-current={isActive ? 'page' : undefined} aria-expanded={isOpen}
           aria-haspopup="true" className="nav-link nav-trigger"
           onClick={() => setOpenMenu(isOpen ? null : item.id)}
           onFocus={() => setOpenMenu(item.id)} type="button">
           {item.label}<span aria-hidden="true" className="nav-caret">&#9662;</span>
-        </button>
+        </button>}
         <div className="dropdown-menu">
           {item.dropdown.map((dropdownItem) => dropdownItem.href ? (
             <Link aria-current={dropdownItem.href === `${location.pathname}${location.hash}` ? 'page' : undefined} key={dropdownItem.label} onClick={() => setOpenMenu(null)} to={dropdownItem.href}>

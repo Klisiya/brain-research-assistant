@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef } from 'react'
 import { Link, useLocation, useParams } from 'react-router-dom'
-import { getResearchDetail, getResearchList, researchPath, type ResearchDetail, type ResearchArea } from '../api/research'
+import { getResearchDetail, getResearchList, type ResearchDetail, type ResearchArea } from '../api/research'
 import { modulePath } from '../api/courses'
 import { useCourseRead } from '../hooks/useCourseRead'
 import { usePersonalState } from '../hooks/usePersonalState'
@@ -9,6 +9,7 @@ import { useAuth } from '../auth/useAuth'
 import Navbar from '../components/Navbar'
 import Footer from '../components/Footer'
 import PageParticleBackground from '../components/PageParticleBackground'
+import ResearchOrbitalIndex from '../components/research/ResearchOrbitalIndex'
 import './ResearchAreaPage.css'
 import '../components/learning/PersonalReading.css'
 
@@ -110,9 +111,7 @@ export default function ResearchAreaPage() {
         {!state.loading && <Link to="/research">Back to Research Areas →</Link>}
       </section> : detail ? <AreaContent detail={detail} account={account} /> : <>
         <header className="research-header research-index-header"><div><p className="research-eyebrow">Explore research</p><h1>Research Areas</h1><p>Find the content linked to each research area.</p></div></header>
-        {areas?.length ? <nav aria-label="Research areas"><ul className="research-index">{areas.map(area => <li key={area.slug} className={`research-accent-${area.slug}`}>
-          <Link className="research-node" to={researchPath(area.slug)}><span className="research-node-code">{area.code}</span><div><h2>{area.name}</h2><span className="research-action">Explore area →</span></div></Link>
-        </li>)}</ul></nav> : <p className="research-empty">No research areas are currently available.</p>}
+        {areas?.length ? <ResearchOrbitalIndex areas={areas} /> : <p className="research-empty">No research areas are currently available.</p>}
       </>}
     </main><Footer />
   </div>
