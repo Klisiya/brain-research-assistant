@@ -7,7 +7,7 @@ from account_lifecycle import email_address
 from flask_login import current_user
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from account_service import AccountError
-from account_api import paginated
+from account_api import paginated, serialize_account
 
 FORGOT_MESSAGE = "If an eligible account exists, a reset link will be sent. If no email arrives, try again later."
 
@@ -47,6 +47,20 @@ def register_lifecycle_api(app, db, Invitation, service, roles_required):
     def serialize(entry):
         return dict(id=entry.id, email=entry.email, role=entry.role, createdAt=entry.created_at.isoformat(),
                     expiresAt=entry.expires_at.isoformat(), status=service.invitation_status(entry))
+
+    @app.post("/api/admin/users")
+    @roles_required("admin")
+    @guarded
+    def create_account():
+        data = payload()
+        if set(data) - {"username", "email", "role", "temporaryPassword", "confirmAdmin"}:
+            raise AccountError("Provide only username, email, role, temporaryPassword and confirmAdmin.", "VALIDATION_ERROR", 400)
+        if "confirmAdmin" in data and type(data["confirmAdmin"]) is not bool:
+            raise AccountError("Administrator confirmation must be true or false.", "ADMIN_CONFIRMATION_REQUIRED", 400)
+        user = service.create_account(data.get("username"), data.get("email"), data.get("role"),
+            data.get("temporaryPassword"), current_user.id, current_user.auth_version, data.get("confirmAdmin", False))
+        # The administrator already holds the temporary password; never echo it.
+        return jsonify(user=serialize_account(user)), 201
 
     @app.route("/api/admin/invitations", methods=["POST"])
     @roles_required("admin")

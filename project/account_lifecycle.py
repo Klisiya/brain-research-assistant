@@ -17,10 +17,16 @@ def validate_password(password):
     return password
 
 
-def email_address(value):
+def email_address(value, code="VALIDATION_ERROR"):
     if not isinstance(value, str) or len(value.strip()) > 255 or not re.fullmatch(r"[^@\s]+@[^@\s]+\.[^@\s]+", value.strip()):
-        raise AccountError("Enter a valid email address.", "VALIDATION_ERROR", 400)
+        raise AccountError("Enter a valid email address.", code, 400)
     return value.strip().lower()
+
+
+def validate_username(value, code="VALIDATION_ERROR"):
+    if not isinstance(value, str) or not 1 <= len(value.strip()) <= 80:
+        raise AccountError("Use a name between 1 and 80 characters.", code, 400)
+    return value.strip()
 
 
 def digest(token):
@@ -59,6 +65,34 @@ class AccountLifecycleService(AccountService):
         if parsed.scheme not in {"http", "https"} or not parsed.netloc or parsed.username or parsed.password or parsed.query or parsed.fragment:
             raise AccountError("Email delivery is unavailable.", "MAIL_UNAVAILABLE", 503)
         return base.rstrip("/") + path + "?" + urlencode({"token": token})
+
+    def create_account(self, username, email, role, password, uid, version, confirm_admin=False):
+        username = validate_username(username, "USERNAME_INVALID")
+        email, role = email_address(email, "EMAIL_INVALID"), validate_role(role)
+        validate_password(password)
+        if role == "admin" and confirm_admin is not True:
+            raise AccountError("Confirm that this account should have administrator access.", "ADMIN_CONFIRMATION_REQUIRED", 400)
+        with self.transaction() as tx:
+            # Username has no unique DB constraint. Serialize direct creation across
+            # admins using the same ordered locks as administrative role changes.
+            if self.db.engine.dialect.name != "sqlite":
+                tx.scalars(select(self.User).where(self.User.role == "admin", self.User.is_active.is_(True))
+                           .order_by(self.User.id).with_for_update()).all()
+            self.actor(tx, uid, version, True)
+            # Python casefold also handles non-ASCII names consistently on SQLite.
+            if any(existing.strip().casefold() == username.casefold()
+                   for existing in tx.scalars(select(self.User.username))):
+                raise AccountError("An account already uses this username.", "USERNAME_ALREADY_EXISTS", 409)
+            if tx.scalar(select(self.User.id).where(func.lower(self.User.email) == email)):
+                raise AccountError("An account already uses this email.", "EMAIL_ALREADY_EXISTS", 409)
+            if tx.scalar(select(self.Invitation.id).where(self.Invitation.pending_email == email,
+                    self.Invitation.expires_at > utc_now())):
+                raise AccountError("A pending invitation already exists for this email. Revoke it before creating an account directly.", "INVITATION_PENDING", 409)
+            user = self.User(username=username, email=email, role=role, is_active=True, auth_version=1)
+            user.set_password(password)
+            tx.add(user); tx.flush()
+            self.audit(tx, "account_created", user.id, uid, username=user.username, assignedRole=role)
+            return user
 
     def invite(self, email, role, uid, version, username=None):
         email, role = email_address(email), validate_role(role)
@@ -118,8 +152,7 @@ class AccountLifecycleService(AccountService):
 
     def accept(self, token, username, password):
         validate_password(password)
-        if not isinstance(username, str) or not 1 <= len(username.strip()) <= 80:
-            raise AccountError("Use a name between 1 and 80 characters.", "VALIDATION_ERROR", 400)
+        username = validate_username(username)
         with self.transaction() as tx:
             entry = self.credential(tx, self.Invitation, token, "INVITATION")
             if tx.scalar(select(self.User.id).where(func.lower(self.User.email) == entry.email)):

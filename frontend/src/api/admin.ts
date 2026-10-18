@@ -5,8 +5,17 @@ export type AdminUser = AuthUser & { createdAt: string | null; lastLoginAt: stri
 export type UserFilters = { q: string; role: UserRole | ''; status: 'active' | 'disabled' | ''; page: number }
 export type Pagination = { page: number; perPage: number; total: number; totalPages: number }
 export type AdminUsersResponse = { users: AdminUser[]; pagination: Pagination; filters: { q: string; role: UserRole | null; status: 'active' | 'disabled' | null; sort: string } }
-export type AccountAuditEntry = { id: number; actor: { id: number; username: string } | null; target: { id: number; username: string } | null; action: string; createdAt: string; details: Partial<Record<'oldRole' | 'newRole' | 'oldStatus' | 'newStatus', string>> & { invitationId?: number } }
+export type AccountAuditEntry = { id: number; actor: { id: number; username: string } | null; target: { id: number; username: string } | null; action: string; createdAt: string; details: Partial<Record<'oldRole' | 'newRole' | 'oldStatus' | 'newStatus' | 'username' | 'assignedRole', string>> & { invitationId?: number } }
 const messages: Record<string, string> = {
+  USERNAME_ALREADY_EXISTS: 'An account already uses this username. Choose another username.',
+  EMAIL_ALREADY_EXISTS: 'An account already uses this email. Choose another email.',
+  USERNAME_INVALID: 'Use a username between 1 and 80 characters.',
+  EMAIL_INVALID: 'Enter a valid email address.',
+  PASSWORD_INVALID: 'Use a temporary password between 12 and 512 characters.',
+  ADMIN_CONFIRMATION_REQUIRED: 'Confirm administrator access before creating an Admin account.',
+  INVITATION_PENDING: 'A pending invitation exists for this email. Revoke it before creating an account directly.',
+  ACCOUNT_CONFLICT: 'An account already exists with these details. Refresh the list before retrying.',
+  CSRF_MISSING: 'Refresh the page and try again.', CSRF_INVALID: 'Refresh the page and try again.', CSRF_ORIGIN_DENIED: 'This request origin is not allowed.',
   IMPORT_INVALID: 'Use a UTF-8 CSV with email, username (or display_name), role columns and 1 to 100 rows. Password columns are not allowed.', REQUEST_TOO_LARGE: 'CSV files must be no larger than 128 KiB.',
   AUTH_REQUIRED: 'Your session has expired. Please sign in again.',
   ACCESS_DENIED: 'You do not have permission to manage accounts.',
@@ -54,6 +63,9 @@ async function userRequest(path: string, options?: RequestInit) {
   return payload.user
 }
 export const fetchAdminUser = (id: number, signal?: AbortSignal) => userRequest(`users/${id}`, { signal })
+export const createAccount = (data: { username: string; email: string; role: UserRole; temporaryPassword: string; confirmAdmin: boolean }, signal: AbortSignal) => userRequest('users', {
+  method: 'POST', signal, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data),
+})
 export const changeUserRole = (id: number, role: UserRole) => userRequest(`users/${id}/role`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ role }) })
 export const disableUser = (id: number) => userRequest(`users/${id}/disable`, { method: 'POST' })
 export const enableUser = (id: number) => userRequest(`users/${id}/enable`, { method: 'POST' })

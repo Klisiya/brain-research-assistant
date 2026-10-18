@@ -148,6 +148,8 @@ def register_account_api(app, db, User, Audit, service, roles_required):
             "details": {key: value for key, value in entry.details.items()
                         if (key in {"oldRole", "newRole"} and isinstance(value, str) and value in {"student", "teacher", "admin", "user"})
                         or (key in {"oldStatus", "newStatus"} and isinstance(value, str) and value in {"active", "disabled"})
-                        or (key == "invitationId" and type(value) is int and value > 0)},
+                          or (key == "invitationId" and type(value) is int and value > 0)
+                          or (entry.action == "account_created" and key == "username" and isinstance(value, str) and 1 <= len(value) <= 80)
+                          or (entry.action == "account_created" and key == "assignedRole" and isinstance(value, str) and value in {"student", "teacher", "admin"})},
         } for entry in logs], "pagination": pagination,
             "filters": {"action": action, "actorId": actor_id, "targetId": target_id}})

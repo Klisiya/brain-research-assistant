@@ -42,3 +42,10 @@
 .admin-import-form .admin-actions { align-items: center; min-width: 0; }
 .admin-import-form span { overflow-wrap: anywhere; min-width: 0; }
 .admin-filters input { min-width: 0; width: 100%; }
+.admin-users-page .admin-create-trigger, .admin-create-dialog .admin-create-trigger { color: #08202b; background: #86d8e9; font-weight: 700; }
+.admin-create-dialog { box-sizing: border-box; }
+.admin-create-dialog input, .admin-create-dialog select { box-sizing: border-box; min-width: 0; }
+.admin-create-dialog button { min-height: 44px; }
+.admin-create-dialog .admin-create-confirm { display: flex; align-items: center; gap: 12px; line-height: 1.5; min-height: 44px; }
+.admin-create-dialog .admin-create-confirm input { flex: 0 0 20px; width: 20px; height: 20px; margin: 0; }
+.admin-created-credentials dd { margin: 4px 0 16px; overflow-wrap: anywhere; }

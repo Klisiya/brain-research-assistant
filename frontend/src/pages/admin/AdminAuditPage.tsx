@@ -2,7 +2,7 @@ import { useEffect, useState, type FormEvent } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { adminErrorMessage, fetchAudit, type AccountAuditEntry, type Pagination } from '../../api/admin'
 import './AdminUsersPage.css'
-const actions = ['role_changed', 'account_disabled', 'account_enabled', 'invitation_created', 'invitation_revoked', 'invitation_accepted', 'password_reset_requested', 'password_reset_completed', 'password_changed']
+const actions = ['account_created', 'role_changed', 'account_disabled', 'account_enabled', 'invitation_created', 'invitation_revoked', 'invitation_accepted', 'password_reset_requested', 'password_reset_completed', 'password_changed']
 function Filters({ params, submit }: { params: URLSearchParams; submit: (values: URLSearchParams) => void }) {
   function apply(event: FormEvent<HTMLFormElement>) {
     event.preventDefault(); const data = new FormData(event.currentTarget); const next = new URLSearchParams()
@@ -17,7 +17,7 @@ function Filters({ params, submit }: { params: URLSearchParams; submit: (values:
   </form>
 }
 function details(entry: AccountAuditEntry) {
-  return Object.entries(entry.details).filter(([key, value]) => key === 'invitationId' ? Number.isSafeInteger(value) : ['oldRole', 'newRole'].includes(key) ? ['student', 'teacher', 'admin'].includes(String(value)) : ['oldStatus', 'newStatus'].includes(key) && ['active', 'disabled'].includes(String(value))).map(([key, value]) => `${key}: ${value}`).join('; ') || '—'
+  return Object.entries(entry.details).filter(([key, value]) => key === 'invitationId' ? Number.isSafeInteger(value) : ['oldRole', 'newRole', 'assignedRole'].includes(key) ? ['student', 'teacher', 'admin'].includes(String(value)) : key === 'username' && entry.action === 'account_created' ? typeof value === 'string' : ['oldStatus', 'newStatus'].includes(key) && ['active', 'disabled'].includes(String(value))).map(([key, value]) => `${key}: ${value}`).join('; ') || '—'
 }
 export default function AdminAuditPage() {
   const [params, setParams] = useSearchParams()

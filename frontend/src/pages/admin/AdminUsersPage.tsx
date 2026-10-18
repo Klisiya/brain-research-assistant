@@ -5,6 +5,7 @@ import { useAuth } from '../../auth/useAuth'
 import UserDialog from './UserDialog'
 import ImportUsersPanel from './ImportUsersPanel'
 import InvitationsPanel from './InvitationsPanel'
+import CreateAccountDialog from './CreateAccountDialog'
 import { readUserFilters, userFilterParams } from './user-filters'
 import './AdminUsersPage.css'
 function SearchForm({ query, onSearch }: { query: string; onSearch: (q: string) => void }) {
@@ -27,6 +28,7 @@ export default function AdminUsersPage() {
   const [result, setResult] = useState<{ key: string; payload: AdminUsersResponse | null; error: string | null } | null>(null)
   const current = result?.key === key ? result : null
   const [selectedId, setSelectedId] = useState<number | null>(null)
+  const [createOpen, setCreateOpen] = useState(false)
   const raw = params.toString()
   useEffect(() => { if (raw !== canonical) setParams(canonical, { replace: true }) }, [raw, canonical, setParams])
   useEffect(() => {
@@ -48,7 +50,7 @@ export default function AdminUsersPage() {
   const payload = current?.payload
   const filtered = Boolean(filters.q || filters.role || filters.status)
   return <div className="admin-users-page">
-    <header className="paper-management-header"><div><span>Admin Console</span><h1 id="admin-users-title" tabIndex={-1}>Users</h1><p>Manage account roles and access.</p><Link to="/admin/audit-log">Audit Log</Link></div></header>
+    <header className="paper-management-header"><div><span>Admin Console</span><h1 id="admin-users-title" tabIndex={-1}>Users</h1><p>Manage account roles and access.</p><Link to="/admin/audit-log">Audit Log</Link></div><button type="button" className="admin-create-trigger" onClick={() => setCreateOpen(true)}>Create Account</button></header>
     <section className="admin-filters admin-glass" aria-label="User filters">
       <SearchForm key={filters.q} query={filters.q} onSearch={q => update({ q })} />
       <label htmlFor="users-role">Role</label><select id="users-role" value={filters.role} onChange={event => update({ role: event.target.value as UserFilters['role'] })}><option value="">All roles</option><option value="student">Student</option><option value="teacher">Teacher</option><option value="admin">Admin</option></select>
@@ -65,5 +67,6 @@ export default function AdminUsersPage() {
     <ImportUsersPanel onImported={() => setRevision(value => value + 1)} />
     <InvitationsPanel refreshVersion={revision} />
     {selectedId !== null ? <UserDialog key={selectedId} id={selectedId} onClose={() => setSelectedId(null)} onChanged={() => setRevision(value => value + 1)} /> : null}
+    {createOpen && <CreateAccountDialog close={() => setCreateOpen(false)} created={() => { setParams(new URLSearchParams()); setRevision(value => value + 1) }} />}
   </div>
 }

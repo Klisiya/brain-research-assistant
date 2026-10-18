@@ -45,7 +45,7 @@ def install_security(app):
     @app.before_request
     def protect_writes():
         # Bound small credential bodies before either the limiter or JSON parser reads them.
-        if request.path.startswith("/api/auth/"):
+        if request.path.startswith("/api/auth/") or (request.path == "/api/admin/users" and request.method == "POST"):
             request.max_content_length = 16 * 1024
         if request.path == "/api/admin/users/import":
             request.max_content_length = 144 * 1024
