@@ -1,11 +1,12 @@
 import { useCallback } from 'react'
-import { NavLink } from 'react-router-dom'
+import { NavLink, useLocation } from 'react-router-dom'
 import { courseRequest, type ManagedCourse } from '../../api/courseManagement'
 import { getResearchList } from '../../api/research'
 import type { AuthUser } from '../../types/auth'
 import { useManagementRead } from './useManagementRead'
 
 export default function ManagementNavigation({ user }: { user: AuthUser }) {
+  const { pathname } = useLocation()
   const reader = useCallback(async (signal: AbortSignal) => {
     if (user.role === 'admin') return { courses: true, research: true, failed: false }
     const [courses, research] = await Promise.allSettled([
@@ -23,7 +24,8 @@ export default function ManagementNavigation({ user }: { user: AuthUser }) {
     <nav aria-label="Management navigation">
       <NavLink end to="/manage">Management</NavLink>
       <NavLink to="/manage/papers">Papers</NavLink>
-      <NavLink to="/manage/hub">Faculty Resources</NavLink>
+      <NavLink to="/manage/hub" end={pathname.startsWith('/manage/hub/industry')}>Faculty Resources</NavLink>
+      <NavLink to="/manage/hub/industry">Industry Updates</NavLink>
       {user.role === 'admin' && <><NavLink to="/admin/users">Users & Invitations</NavLink><NavLink to="/admin/audit-log">Audit Log</NavLink></>}
       {access.data?.research && <NavLink to="/manage/research-areas">Research Maintenance</NavLink>}
       {access.data?.courses && <NavLink to="/manage/courses">Course Maintenance</NavLink>}

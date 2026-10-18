@@ -4,6 +4,7 @@ import Navbar from '../components/Navbar'
 import PageParticleBackground from '../components/PageParticleBackground'
 import RequireRole from '../components/auth/RequireRole'
 import FacultyWorkspace from '../components/hub/FacultyWorkspace'
+import IndustryWorkspace from '../components/hub/IndustryWorkspace'
 import '../pages/PaperManagementPage.css'
 import './InnovationHubPage.css'
 
@@ -37,10 +38,10 @@ function isInnovationView(value: string | null): value is InnovationView {
   return value !== null && Object.prototype.hasOwnProperty.call(innovationViews, value)
 }
 
-function InnovationHubPage({ detail = false }: { detail?: boolean }) {
+function InnovationHubPage({ detail = false, kind = 'faculty' }: { detail?: boolean; kind?: 'faculty' | 'industry' }) {
   const [searchParams] = useSearchParams()
   const requestedView = searchParams.get('view')
-  const activeView: InnovationView = isInnovationView(requestedView) ? requestedView : 'faculty'
+  const activeView: InnovationView = detail ? kind : isInnovationView(requestedView) ? requestedView : 'faculty'
   const activeContent = innovationViews[activeView]
 
   return (
@@ -71,7 +72,7 @@ function InnovationHubPage({ detail = false }: { detail?: boolean }) {
           ))}
         </nav></>}
 
-        {detail || activeView === 'faculty' ? <FacultyWorkspace user={user} /> : <section aria-live="polite" className="innovation-view-card">
+        {activeView === 'faculty' ? <FacultyWorkspace user={user} /> : activeView === 'industry' ? <IndustryWorkspace user={user} /> : <section aria-live="polite" className="innovation-view-card">
           <span>Selected View</span>
           <h2>{activeContent.title}</h2>
           <p>This workspace is not available yet.</p>

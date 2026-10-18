@@ -39,6 +39,7 @@ def define_hub_models(db):
         body = db.Column(db.Text, nullable=False, default='')
         source_name = db.Column(db.String(300))
         source_url = db.Column(db.String(1500))
+        source_date = db.Column(db.Date)
         submitted_at = db.Column(db.DateTime)
         reviewed_at = db.Column(db.DateTime)
         reviewed_by_id = db.Column(db.Integer, db.ForeignKey('user.id', ondelete='RESTRICT'))
@@ -69,3 +70,17 @@ def define_hub_models(db):
         created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
 
     return HubEntry, HubRevision, HubAttachment, HubModerationEvent
+
+
+def define_hub_deletion_audit(db):
+    class HubDeletionAudit(db.Model):
+        """Deletion receipt, deliberately independent of the deleted content graph."""
+        __tablename__ = 'hub_deletion_audits'
+        __table_args__ = ({'sqlite_autoincrement': True},)
+        id = db.Column(db.Integer, primary_key=True)
+        original_entry_id = db.Column(db.Integer, nullable=False, unique=True)
+        actor_id = db.Column(db.Integer, db.ForeignKey('user.id', ondelete='RESTRICT'), nullable=False)
+        snapshot = db.Column(db.JSON, nullable=False)
+        created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+
+    return HubDeletionAudit

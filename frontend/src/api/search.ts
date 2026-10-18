@@ -11,7 +11,7 @@ export type SearchResult =
   | (ResultBase & { type: 'courses'; slug: string; titleZh: string | null; metadata: Record<string, never> })
   | (ResultBase & { type: 'modules'; courseSlug: string; moduleSlug: string; titleZh: string; metadata: { number: number; category: string; durationHours: number; courseTitle: string } })
   | (ResultBase & { type: 'research'; code: string; slug: string; name: string; metadata: Record<string, never> })
-  | (ResultBase & { type: 'hub'; id: number; metadata: { kind: 'faculty' } })
+  | (ResultBase & { type: 'hub'; id: number; metadata: { kind: 'faculty' | 'industry' } })
 export type SearchResponse = SearchParams & { items: SearchResult[]; perPage: number; total: number; totalPages: number; counts: Record<Exclude<SearchType, 'all'>, number> }
 export class SearchError extends Error {}
 
@@ -31,7 +31,7 @@ export function searchResultPath(item: SearchResult) {
     case 'courses': return coursePath(item.slug)
     case 'modules': return modulePath(item.courseSlug, item.moduleSlug)
     case 'research': return researchPath(item.slug)
-    case 'hub': return `/innovation-hub/faculty/${item.id}`
+    case 'hub': return `/innovation-hub/${item.metadata.kind}/${item.id}`
   }
 }
 const record = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null && !Array.isArray(v)
@@ -47,7 +47,7 @@ function result(v: unknown): v is SearchResult {
     case 'courses': valid = text(v.slug) && optionalText(v.titleZh); break
     case 'modules': valid = text(v.courseSlug) && text(v.moduleSlug) && text(v.titleZh) && integer(m.number) && m.number > 0 && integer(m.durationHours) && m.durationHours > 0 && text(m.category) && text(m.courseTitle); break
     case 'research': valid = text(v.slug) && text(v.code) && text(v.name); break
-    case 'hub': valid = integer(v.id) && v.id > 0 && m.kind === 'faculty'; break
+    case 'hub': valid = integer(v.id) && v.id > 0 && (m.kind === 'faculty' || m.kind === 'industry'); break
   }
   return valid && v.route === searchResultPath(v as SearchResult)
 }

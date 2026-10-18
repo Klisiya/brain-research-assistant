@@ -79,7 +79,7 @@ class SearchService:
             providers.append(select(literal('hub').label('kind'), E.id.label('entity_id'),
                 func.lower(R.title).label('title_order'), rank.label('rank'), literal(4).label('type_order'))
                 .join_from(E, R, and_(R.id == E.published_revision_id, R.entry_id == E.id))
-                .where(E.kind == 'faculty', E.archived_at.is_(None), R.state == 'approved',
+                .where(E.kind.in_(['faculty', 'industry']), E.archived_at.is_(None), R.state == 'approved',
                        or_(title_match, self.text_match(R.body, pattern), self.text_match(R.source_name, pattern))))
         return providers
 
@@ -92,7 +92,7 @@ class SearchService:
         if kind == 'hub':
             entry, revision = row
             return dict(type='hub', key=f'hub:{entry.id}', id=entry.id, title=revision.title,
-                        summary=self.excerpt(revision.body), route=f'/innovation-hub/faculty/{entry.id}', metadata=dict(kind=entry.kind))
+                        summary=self.excerpt(revision.body), route=f'/innovation-hub/{entry.kind}/{entry.id}', metadata=dict(kind=entry.kind))
         route_slug = lambda slug: quote(slug, safe='')
         common = dict(type=kind, key=f'{kind}:{row.slug}', title=row.name if kind == 'research' else row.title)
         if kind == 'papers':
@@ -137,7 +137,7 @@ class SearchService:
             # Recheck current publication at hydration, including ownership of pointer.
             for entry, revision in self.db.session.execute(select(E, R).join_from(E, R,
                 and_(R.id == E.published_revision_id, R.entry_id == E.id)).where(
-                E.id.in_(ids), E.kind == 'faculty', E.archived_at.is_(None), R.state == 'approved')):
+                E.id.in_(ids), E.kind.in_(['faculty', 'industry']), E.archived_at.is_(None), R.state == 'approved')):
                 hydrated[('hub', entry.id)] = (entry, revision)
         return dict(items=[self.serialize(r['kind'], hydrated[(r['kind'], r['entity_id'])]) for r in rows
                            if (r['kind'], r['entity_id']) in hydrated],

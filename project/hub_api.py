@@ -1,5 +1,5 @@
-"""Authenticated Hub reads and atomic, version-checked Faculty moderation."""
-from datetime import datetime
+"""Authenticated, version-checked moderation with isolated Faculty / Industry routes."""
+from datetime import date, datetime
 from functools import wraps
 from math import ceil
 from flask import g, jsonify, request, send_file
@@ -13,8 +13,12 @@ from hub_files import validate_hub_file
 from storage import StorageWriteError
 
 
-def register_hub_api(app, db, User, Entry, Revision, Attachment, Event, roles_required, limiter):
+def register_hub_api(app, db, User, Entry, Revision, Attachment, Event, roles_required, limiter, DeletionAudit):
     assets = app.extensions['file_asset_service']
+
+    def request_kind():
+        # Route identity, never client-provided JSON/query fields, selects the namespace.
+        return 'industry' if request.path.startswith('/api/hub/industry/') else 'faculty'
 
     def fail(message, code='HUB_VALIDATION_ERROR', status=400):
         raise AttachmentError(message, code, status)
@@ -42,7 +46,8 @@ def register_hub_api(app, db, User, Entry, Revision, Attachment, Event, roles_re
         if not actor().is_authenticated:
             return False
         entry = db.session.get(Entry, revision.entry_id)
-        return bool(entry and (owns(entry) or published(entry) is not None and entry.published_revision_id == revision.id))
+        return bool(entry and entry.kind in {'faculty', 'industry'} and
+                    (owns(entry) or published(entry) is not None and entry.published_revision_id == revision.id))
 
     def can_manage(revision):
         entry = db.session.get(Entry, revision.entry_id)
@@ -98,7 +103,6 @@ def register_hub_api(app, db, User, Entry, Revision, Attachment, Event, roles_re
         # Decorating the unnamed inner wrapper registered all Hub limits together.
         return roles_required('student', 'teacher', 'admin')(
             limiter.limit('120/minute', exempt_when=lambda: app.testing)(wrapped))
-        return wrapped
 
     def payload(required, optional=()):
         data = request.get_json(silent=True)
@@ -125,13 +129,24 @@ def register_hub_api(app, db, User, Entry, Revision, Attachment, Event, roles_re
             result[column] = value if key == 'body' else value or None
         if result['source_url']:
             result['source_url'] = validate_external_url(result['source_url'])
+        if request_kind() == 'industry':
+            if not result['body'] or not result['source_name']:
+                fail('A description and a real source name are required.')
+            value = data.get('sourceDate')
+            try:
+                result['source_date'] = None if value in (None, '') else date.fromisoformat(value)
+                if value not in (None, '') and result['source_date'].isoformat() != value:
+                    raise ValueError('Use YYYY-MM-DD.')
+            except (TypeError, ValueError):
+                fail('Source date must be a real date in YYYY-MM-DD format.')
         return result
 
     def entry_for(identifier, *, manage=False):
-        query = select(Entry).where(Entry.id == identifier, Entry.kind == 'faculty')
+        query = select(Entry).where(Entry.id == identifier, Entry.kind == request_kind())
         entry = db.session.scalar(query.with_for_update() if request.method not in {'GET', 'HEAD'} else query)
         if entry is None or (manage and not owns(entry)) or (not manage and published(entry) is None):
-            fail('Faculty resource is not available.', 'HUB_NOT_FOUND', 404)
+            fail('Industry update is not available.' if request_kind() == 'industry' else
+                 'Faculty resource is not available.', 'HUB_NOT_FOUND', 404)
         return entry
 
     def token(entry, data):
@@ -171,19 +186,31 @@ def register_hub_api(app, db, User, Entry, Revision, Attachment, Event, roles_re
         for item in attachments:
             assets.authorize('hub', revision, item)
             asset = item.asset
+            prefix = '/api/hub/industry/entries' if db.session.get(Entry, revision.entry_id).kind == 'industry' else '/api/hub/entries'
             items.append(dict(id=item.id, displayName=item.display_name, attachmentType=asset.asset_type,
                 mimeType=asset.mime_type, fileSize=asset.file_size, externalUrl=asset.external_url,
-                downloadUrl=None if asset.external_url else f'/api/hub/entries/{revision.entry_id}/revisions/{revision.id}/attachments/{item.id}/download'))
+                downloadUrl=None if asset.external_url else f'{prefix}/{revision.entry_id}/revisions/{revision.id}/attachments/{item.id}/download'))
         result = dict(id=revision.id, number=revision.number, title=revision.title, body=revision.body,
                       sourceName=revision.source_name, sourceUrl=revision.source_url, attachments=items)
+        industry = db.session.get(Entry, revision.entry_id).kind == 'industry'
+        if industry:
+            result.update(sourceDate=revision.source_date.isoformat() if revision.source_date else None,
+                          createdAt=revision.created_at.isoformat()+'Z')
         if manage:
             result.update(state=revision.state, reviewNote=revision.review_note,
                           submittedAt=revision.submitted_at.isoformat()+'Z' if revision.submitted_at else None)
+            if industry:
+                result.update(reviewedById=revision.reviewed_by_id,
+                              reviewedAt=revision.reviewed_at.isoformat()+'Z' if revision.reviewed_at else None)
         return result
 
     def serialize(entry, *, manage=False):
         result = dict(id=entry.id, kind=entry.kind, status=status(entry),
                       published=serialize_revision(approved_snapshot(entry) if manage else published(entry), manage=manage))
+        if entry.kind == 'industry':
+            live = published(entry)
+            result.update(submittedById=entry.owner_id, createdAt=entry.created_at.isoformat()+'Z',
+                          updatedAt=(entry.updated_at if manage else (live.reviewed_at or live.created_at) if live else entry.created_at).isoformat()+'Z')
         if manage:
             result.update(version=entry.version, ownerId=entry.owner_id,
                           working=serialize_revision(revision_for(entry, entry.working_revision_id), manage=True))
@@ -193,15 +220,17 @@ def register_hub_api(app, db, User, Entry, Revision, Attachment, Event, roles_re
         db.session.commit()
         return jsonify(entry=serialize(entry, manage=True)), response_status
 
+    @app.get('/api/hub/industry/entries')
     @app.get('/api/hub/entries')
     @guarded
     def hub_list():
         if set(request.args) - {'scope', 'page'} or any(len(request.args.getlist(k)) != 1 for k in request.args):
             fail('Invalid or repeated list parameters.')
         scope, page = request.args.get('scope', 'published'), request.args.get('page', '1')
-        if scope not in {'published', 'mine', 'review'} or not page.isascii() or not page.isdecimal() or len(page) > 5 or not 1 <= int(page) <= 10000:
+        scopes = {'published', 'mine', 'review', 'all'} if request_kind() == 'industry' else {'published', 'mine', 'review'}
+        if scope not in scopes or not page.isascii() or not page.isdecimal() or len(page) > 5 or not 1 <= int(page) <= 10000:
             fail('Invalid list parameters.')
-        query = select(Entry).where(Entry.kind == 'faculty')
+        query = select(Entry).where(Entry.kind == request_kind())
         manage = scope != 'published'
         if scope == 'published':
             query = query.join(Revision, (Revision.id == Entry.published_revision_id) & (Revision.entry_id == Entry.id)).where(
@@ -213,10 +242,14 @@ def register_hub_api(app, db, User, Entry, Revision, Attachment, Event, roles_re
         else:
             if account_role(actor().role) != 'admin':
                 fail('Access denied.', 'FORBIDDEN', 403)
+            if request_kind() == 'industry' and scope == 'review':
+                query = query.join(Revision, (Revision.id == Entry.working_revision_id) & (Revision.entry_id == Entry.id)).where(
+                    Entry.archived_at.is_(None), Revision.state == 'pending')
         total = db.session.scalar(select(func.count()).select_from(query.subquery()))
         rows = db.session.scalars(query.order_by(Entry.id.desc()).limit(12).offset((int(page)-1)*12)).all()
         return jsonify(entries=[serialize(row, manage=manage) for row in rows], page=int(page), total=total, totalPages=ceil(total/12))
 
+    @app.get('/api/hub/industry/entries/<int:entry_id>')
     @app.get('/api/hub/entries/<int:entry_id>')
     @guarded
     def hub_detail(entry_id):
@@ -224,6 +257,7 @@ def register_hub_api(app, db, User, Entry, Revision, Attachment, Event, roles_re
             fail('Query parameters are not supported.')
         return jsonify(entry=serialize(entry_for(entry_id)))
 
+    @app.get('/api/hub/industry/entries/<int:entry_id>/manage')
     @app.get('/api/hub/entries/<int:entry_id>/manage')
     @guarded
     def hub_managed_detail(entry_id):
@@ -231,13 +265,15 @@ def register_hub_api(app, db, User, Entry, Revision, Attachment, Event, roles_re
             fail('Query parameters are not supported.')
         return jsonify(entry=serialize(entry_for(entry_id, manage=True), manage=True))
 
+    @app.post('/api/hub/industry/entries')
     @app.post('/api/hub/entries')
     @guarded
     def hub_create():
         if account_role(actor().role) not in {'teacher','admin'}:
             fail('Access denied.', 'FORBIDDEN', 403)
-        data = payload({'title'}, {'body', 'sourceName', 'sourceUrl'})
-        entry = Entry(kind='faculty', owner_id=actor().id)
+        data = (payload({'title', 'body', 'sourceName'}, {'sourceUrl', 'sourceDate'}) if request_kind() == 'industry'
+                else payload({'title'}, {'body', 'sourceName', 'sourceUrl'}))
+        entry = Entry(kind=request_kind(), owner_id=actor().id)
         db.session.add(entry); db.session.flush()
         revision = Revision(entry_id=entry.id, number=1, **content(data))
         db.session.add(revision); db.session.flush()
@@ -245,17 +281,20 @@ def register_hub_api(app, db, User, Entry, Revision, Attachment, Event, roles_re
         event(entry, revision, 'created')
         return saved(entry, 201)
 
+    @app.patch('/api/hub/industry/entries/<int:entry_id>')
     @app.patch('/api/hub/entries/<int:entry_id>')
     @guarded
     def hub_edit(entry_id):
         entry = entry_for(entry_id, manage=True)
-        data = payload({'expectedVersion', 'title'}, {'body','sourceName','sourceUrl'})
+        data = (payload({'expectedVersion', 'title', 'body', 'sourceName'}, {'sourceUrl', 'sourceDate'}) if request_kind() == 'industry'
+                else payload({'expectedVersion', 'title'}, {'body','sourceName','sourceUrl'}))
         token(entry, data); revision = working(entry)
         for key, value in content(data).items():
             setattr(revision, key, value)
         event(entry, revision, 'edited')
         return saved(entry)
 
+    @app.post('/api/hub/industry/entries/<int:entry_id>/draft')
     @app.post('/api/hub/entries/<int:entry_id>/draft')
     @guarded
     def hub_new_draft(entry_id):
@@ -265,7 +304,7 @@ def register_hub_api(app, db, User, Entry, Revision, Attachment, Event, roles_re
         if entry.archived_at or previous is None or previous.state not in {'approved', 'rejected'}:
             fail('A new draft is not available in this state.', 'HUB_STATE_CONFLICT', 409)
         revision = Revision(entry_id=entry.id, number=previous.number+1, title=previous.title, body=previous.body,
-                            source_name=previous.source_name, source_url=previous.source_url)
+                            source_name=previous.source_name, source_url=previous.source_url, source_date=previous.source_date)
         db.session.add(revision); db.session.flush()
         for item in db.session.scalars(select(Attachment).where(Attachment.revision_id == previous.id)).all():
             db.session.add(Attachment(revision_id=revision.id, asset_id=item.asset_id, display_name=item.display_name))
@@ -273,6 +312,7 @@ def register_hub_api(app, db, User, Entry, Revision, Attachment, Event, roles_re
         event(entry, revision, 'draft_created')
         return saved(entry)
 
+    @app.post('/api/hub/industry/entries/<int:entry_id>/<action>')
     @app.post('/api/hub/entries/<int:entry_id>/<action>')
     @guarded
     def hub_transition(entry_id, action):
@@ -308,6 +348,56 @@ def register_hub_api(app, db, User, Entry, Revision, Attachment, Event, roles_re
             event(entry, revision, {'submit':'submitted','withdraw':'withdrawn','approve':'approved','reject':'rejected'}[action], revision.review_note)
         return saved(entry)
 
+    @app.delete('/api/hub/industry/entries/<int:entry_id>')
+    @guarded
+    def industry_delete(entry_id):
+        entry = entry_for(entry_id, manage=True)
+        data = payload({'expectedVersion', 'confirmation'})
+        token(entry, data)
+        if data['confirmation'] != 'DELETE':
+            fail('Type DELETE to confirm permanent deletion.')
+        revisions = db.session.scalars(select(Revision).where(Revision.entry_id == entry.id).order_by(Revision.number)).all()
+        events = db.session.scalars(select(Event).where(Event.entry_id == entry.id).order_by(Event.id)).all()
+        # An archived entry or a working draft does not erase its publication history.
+        ever_published = bool(entry.published_revision_id or any(row.state == 'approved' for row in revisions)
+                              or any(row.action == 'approved' for row in events))
+        current = revision_for(entry, entry.working_revision_id)
+        if ever_published:
+            if account_role(actor().role) != 'admin':
+                fail('Only administrators can permanently delete previously published updates.', 'FORBIDDEN', 403)
+        elif current is None or current.state not in {'draft', 'rejected'}:
+            fail('Withdraw pending updates to Draft before deleting.', 'HUB_STATE_CONFLICT', 409)
+        ids = [row.id for row in revisions]
+        attachments = db.session.scalars(select(Attachment).where(Attachment.revision_id.in_(ids))).all()
+        asset_ids = [row.asset_id for row in attachments]
+        keys = [row.asset.storage_key for row in attachments if row.asset.storage_key]
+        # Keep an attributable receipt, not a hidden copy of deleted content/files.
+        db.session.add(DeletionAudit(original_entry_id=entry.id, actor_id=actor().id, snapshot={
+            'kind': 'industry', 'ownerId': entry.owner_id, 'version': entry.version,
+            'everPublished': ever_published, 'archived': entry.archived_at is not None,
+            'publishedRevisionId': entry.published_revision_id, 'workingRevisionId': entry.working_revision_id,
+            'revisions': [{'id': row.id, 'number': row.number, 'state': row.state} for row in revisions],
+            'attachmentCount': len(attachments),
+            'moderation': [{'action': row.action, 'actorId': row.actor_id, 'revisionId': row.revision_id,
+                            'createdAt': row.created_at.isoformat()+'Z'} for row in events],
+        }))
+        # Explicit ordering honors RESTRICT constraints; the guard makes all changes atomic.
+        for row in events:
+            db.session.delete(row)
+        for row in attachments:
+            db.session.delete(row)
+        db.session.flush()
+        entry.published_revision_id = entry.working_revision_id = None
+        for row in revisions:
+            db.session.delete(row)
+        db.session.flush()
+        db.session.delete(entry)
+        assets.retire_unreferenced(asset_ids)
+        db.session.commit()
+        pending = assets.drain_cleanup(keys)
+        return jsonify(deleted=True, cleanupPending=bool(pending))
+
+    @app.post('/api/hub/industry/entries/<int:entry_id>/attachments')
     @app.post('/api/hub/entries/<int:entry_id>/attachments')
     @limiter.limit('10/minute', exempt_when=lambda: app.testing)
     @guarded
@@ -339,6 +429,7 @@ def register_hub_api(app, db, User, Entry, Revision, Attachment, Event, roles_re
         event(entry, revision, 'attachment_added')
         return saved(entry, 201)
 
+    @app.delete('/api/hub/industry/entries/<int:entry_id>/attachments/<int:attachment_id>')
     @app.delete('/api/hub/entries/<int:entry_id>/attachments/<int:attachment_id>')
     @guarded
     def hub_remove_attachment(entry_id, attachment_id):
@@ -355,13 +446,14 @@ def register_hub_api(app, db, User, Entry, Revision, Attachment, Event, roles_re
         assets.drain_cleanup([key] if key else [])
         return jsonify(entry=serialize(entry, manage=True))
 
+    @app.get('/api/hub/industry/entries/<int:entry_id>/revisions/<int:revision_id>/attachments/<int:attachment_id>/download')
     @app.get('/api/hub/entries/<int:entry_id>/revisions/<int:revision_id>/attachments/<int:attachment_id>/download')
     @guarded
     def hub_download(entry_id, revision_id, attachment_id):
         if request.args:
             fail('Query parameters are not supported.')
         entry = db.session.get(Entry, entry_id)
-        revision = revision_for(entry, revision_id) if entry and entry.kind == 'faculty' else None
+        revision = revision_for(entry, revision_id) if entry and entry.kind == request_kind() else None
         item = db.session.scalar(select(Attachment).where(Attachment.id == attachment_id, Attachment.revision_id == revision_id))
         if revision is None or item is None or not can_read(revision, item):
             fail('Attachment is not available.', 'HUB_NOT_FOUND', 404)
@@ -371,6 +463,7 @@ def register_hub_api(app, db, User, Entry, Revision, Attachment, Event, roles_re
         response.headers['Content-Security-Policy'] = "sandbox; default-src 'none'"
         return response
 
+    @app.get('/api/hub/industry/entries/<int:entry_id>/history')
     @app.get('/api/hub/entries/<int:entry_id>/history')
     @guarded
     def hub_history(entry_id):
@@ -378,5 +471,13 @@ def register_hub_api(app, db, User, Entry, Revision, Attachment, Event, roles_re
         if request.args:
             fail('Query parameters are not supported.')
         rows = db.session.scalars(select(Event).where(Event.entry_id == entry.id).order_by(Event.id.desc()).limit(100)).all()
-        return jsonify(events=[dict(id=row.id, action=row.action, actorId=row.actor_id, revisionId=row.revision_id,
-                                    note=row.note, createdAt=row.created_at.isoformat()+'Z') for row in rows])
+        items = []
+        for row in rows:
+            item = dict(id=row.id, action=row.action, actorId=row.actor_id, revisionId=row.revision_id,
+                        note=row.note, createdAt=row.created_at.isoformat()+'Z')
+            if entry.kind == 'industry':
+                revision = revision_for(entry, row.revision_id)
+                item.update(contentAuthorId=entry.owner_id, revisionNumber=revision.number if revision else None,
+                            sourceName=revision.source_name if revision else None)
+            items.append(item)
+        return jsonify(events=items)

@@ -49,7 +49,7 @@ from reading_api import register_reading_api
 from annotation_models import define_annotation_models
 from annotation_api import register_annotation_api
 from content_authority import register_content_authority_cli
-from hub_models import define_hub_models
+from hub_models import define_hub_models, define_hub_deletion_audit
 from hub_api import register_hub_api
 
 load_dotenv()
@@ -423,6 +423,7 @@ class Paper(db.Model):
 
 FileAsset = define_file_asset(db)
 HubEntry, HubRevision, HubAttachment, HubModerationEvent = define_hub_models(db)
+HubDeletionAudit = define_hub_deletion_audit(db)
 Course, CourseModule, CourseStaff, CourseResource, ModuleResource = define_course_models(db)
 CourseModulePaper = define_module_paper(db)
 Enrollment, ModuleProgress, CourseResourceProgress, ModuleResourceProgress = define_learning_models(db)
@@ -2077,7 +2078,7 @@ register_course_management(app, db, Course, CourseModule, CourseStaff, CourseMod
 register_research_api(app, db, ResearchArea, ResearchAreaStaff, ResearchAreaPaper, ResearchAreaModule,
                       ResearchAreaResource, User, Paper, Course, CourseModule, research_authorization,
                       roles_required, BRAIN_REGIONS, serialize_paper, can_manage_paper, course_authorization.can_manage_module)
-register_hub_api(app, db, User, HubEntry, HubRevision, HubAttachment, HubModerationEvent, roles_required, limiter)
+register_hub_api(app, db, User, HubEntry, HubRevision, HubAttachment, HubModerationEvent, roles_required, limiter, HubDeletionAudit)
 register_search_api(app, db, Paper, Course, CourseModule, ResearchArea, limiter, HubEntry, HubRevision)
 register_learning_api(app, db, User, Course, CourseModule, CourseResource, ModuleResource,
                       Enrollment, ModuleProgress, CourseResourceProgress, ModuleResourceProgress,

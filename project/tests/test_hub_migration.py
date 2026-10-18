@@ -29,8 +29,8 @@ class HubMigrationTests(unittest.TestCase):
                     for table,rows in baseline.items():self.assertEqual(connection.execute('SELECT * FROM "'+table+'" ORDER BY rowid').fetchall(),rows,table)
                     self.assertEqual(connection.execute('PRAGMA foreign_key_check').fetchall(),[])
                     if direction=='upgrade':
-                        self.assertEqual(connection.execute('SELECT version_num FROM alembic_version').fetchone()[0],'f18a4c70d293')
-                        for table in ['hub_entries','hub_revisions','hub_attachments','hub_moderation_events']:
+                        self.assertEqual(connection.execute('SELECT version_num FROM alembic_version').fetchone()[0],'b3d970ef624a')
+                        for table in ['hub_entries','hub_revisions','hub_attachments','hub_moderation_events','hub_deletion_audits']:
                             self.assertEqual(connection.execute('SELECT COUNT(*) FROM '+table).fetchone()[0],0)
             with closing(sqlite3.connect(path)) as connection:
                 connection.execute("INSERT INTO hub_entries(kind,owner_id,version,created_at,updated_at) VALUES('faculty',1,1,'2026-01-01','2026-01-01')");connection.commit()
