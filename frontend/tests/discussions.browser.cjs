@@ -1,0 +1,87 @@
+/* R8A3 TEST ONLY: isolated migrated Hub fixture, real API and headless Edge. */
+const { chromium } = require('playwright');
+const assert=require('node:assert/strict'),fs=require('node:fs/promises'),path=require('node:path');
+const base=process.env.HUB_TEST_ORIGIN||'http://127.0.0.1:5177', output=process.env.HUB_TEST_OUTPUT||'tmp/r8a3/browser';
+const fixturePath=process.env.HUB_TEST_FIXTURE||'tmp/r8a2/fixture.json';
+const api='/api/hub/discussions',home='/innovation-hub?view=discussions',manage=id=>'/innovation-hub/discussions/manage/'+id,detail=id=>'/innovation-hub/discussions/'+id;
+const checks=[],errors=[],learningWrites=[];let browser;
+function check(name,value=true){assert.ok(value,name);checks.push(name);}
+async function post(context,url,data,method='POST'){
+  const csrf=(await(await context.request.get(base+'/api/auth/csrf')).json()).csrfToken;
+  return context.request.fetch(base+url,{method,headers:{'X-CSRF-Token':csrf},data});
+}
+async function login(context,name){assert.equal((await post(context,'/api/auth/login',{email:name+'@example.test',password:'TEST-ONLY-R8A1-password'})).status(),200);}
+function watch(page){page.setDefaultTimeout(15000);page.on('pageerror',e=>errors.push(e.message));page.on('request',r=>{if(/\/api\/(learning|reading|progress)(\/|\?)/.test(r.url())&&!['GET','HEAD'].includes(r.method()))learningWrites.push(r.url());});}
+async function confirm(page,name,word){
+  const button=page.getByRole('button',{name,exact:true});await button.click();const dialog=page.getByRole('dialog');await dialog.waitFor();
+  if(word)await dialog.getByLabel('Type '+word+' to continue').fill(word);
+  await dialog.getByRole('button',{name:name==='Approve & Publish'?'Approve & Publish':name.startsWith('Delete')?'Delete permanently':'Confirm',exact:true}).click();await dialog.waitFor({state:'hidden'});
+}
+async function layout(page,name,width){
+  const measured=await page.locator('.discussion-workspace').evaluate(el=>({overflow:document.documentElement.scrollWidth>innerWidth||el.scrollWidth>el.clientWidth,
+    targets:[...el.querySelectorAll('button,input')].filter(item=>item.getClientRects().length&&!item.disabled).every(item=>item.getBoundingClientRect().height>=43.9),
+    terms:/\b(enroll|enrolled|enrollment)\b/i.test(el.innerText)}));
+  check(name+' responsive '+width,!measured.overflow&&measured.targets&&!measured.terms);await page.screenshot({path:path.join(output,`${name}-${width}.png`),fullPage:true});
+}
+async function create(context,title,body='TEST ONLY neutral body',parent){
+  const response=await post(context,api+(parent?`/entries/${parent}/replies`:'/entries'),{...(parent?{}:{title}),body});assert.equal(response.status(),201);return(await response.json()).entry;
+}
+async function action(context,entry,name,extra={}){const response=await post(context,`${api}/entries/${entry.id}/${name}`,{expectedVersion:entry.version,...extra});assert.equal(response.status(),200);return(await response.json()).entry;}
+async function run(){
+  const learner=await browser.newContext({viewport:{width:390,height:844},reducedMotion:'reduce'}),teacher=await browser.newContext({viewport:{width:820,height:1000},reducedMotion:'reduce'}),admin=await browser.newContext({viewport:{width:1440,height:1000},reducedMotion:'reduce'});
+  await login(learner,'learner');await login(teacher,'teacher');await login(admin,'admin');const lp=await learner.newPage(),tp=await teacher.newPage(),ap=await admin.newPage();[lp,tp,ap].forEach(watch);
+  await lp.goto(base+home);await lp.getByText('No discussions have been published yet.',{exact:true}).waitFor();check('honest empty state');
+  for(const width of [390,820,1440]){await lp.setViewportSize({width,height:width===390?844:1000});await layout(lp,'discussion-empty',width);}
+  await lp.setViewportSize({width:390,height:844});await lp.getByRole('link',{name:'Create thread',exact:true}).click();await lp.getByLabel('Title',{exact:true}).fill('TEST ONLY BrowserThreadAlpha');await lp.getByLabel('Body',{exact:true}).fill('TEST ONLY <img src=x onerror="window.__discussionXss=1">');await lp.getByRole('button',{name:'Save Draft',exact:true}).click();await lp.waitForURL(/\/discussions\/manage\/\d+$/);const id=Number(new URL(lp.url()).pathname.split('/').at(-1));
+  await lp.getByRole('button',{name:'Submit for Review',exact:true}).waitFor();check('learner creates private draft');
+  check('draft direct read denied',(await teacher.request.get(base+api+'/entries/'+id)).status()===404);
+  check('foreign management denied',(await teacher.request.get(base+api+'/entries/'+id+'/manage')).status()===404);
+  check('no teacher approval bypass',(await post(teacher,api+'/entries/'+id+'/approve',{expectedVersion:2})).status()===404);
+  await confirm(lp,'Submit for Review');await lp.getByRole('heading',{name:'Working revision v1',exact:true}).waitFor();check('pending thread not public',(await teacher.request.get(base+api+'/entries/'+id)).status()===404);
+  await ap.goto(base+'/manage/hub/discussions');await ap.getByRole('link',{name:'TEST ONLY BrowserThreadAlpha',exact:true}).click();await ap.getByLabel('Rejection reason').fill('TEST ONLY correction requested');await confirm(ap,'Reject');await ap.getByText('Review feedback: TEST ONLY correction requested',{exact:true}).waitFor();
+  check('rejection does not invent publication time',(await(await admin.request.get(base+api+'/entries/'+id+'/manage')).json()).entry.working.publishedAt===null);
+  await lp.reload();await lp.getByRole('button',{name:'Revise rejected content',exact:true}).click();await lp.getByLabel('Body',{exact:true}).fill('TEST ONLY <img src=x onerror="window.__discussionXss=1">');await lp.getByRole('button',{name:'Save Draft',exact:true}).click();await lp.getByText('Discussion saved.',{exact:true}).waitFor();await confirm(lp,'Submit for Review');
+  await ap.reload();await ap.getByRole('button',{name:'Approve & Publish',exact:true}).waitFor();await confirm(ap,'Approve & Publish');check('rejected thread edits and resubmits');
+  await tp.goto(base+detail(id));await tp.getByRole('heading',{name:'TEST ONLY BrowserThreadAlpha',exact:true,level:1}).waitFor();check('published thread appears');
+  check('plaintext XSS inert',await tp.locator('.discussion-workspace img').count()===0&&await tp.evaluate(()=>window.__discussionXss===undefined));
+  check('public discussion hides account metadata',!(await(await teacher.request.get(base+api+'/entries/'+id)).text()).match(/ownerId|reviewedById|fixture-1@example|reporterId/));
+  // A reply stays private through draft, pending and rejection.
+  await tp.getByLabel('Body',{exact:true}).fill('TEST ONLY BrowserReplyAlpha');await tp.getByRole('button',{name:'Save Draft',exact:true}).click();await tp.waitForURL(/\/discussions\/manage\/\d+$/);const replyId=Number(new URL(tp.url()).pathname.split('/').at(-1));
+  await confirm(tp,'Submit for Review');check('pending reply omitted',(await(await learner.request.get(base+api+'/entries/'+id+'/replies')).json()).entries.length===0);
+  await ap.goto(base+manage(replyId));await ap.getByLabel('Rejection reason').fill('TEST ONLY reply correction');await confirm(ap,'Reject');await tp.reload();await tp.getByRole('button',{name:'Revise rejected content',exact:true}).click();await tp.getByLabel('Body',{exact:true}).fill('TEST ONLY BrowserReplyApproved');await tp.getByRole('button',{name:'Save Draft',exact:true}).click();await tp.getByText('Discussion saved.',{exact:true}).waitFor();await confirm(tp,'Submit for Review');
+  await ap.reload();await confirm(ap,'Approve & Publish');await lp.goto(base+detail(id));await lp.getByText('TEST ONLY BrowserReplyApproved',{exact:true}).waitFor();check('reply rejection resubmit approval');
+  check('reply has no independent Search result',(await(await learner.request.get(base+'/api/search?q=BrowserReplyApproved&type=hub')).json()).total===0);
+  // A pending/rejected edited version never replaces the live version.
+  await lp.goto(base+manage(id));await lp.getByRole('button',{name:'Create revision',exact:true}).click();await lp.getByLabel('Title',{exact:true}).fill('TEST ONLY BrowserThreadBeta');await lp.getByLabel('Body',{exact:true}).fill('TEST ONLY PendingRevisionToken');await lp.getByRole('button',{name:'Save Draft',exact:true}).click();await lp.getByText('Discussion saved.',{exact:true}).waitFor();await confirm(lp,'Submit for Review');
+  await tp.goto(base+detail(id));await tp.getByRole('heading',{name:'TEST ONLY BrowserThreadAlpha',exact:true,level:1}).waitFor();check('pending revision leaves old public version');
+  check('pending revision absent from Search',(await(await teacher.request.get(base+'/api/search?q=PendingRevisionToken&type=hub')).json()).total===0);
+  await ap.goto(base+manage(id));await ap.getByLabel('Rejection reason').fill('TEST ONLY reject pending revision');await confirm(ap,'Reject');await tp.reload();await tp.getByRole('heading',{name:'TEST ONLY BrowserThreadAlpha',exact:true,level:1}).waitFor();check('rejected revision leaves old public version');
+  await lp.reload();await lp.getByRole('button',{name:'Revise rejected content',exact:true}).click();await confirm(lp,'Submit for Review');await ap.reload();await confirm(ap,'Approve & Publish');await tp.reload();await tp.getByRole('heading',{name:'TEST ONLY BrowserThreadBeta',exact:true,level:1}).waitFor();check('approval switches published revision');
+  await tp.goto(base+'/search?q=BrowserThreadBeta&type=hub');await tp.getByText('Discussion',{exact:true}).waitFor();await tp.getByRole('link',{name:'TEST ONLY BrowserThreadBeta',exact:true}).click();await tp.waitForURL(base+detail(id));check('Search opens existing thread');
+  // Report both content types, then resolve and dismiss without changing content.
+  await tp.getByRole('button',{name:'Report thread',exact:true}).click();let form=tp.locator('.discussion-report-control').filter({has:tp.getByRole('button',{name:'Report thread',exact:true})});await form.getByLabel('Reason',{exact:true}).fill('TEST ONLY thread reason');await form.getByLabel('Detail (optional)').fill('TEST ONLY private report');await form.getByRole('button',{name:'Submit report',exact:true}).click();await form.getByText('Report submitted for administrator review. Content is unchanged.',{exact:true}).waitFor();check('thread report submitted without automatic removal');
+  await tp.getByRole('button',{name:'Report reply',exact:true}).click();form=tp.locator('.discussion-report-control').filter({has:tp.getByRole('button',{name:'Report reply',exact:true})});await form.getByLabel('Reason',{exact:true}).fill('TEST ONLY reply reason');await form.getByRole('button',{name:'Submit report',exact:true}).click();await form.getByText('Report submitted for administrator review. Content is unchanged.',{exact:true}).waitFor();check('reply report submitted');
+  check('non-admin reports queue denied',(await teacher.request.get(base+api+'/reports')).status()===403);
+  await ap.goto(base+'/manage/hub/discussions/reports');await ap.getByRole('heading',{name:'Discussion Reports',exact:true}).waitFor();await ap.getByText('TEST ONLY thread reason',{exact:true}).waitFor();
+  for(const width of [390,820,1440]){await ap.setViewportSize({width,height:width===390?844:1000});await layout(ap,'reports-open',width);}
+  const threadReport=ap.locator('article').filter({hasText:'TEST ONLY thread reason'}),replyReport=ap.locator('article').filter({hasText:'TEST ONLY reply reason'});
+  const failResolve=route=>route.fulfill({status:409,json:{error:'TEST ONLY stale report. Refresh before editing.'}});await ap.route('**/api/hub/discussions/reports/*/resolve',failResolve);await threadReport.getByRole('button',{name:'Resolve report',exact:true}).click();await ap.getByText('TEST ONLY stale report. Refresh before editing.',{exact:true}).waitFor();await ap.unroute('**/api/hub/discussions/reports/*/resolve',failResolve);await ap.getByRole('button',{name:'Refresh reports',exact:true}).click();await ap.getByText('TEST ONLY thread reason',{exact:true}).waitFor();check('stale report action has refresh recovery');
+  await threadReport.getByRole('button',{name:'Resolve report',exact:true}).click();await ap.getByText('Report updated. Content is unchanged.',{exact:true}).waitFor();await replyReport.getByRole('button',{name:'Dismiss report',exact:true}).click();await ap.getByText('No reports in this view.',{exact:true}).waitFor();check('resolve and dismiss reports');
+  await ap.getByRole('button',{name:'Resolved',exact:true}).click();await ap.getByText('TEST ONLY thread reason',{exact:true}).waitFor();await ap.getByText('Report history',{exact:true}).click();await ap.getByText('resolved · Account',{exact:false}).waitFor();check('report audit history retained');
+  await tp.reload();await tp.getByRole('heading',{name:'TEST ONLY BrowserThreadBeta',exact:true,level:1}).waitFor();check('resolved reports do not change content');
+  for(const width of [390,820,1440]){await tp.setViewportSize({width,height:width===390?844:1000});await layout(tp,'thread-ready',width);await lp.setViewportSize({width,height:width===390?844:1000});await lp.goto(base+manage(id));await lp.getByRole('heading',{name:'Manage Thread',exact:true}).waitFor();await layout(lp,'my-thread',width);}
+  check('normal author cannot permanently delete published content',await lp.getByRole('button',{name:'Delete permanently',exact:true}).count()===0);
+  // Dialog keyboard and governance cleanup.
+  await ap.goto(base+manage(id));const archive=ap.getByRole('button',{name:'Archive content',exact:true});await archive.click();await ap.getByRole('dialog').waitFor();await ap.keyboard.press('Tab');check('dialog focus contained',await ap.getByRole('dialog').evaluate(el=>el.contains(document.activeElement)));await ap.keyboard.press('Escape');await ap.getByRole('dialog').waitFor({state:'hidden'});check('dialog focus restored',await archive.evaluate(el=>el===document.activeElement));
+  await confirm(ap,'Archive content','ARCHIVE');await tp.reload();await tp.getByRole('heading',{name:'Discussion unavailable',exact:true}).waitFor();check('archive hides thread and replies',(await learner.request.get(base+api+'/entries/'+replyId)).status()===404);
+  await confirm(ap,'Delete permanently','DELETE');await ap.waitForURL('**/innovation-hub?view=discussions&scope=mine');check('admin permanently deletes thread graph',(await admin.request.get(base+api+'/entries/'+id+'/manage')).status()===404&&(await admin.request.get(base+api+'/entries/'+replyId+'/manage')).status()===404);
+  const reports=(await(await admin.request.get(base+api+'/reports?status=all')).json()).entries;check('deleted targets have honest tombstone',reports.every(row=>row.targetId===null&&row.targetState==='deleted'));
+  let draft=await create(teacher,'TEST ONLY TeacherRequiredReview');draft=await action(teacher,draft,'submit');check('teacher still requires approval',(await learner.request.get(base+api+'/entries/'+draft.id)).status()===404&&(await post(teacher,api+'/entries/'+draft.id+'/approve',{expectedVersion:draft.version})).status()===403);
+  let own=await create(admin,'TEST ONLY AdminDirect');own=await action(admin,own,'publish');check('admin may directly publish own content',(await learner.request.get(base+api+'/entries/'+own.id)).status()===200);
+  await lp.goto(base+home);await lp.getByRole('link',{name:'TEST ONLY AdminDirect',exact:true}).waitFor();
+  const fail=route=>route.fulfill({status:503,json:{error:'TEST ONLY unavailable'}});await lp.route('**/api/hub/discussions/entries?*',fail);await lp.reload();await lp.getByRole('heading',{name:'Discussions unavailable',exact:true}).waitFor();await lp.unroute('**/api/hub/discussions/entries?*',fail);await lp.getByRole('button',{name:'Retry',exact:true}).click();await lp.getByRole('link',{name:'TEST ONLY AdminDirect',exact:true}).waitFor();check('error Retry restores published list');
+  const privateDraft=await create(learner,'TEST ONLY PrivateSwitch');await lp.goto(base+manage(privateDraft.id));await lp.getByLabel('Title',{exact:true}).waitFor();await learner.clearCookies();await login(learner,'teacher-b');await lp.evaluate(()=>window.dispatchEvent(new Event('focus')));await lp.getByRole('heading',{name:'Discussion unavailable',exact:true}).waitFor();check('account switch clears private draft',!(await lp.locator('main').innerText()).includes('PrivateSwitch'));
+  const anon=await browser.newContext();const page=await anon.newPage();watch(page);for(const route of [home,detail(own.id),manage(privateDraft.id)]){await page.goto(base+route);await page.waitForURL('**/login');check('anonymous redirected '+route);}check('anonymous API denied',(await anon.request.get(base+api+'/entries')).status()===401);
+  await Promise.all([learner.close(),teacher.close(),admin.close(),anon.close()]);
+}
+(async()=>{assert.match(base,/^http:\/\/127\.0\.0\.1:\d+$/);const fixture=JSON.parse(await fs.readFile(fixturePath,'utf8'));assert.match(fixture.database,/tmp[\\/]r8a2[\\/]/);await fs.mkdir(output,{recursive:true});browser=await chromium.launch({headless:true,channel:'msedge'});await run();check('zero page errors',errors.length===0);check('zero automatic learning writes',learningWrites.length===0);console.log(JSON.stringify({count:checks.length,errors,learningWrites}));})().catch(error=>{console.error(error);process.exitCode=1;}).finally(async()=>{await fs.mkdir(output,{recursive:true});await fs.writeFile(path.join(output,'results.json'),JSON.stringify({checks,errors,learningWrites},null,2));await browser?.close();});

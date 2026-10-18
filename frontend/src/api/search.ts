@@ -11,7 +11,7 @@ export type SearchResult =
   | (ResultBase & { type: 'courses'; slug: string; titleZh: string | null; metadata: Record<string, never> })
   | (ResultBase & { type: 'modules'; courseSlug: string; moduleSlug: string; titleZh: string; metadata: { number: number; category: string; durationHours: number; courseTitle: string } })
   | (ResultBase & { type: 'research'; code: string; slug: string; name: string; metadata: Record<string, never> })
-  | (ResultBase & { type: 'hub'; id: number; metadata: { kind: 'faculty' | 'industry' } })
+  | (ResultBase & { type: 'hub'; id: number; metadata: { kind: 'faculty' | 'industry' | 'discussions' } })
 export type SearchResponse = SearchParams & { items: SearchResult[]; perPage: number; total: number; totalPages: number; counts: Record<Exclude<SearchType, 'all'>, number> }
 export class SearchError extends Error {}
 
@@ -47,7 +47,7 @@ function result(v: unknown): v is SearchResult {
     case 'courses': valid = text(v.slug) && optionalText(v.titleZh); break
     case 'modules': valid = text(v.courseSlug) && text(v.moduleSlug) && text(v.titleZh) && integer(m.number) && m.number > 0 && integer(m.durationHours) && m.durationHours > 0 && text(m.category) && text(m.courseTitle); break
     case 'research': valid = text(v.slug) && text(v.code) && text(v.name); break
-    case 'hub': valid = integer(v.id) && v.id > 0 && (m.kind === 'faculty' || m.kind === 'industry'); break
+    case 'hub': valid = integer(v.id) && v.id > 0 && (m.kind === 'faculty' || m.kind === 'industry' || m.kind === 'discussions'); break
   }
   return valid && v.route === searchResultPath(v as SearchResult)
 }

@@ -31,6 +31,7 @@ import PaperManagementPage from './pages/PaperManagementPage'
 import PapersPage from './pages/PapersPage'
 import AdminAuditPage from './pages/admin/AdminAuditPage'
 import AdminUsersPage from './pages/admin/AdminUsersPage'
+import DiscussionWorkspace from './components/hub/DiscussionWorkspace'
 import AccountCredentialPage from './pages/AccountCredentialPage'
 import ManagementPage from './pages/ManagementPage'
 import './App.css'
@@ -129,6 +130,11 @@ function App() {
       <Route element={<InnovationHubPage />} path="/innovation-hub" />
       <Route element={<InnovationHubPage detail />} path="/innovation-hub/faculty/:entryId" />
       <Route element={<InnovationHubPage detail kind="industry" />} path="/innovation-hub/industry/:entryId" />
+      <Route element={<InnovationHubPage detail kind="discussions" discussionMode="create" />} path="/innovation-hub/discussions/new" />
+      <Route element={<InnovationHubPage detail kind="discussions" discussionMode="manage" />} path="/innovation-hub/discussions/manage/:entryId" />
+      <Route element={<InnovationHubPage detail kind="discussions" />} path="/innovation-hub/discussions/:entryId" />
+      <Route element={<PapersManagementGuard adminOnly>{user=><DiscussionWorkspace user={user} mode="review"/>}</PapersManagementGuard>} path="/manage/hub/discussions" />
+      <Route element={<PapersManagementGuard adminOnly>{user=><DiscussionWorkspace user={user} mode="reports"/>}</PapersManagementGuard>} path="/manage/hub/discussions/reports" />
       <Route element={<PapersManagementGuard>{user => <IndustryWorkspace user={user} managed />}</PapersManagementGuard>} path="/manage/hub/industry" />
       <Route element={<PapersManagementGuard>{user => <IndustryWorkspace user={user} managed create />}</PapersManagementGuard>} path="/manage/hub/industry/new" />
       <Route element={<PapersManagementGuard>{user => <IndustryWorkspace user={user} managed />}</PapersManagementGuard>} path="/manage/hub/industry/:entryId" />

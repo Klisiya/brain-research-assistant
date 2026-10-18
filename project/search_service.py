@@ -30,9 +30,16 @@ def parse_search(args):
 
 
 class SearchService:
-    def __init__(self, db, Paper, Course, Module, Area, HubEntry=None, HubRevision=None):
+    def __init__(self, db, Paper, Course, Module, Area, HubEntry=None, HubRevision=None, HubDiscussion=None):
         self.db, self.Paper, self.Course, self.Module, self.Area = db, Paper, Course, Module, Area
         self.HubEntry, self.HubRevision = HubEntry, HubRevision
+        self.HubDiscussion = HubDiscussion
+
+    def hub_visibility(self):
+        E, D = self.HubEntry, self.HubDiscussion
+        catalog = E.kind.in_(['faculty', 'industry'])
+        return catalog if D is None else or_(catalog, and_(E.kind == 'discussions',
+            exists(select(D.entry_id).where(D.entry_id == E.id, D.thread_id.is_(None)))))
 
     def text_match(self, column, pattern):
         return func.lower(func.coalesce(cast(column, Text), '')).like(pattern, escape='\\')
@@ -79,7 +86,7 @@ class SearchService:
             providers.append(select(literal('hub').label('kind'), E.id.label('entity_id'),
                 func.lower(R.title).label('title_order'), rank.label('rank'), literal(4).label('type_order'))
                 .join_from(E, R, and_(R.id == E.published_revision_id, R.entry_id == E.id))
-                .where(E.kind.in_(['faculty', 'industry']), E.archived_at.is_(None), R.state == 'approved',
+                .where(self.hub_visibility(), E.archived_at.is_(None), R.state == 'approved',
                        or_(title_match, self.text_match(R.body, pattern), self.text_match(R.source_name, pattern))))
         return providers
 
@@ -137,7 +144,7 @@ class SearchService:
             # Recheck current publication at hydration, including ownership of pointer.
             for entry, revision in self.db.session.execute(select(E, R).join_from(E, R,
                 and_(R.id == E.published_revision_id, R.entry_id == E.id)).where(
-                E.id.in_(ids), E.kind.in_(['faculty', 'industry']), E.archived_at.is_(None), R.state == 'approved')):
+                E.id.in_(ids), self.hub_visibility(), E.archived_at.is_(None), R.state == 'approved')):
                 hydrated[('hub', entry.id)] = (entry, revision)
         return dict(items=[self.serialize(r['kind'], hydrated[(r['kind'], r['entity_id'])]) for r in rows
                            if (r['kind'], r['entity_id']) in hydrated],

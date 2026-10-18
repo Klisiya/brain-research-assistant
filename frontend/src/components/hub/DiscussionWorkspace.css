@@ -1,0 +1,11 @@
+.discussion-workspace .discussion-fields { display: grid; gap: 16px; border: 0; padding: 16px 0; min-width: 0; }
+.discussion-workspace .discussion-fields > div { display: grid; gap: 8px; }
+.discussion-workspace .discussion-reply, .discussion-workspace .discussion-danger { border-top: 1px solid #385063; margin-top: 24px; padding: 20px 0; }
+.discussion-workspace .discussion-report-control { margin: 16px 0; }
+.discussion-workspace .discussion-report-control form { display: grid; gap: 12px; margin: 16px 0; }
+.discussion-workspace .discussion-text { overflow-wrap: anywhere; }
+.discussion-workspace .faculty-list h2 { font-size: 20px; }
+.discussion-workspace [aria-pressed=true] { border-color: #8bdaea; }
+.discussion-workspace .discussion-index-header { justify-content: space-between; }
+.discussion-workspace .discussion-index-header h1,
+.discussion-workspace .discussion-index-header h2 { margin: 0; }

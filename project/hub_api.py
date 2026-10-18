@@ -481,3 +481,9 @@ def register_hub_api(app, db, User, Entry, Revision, Attachment, Event, roles_re
                             sourceName=revision.source_name if revision else None)
             items.append(item)
         return jsonify(events=items)
+
+    # Reuse the established transaction/session, concurrency and audit boundary.
+    # Discussion-specific publication/parent rules live in their own adapter.
+    app.extensions['hub_moderation'] = dict(guarded=guarded, actor=actor, fail=fail,
+        payload=payload, token=token, revision_for=revision_for, working=working,
+        event=event, status=status, published=published, approved_snapshot=approved_snapshot)

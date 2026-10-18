@@ -5,8 +5,8 @@ from sqlalchemy.exc import SQLAlchemyError
 from search_service import SearchService, SearchValidationError, parse_search
 
 
-def register_search_api(app, db, Paper, Course, Module, Area, limiter, HubEntry=None, HubRevision=None):
-    service = SearchService(db, Paper, Course, Module, Area, HubEntry, HubRevision)
+def register_search_api(app, db, Paper, Course, Module, Area, limiter, HubEntry=None, HubRevision=None, HubDiscussion=None):
+    service = SearchService(db, Paper, Course, Module, Area, HubEntry, HubRevision, HubDiscussion)
     app.extensions['search_service'] = service
 
     @app.after_request
