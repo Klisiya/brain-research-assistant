@@ -22,7 +22,7 @@ function list(entries, requestedPage, size = 12) {
 }
 async function fixture(role = 'admin') {
   const context = await browser.newContext({ viewport: { width: 1440, height: 1000 }, reducedMotion: 'reduce', serviceWorkers: 'block' });
-  const state = { role, id: 901, delay: 0, industry: [], faculty: [], discussions: [], reports: [], paperPages: 3, forbidden: false };
+  const state = { role, id: 901, delay: 0, industry: [], faculty: [], discussions: [], reports: [], paperPages: 3, paperStatus: 'published', forbidden: false };
   for (let i = 0; i < 25; i++) {
     for (const kind of ['industry', 'faculty']) state[kind].push({ id: (kind === 'industry' ? 201 : 101) + i, kind, status: 'pending', ownerId: 901, submittedById: 901, version: 1, published: null, working: revision(`TEST ONLY ${kind} ${i + 1}`) });
     state.discussions.push({ id: 301 + i, type: 'thread', threadId: null, author: 'TEST ONLY learner', canManage: true, isAuthor: false, status: 'pending', version: 1, published: null, working: revision(`TEST ONLY Thread ${i + 1}`) });
@@ -37,6 +37,7 @@ async function fixture(role = 'admin') {
     else if (p === '/api/auth/csrf') body = { csrfToken: 'TEST-ONLY-NAV' };
     else if (p === '/api/auth/logout') { state.role = 'anonymous'; body = { success: true }; }
     else if (p === '/api/courses/manage') body = { courses: [] };
+    else if (p === '/api/courses') body = { courses: [course] };
     else if (p === '/api/courses/' + course.slug) body = { course };
     else if (p.startsWith('/api/courses/') && p.includes('/modules/')) { if (p.endsWith('/resources')) body = { resources: [] }; else if (p.endsWith('/papers')) body = { readings: [{ relationId: 1, readingType: 'required', sortOrder: 1, paper }] }; else body = { course, module: course.modules[0] }; }
     else if (p.startsWith('/api/learning/courses/')) body = { enrollment: null };
@@ -44,13 +45,20 @@ async function fixture(role = 'admin') {
     else if (p === '/api/learning/bookmarks') body = { bookmarks: [] };
     else if (p.endsWith('/notes') || p.endsWith('/highlights')) body = { notes: [], highlights: [], resources: [] };
     else if (p.startsWith('/api/learning/papers/')) body = { reading: { status: 'not_started', startedAt: null, selfCompletedAt: null, lastActivityAt: null, resources: [], unavailableHistory: [] } };
+    else if (p === '/api/papers') body = {
+      papers: [paper], highlights: [], libraryTotal: 1,
+      pagination: { page: 1, perPage: 12, total: 1, totalPages: 1 },
+      filters: { q: q.get('q') || '', course: null, module: null, topic: null, author: null, year: null, view: 'all', difficulty: null, publicationType: null, resourceCategory: null, featured: null, sort: 'recommended' },
+      availableFilters: { topics: [], authors: [], years: [], difficulties: [], publicationTypes: [], resourceCategories: [] },
+    };
     else if (p === '/api/papers/manage') {
       const page = Number(q.get('page') || 1);
-      body = { papers: page <= state.paperPages ? [paper] : [], pagination: { page, perPage: 20, total: state.paperPages * 20, totalPages: state.paperPages }, filters: { q: q.get('q') || '', status: q.get('status') === 'all' ? null : q.get('status'), sort: q.get('sort') || 'recommended' } };
+      body = { papers: page <= state.paperPages ? [{ ...paper, status: state.paperStatus }] : [], pagination: { page, perPage: 20, total: state.paperPages * 20, totalPages: state.paperPages }, filters: { q: q.get('q') || '', status: q.get('status') === 'all' ? null : q.get('status'), sort: q.get('sort') || 'recommended' } };
     if (q.get('q') === 'TEST ONLY EMPTY') body = { ...body, papers: [], pagination: { page, perPage: 20, total: 0, totalPages: 0 } };
     } else if (p.endsWith('/attachments') && p.startsWith('/api/papers')) body = { attachments: [] };
-    else if (p === '/api/papers/manage/41/preview') body = { paper: { ...paper, preview: true } };
-    else if (p === '/api/papers/manage/41' || p === '/api/papers/test-only-paper') body = { paper };
+    else if (p === '/api/papers/manage/41/preview') body = { paper: { ...paper, status: state.paperStatus, preview: true } };
+    else if (p === '/api/papers/manage/41') body = { paper: { ...paper, status: state.paperStatus } };
+    else if (p === '/api/papers/test-only-paper') body = { paper };
     else if (p.startsWith('/api/hub/discussions')) {
       const suffix = p.slice('/api/hub/discussions'.length);
       if (suffix === '/reports') body = list(state.reports.filter(x => q.get('status') === 'all' || x.status === q.get('status')), q.get('page'));
@@ -176,13 +184,32 @@ async function run() {
   const paperList = '/manage/papers?q=TEST+ONLY&status=published&sort=title&page=2';
   await goto(a.page, paperList); await a.page.locator('.management-row-actions a').filter({ hasText: /^Edit$/ }).first().click();
   await a.page.getByRole('button', { name: /Back to papers management/, exact: false }).waitFor();
-  await a.page.reload(); await click(a.page, 'link', 'Preview');
+  await a.page.reload(); await click(a.page, 'link', 'Preview saved version');
+  ok('editor opens protected saved-version preview', new URL(a.page.url()).pathname === '/manage/papers/41/preview');
   await click(a.page, 'link', 'Back to Edit');
   await a.page.getByRole('button', { name: /Back to papers management/ }).click();
   await a.page.waitForURL(url => url.pathname === '/manage/papers' && url.searchParams.get('page') === '2');
   let url = new URL(a.page.url()); ok('Paper editor/managed preview restores q/status/sort/page', url.searchParams.get('q') === 'TEST ONLY' && url.searchParams.get('status') === 'published' && url.searchParams.get('sort') === 'title');
-  await a.page.locator('.management-row-actions a').filter({ hasText: /^Preview$/ }).first().click();
-  await a.page.locator('.pr-back').click(); await a.page.waitForURL(/\/manage\/papers/); ok('published Paper return uses management origin without renaming Preview', true);
+  await click(a.page, 'link', 'View published paper');
+  await a.page.locator('.pr-back').waitFor();
+  ok('View published paper opens public reading workspace in the same tab', new URL(a.page.url()).pathname === '/papers/test-only-paper' && a.context.pages().length === 1);
+  await a.page.locator('.pr-back').click(); await a.page.waitForURL(/\/manage\/papers/);
+  url = new URL(a.page.url()); ok('published Paper return preserves management page and filters', url.searchParams.get('page') === '2' && url.searchParams.get('q') === 'TEST ONLY' && url.searchParams.get('status') === 'published' && url.searchParams.get('sort') === 'title');
+  for (const status of ['draft', 'archived']) {
+    a.state.paperStatus = status; await goto(a.page, '/manage/papers'); await a.page.locator('.management-row-actions').first().waitFor();
+    ok(`${status} has no misleading public action or public Paper URL`, await a.page.getByRole('link', { name: 'View published paper', exact: true }).count() === 0 && await a.page.locator('.management-row-actions a[href^="/papers/"]').count() === 0);
+    await click(a.page, 'link', 'Edit'); await click(a.page, 'link', 'Preview saved version');
+    await a.page.getByText(`Preview Mode · ${status[0].toUpperCase() + status.slice(1)}`, { exact: true }).waitFor();
+    ok(`${status} saved preview uses protected endpoint and saved title`, new URL(a.page.url()).pathname === '/manage/papers/41/preview' && await a.page.getByRole('heading', { name: paper.title, exact: true }).count() === 1);
+    await click(a.page, 'link', 'Back to Edit'); await a.page.getByLabel('Title', { exact: true }).waitFor();
+    ok(`${status} preview Back to Edit`, new URL(a.page.url()).pathname === '/manage/papers/41/edit');
+  }
+  a.state.paperStatus = 'published';
+  await goto(a.page, '/manage/papers/new'); await a.page.getByRole('heading', { name: 'Create Paper', exact: true }).waitFor();
+  ok('unsaved new Paper has no fake preview or published-view action', await a.page.getByRole('link', { name: /Preview saved version|View published paper/ }).count() === 0);
+  await goto(a.page, '/papers'); const libraryLink = a.page.getByRole('link', { name: 'View Paper', exact: true }); await libraryLink.waitFor(); const libraryReturn = relative(a.page); await libraryLink.click();
+  await a.page.locator('.pr-back').waitFor();
+  ok('Paper Library still opens reading workspace with exact Library return', new URL(a.page.url()).pathname === '/papers/test-only-paper' && await a.page.locator('.pr-back').getAttribute('href') === libraryReturn);
   await goto(a.page, paperList); a.state.paperPages = 1; await a.page.reload(); await a.page.waitForURL(url => url.searchParams.get('page') === '1'); ok('Paper last page adjusts while preserving filters', new URL(a.page.url()).searchParams.get('q') === 'TEST ONLY');
   await goto(a.page, '/manage/papers'); await a.page.locator('#management-paper-search').fill('TEST ONLY FILTER'); await a.page.locator('.paper-management-filters button[type="submit"]').click();
   await a.page.locator('.paper-management-filters select').nth(0).selectOption('published'); await a.page.locator('.paper-management-filters select').nth(1).selectOption('title');
@@ -226,6 +253,19 @@ async function run() {
   ok('accepted single admin toolbar retained with inline Reports', await toolbar.count() === 1 && await toolbar.getByRole('button').count() === 5 && await a.page.getByRole('heading', { name: 'Discussion Reports', exact: true }).count() === 1);
   for (const width of [1440, 820, 390]) {
     await a.page.setViewportSize({ width, height: width === 390 ? 844 : 1000 });
+    await goto(a.page, paperList);
+    const publishedAction = a.page.getByRole('link', { name: 'View published paper', exact: true });
+    await publishedAction.waitFor(); await publishedAction.focus();
+    const publishedLayout = await publishedAction.evaluate(el => ({ focus: el.matches(':focus-visible'), outline: getComputedStyle(el).outlineStyle, overflow: document.documentElement.scrollWidth > innerWidth }));
+    ok(`Paper published action ${width}: accessible name, visible keyboard focus, no overflow`, publishedLayout.focus && publishedLayout.outline !== 'none' && !publishedLayout.overflow && await publishedAction.getAttribute('target') === null);
+    await a.page.screenshot({ path: path.join(output, `paper-actions-${width}.png`), fullPage: true });
+    await a.page.keyboard.press('Enter'); await a.page.locator('.pr-back').waitFor();
+    ok(`Paper published action ${width}: Enter opens public reader`, new URL(a.page.url()).pathname === '/papers/test-only-paper');
+    await a.page.locator('.pr-back').click(); await click(a.page, 'link', 'Edit');
+    const previewAction = a.page.getByRole('link', { name: 'Preview saved version', exact: true }); await previewAction.waitFor(); await previewAction.focus(); await a.page.keyboard.press('Tab'); await a.page.keyboard.press('Shift+Tab');
+    ok(`Paper saved preview ${width}: keyboard focus and no overflow`, await previewAction.evaluate(el => el.matches(':focus-visible') && getComputedStyle(el).outlineStyle !== 'none' && document.documentElement.scrollWidth <= innerWidth));
+    await a.page.keyboard.press('Enter'); await a.page.getByText('Preview Mode · Published', { exact: true }).waitFor();
+    ok(`Paper saved preview ${width}: Enter opens protected saved version`, new URL(a.page.url()).pathname === '/manage/papers/41/preview');
     for (const [name, start, label] of [
       ['industry', '/manage/hub/industry?scope=review&page=2', 'Back to review queue'],
       ['faculty', '/manage/hub?scope=review&page=2', 'Back to all resources / review'],

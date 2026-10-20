@@ -19,7 +19,7 @@ function PaperActions({ paper, destination }: { paper: ManagedPaper; destination
     <div className="management-row-actions">
       <Link to={destination(`/manage/papers/${paper.id}/edit`, paper.id)}>Edit</Link>
       {paper.status === 'published' ? (
-        <Link to={destination(`/papers/${paper.slug}`, paper.id)}>Preview</Link>
+        <Link to={destination(`/papers/${paper.slug}`, paper.id)}>View published paper</Link>
       ) : null}
     </div>
   )

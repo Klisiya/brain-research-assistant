@@ -220,7 +220,7 @@ function PaperEditorPage({ currentUser }: { currentUser: AuthUser }) {
             <PaperStatusBadge status={paper.status} />
             <span>Current slug</span>
             <code>{paper.slug}</code>
-            <Link to={withManagementOrigin(`/manage/papers/${paper.id}/preview`, origin)}>Preview</Link>
+            <Link to={withManagementOrigin(`/manage/papers/${paper.id}/preview`, origin)}>Preview saved version</Link>
           </div>
         ) : null}
       </header>
