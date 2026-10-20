@@ -40,6 +40,8 @@ type PaperFormField = keyof PaperFormValues
 type PaperFormErrors = Partial<Record<PaperFormField, string>>
 
 type PaperFormProps = {
+  returnPath?: string
+  returnLabel?: string
   initialPaper?: ManagedPaper
   mode: PaperFormMode
   onSubmit: (input: PaperWriteInput) => Promise<ManagedPaper>
@@ -245,7 +247,7 @@ function FieldError({ field, message }: { field: PaperFormField; message?: strin
   return message ? <span className="paper-form-error" id={`paper-${field}-error`}>{message}</span> : null
 }
 
-function PaperForm({ initialPaper, mode, onSubmit }: PaperFormProps) {
+function PaperForm({ initialPaper, mode, onSubmit, returnPath = '/manage/papers', returnLabel = 'Back to Papers Management' }: PaperFormProps) {
   const navigate = useNavigate()
   const initialValues = getInitialValues(initialPaper)
   const [values, setValues] = useState<PaperFormValues>(initialValues)
@@ -321,15 +323,15 @@ function PaperForm({ initialPaper, mode, onSubmit }: PaperFormProps) {
       setShowDiscardDialog(true)
       return
     }
-    navigate('/manage/papers')
+    navigate(returnPath)
   }
 
   return (
     <>
       <form className="paper-editor-form" noValidate onSubmit={handleSubmit}>
         <div className="paper-editor-form-toolbar">
-          <button className="paper-editor-back" onClick={handleBack} type="button">
-            <span aria-hidden="true">←</span> Back to Papers Management
+          <button className="paper-editor-back management-return" onClick={handleBack} type="button">
+            <span aria-hidden="true">←</span> {returnLabel}
           </button>
           {isDirty ? <span>Unsaved changes</span> : <span>All changes saved</span>}
         </div>
@@ -592,7 +594,7 @@ function PaperForm({ initialPaper, mode, onSubmit }: PaperFormProps) {
           confirmLabel="Discard"
           description="Your unsaved edits will be lost."
           onCancel={() => setShowDiscardDialog(false)}
-          onConfirm={() => navigate('/manage/papers')}
+          onConfirm={() => navigate(returnPath)}
           title="Discard unsaved changes?"
           tone="danger"
         />

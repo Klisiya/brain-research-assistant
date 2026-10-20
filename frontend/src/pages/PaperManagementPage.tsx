@@ -1,5 +1,7 @@
 import { useEffect, useState, type FormEvent } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
+import { makeManagementOrigin, readPaperListFilters, withManagementOrigin } from '../components/management/managementOrigin'
+import { useManagementListPosition } from '../components/management/useManagementOrigin'
 import {
   fetchManagedPapers,
   PaperApiError,
@@ -8,7 +10,6 @@ import {
 } from '../api/papers'
 import PaperManagementTable from '../components/papers/PaperManagementTable'
 import type { AuthUser } from '../types/auth'
-import type { PaperStatus } from '../types/paper'
 import './PaperManagementPage.css'
 
 type ManagementListResult = {
@@ -28,11 +29,15 @@ function PaperManagementLoading() {
 }
 
 function PaperManagementPage({ currentUser }: { currentUser: AuthUser }) {
-  const [searchInput, setSearchInput] = useState('')
-  const [query, setQuery] = useState('')
-  const [status, setStatus] = useState<PaperStatus | 'all'>('all')
-  const [sort, setSort] = useState<PaperManagementSort>('recommended')
-  const [page, setPage] = useState(1)
+  const [params, setParams] = useSearchParams()
+  const filters = readPaperListFilters(params, currentUser)
+  const { q: query, status, sort, page } = filters
+  const canonical = new URLSearchParams({ q: query, status, sort, page: String(page), account: `${currentUser.id}:${currentUser.role}` }).toString()
+  const [searchDraft, setSearchDraft] = useState<{ source: string; value: string } | null>(null)
+  const searchInput = searchDraft?.source === query ? searchDraft.value : query
+  const changeFilters = (next: Partial<typeof filters>) => setParams(new URLSearchParams({ ...filters, ...next, page: String(next.page ?? 1), account: `${currentUser.id}:${currentUser.role}` }))
+  const destination = (path: string, selectedId?: number) => withManagementOrigin(path, makeManagementOrigin(currentUser, 'papers', new URLSearchParams(canonical), selectedId))
+  useEffect(() => { if (params.toString() !== canonical) setParams(canonical, { replace: true }) }, [params, canonical, setParams])
   const [requestVersion, setRequestVersion] = useState(0)
   const requestId = JSON.stringify({ page, query, requestVersion, sort, status })
   const [result, setResult] = useState<ManagementListResult | null>(null)
@@ -65,14 +70,14 @@ function PaperManagementPage({ currentUser }: { currentUser: AuthUser }) {
 
   const handleSearch = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
-    setPage(1)
-    setQuery(searchInput.trim())
+    changeFilters({ q: searchInput.trim(), page: 1 })
   }
 
   const payload = currentResult?.payload
   const papers = payload?.papers ?? []
   const totalPages = payload?.pagination.totalPages ?? 0
   const filtered = Boolean(query || status !== 'all')
+  useManagementListPosition(payload?.pagination)
 
   return (
     <>
@@ -82,7 +87,7 @@ function PaperManagementPage({ currentUser }: { currentUser: AuthUser }) {
           <h1>Papers</h1>
           <p>Manage learning resources, drafts, and published research materials.</p>
         </div>
-        <Link className="management-primary-action" to="/manage/papers/new">
+        <Link className="management-primary-action" to={destination('/manage/papers/new')}>
           <span aria-hidden="true">＋</span> New Paper
         </Link>
       </header>
@@ -93,7 +98,7 @@ function PaperManagementPage({ currentUser }: { currentUser: AuthUser }) {
           <div>
             <input
               id="management-paper-search"
-              onChange={(event) => setSearchInput(event.target.value)}
+              onChange={(event) => setSearchDraft({ source: query, value: event.target.value })}
               placeholder="Search title, author, topic..."
               type="search"
               value={searchInput}
@@ -105,8 +110,7 @@ function PaperManagementPage({ currentUser }: { currentUser: AuthUser }) {
           <span>Status</span>
           <select
             onChange={(event) => {
-              setPage(1)
-              setStatus(event.target.value as PaperStatus | 'all')
+              changeFilters({ status: event.target.value as typeof status, page: 1 })
             }}
             value={status}
           >
@@ -120,8 +124,7 @@ function PaperManagementPage({ currentUser }: { currentUser: AuthUser }) {
           <span>Sort</span>
           <select
             onChange={(event) => {
-              setPage(1)
-              setSort(event.target.value as PaperManagementSort)
+              changeFilters({ sort: event.target.value as PaperManagementSort, page: 1 })
             }}
             value={sort}
           >
@@ -168,7 +171,7 @@ function PaperManagementPage({ currentUser }: { currentUser: AuthUser }) {
           <p>
             {filtered ? 'Try another search or change the status filter.' : 'Papers you can manage will appear here.'}
           </p>
-          <Link to="/manage/papers/new">Create Paper</Link>
+          <Link to={destination('/manage/papers/new')}>Create Paper</Link>
         </section>
       ) : (
         <section className="paper-management-results">
@@ -178,13 +181,13 @@ function PaperManagementPage({ currentUser }: { currentUser: AuthUser }) {
             </p>
             <span>{currentUser.role === 'admin' ? 'All creators' : 'Your resources'}</span>
           </div>
-          <PaperManagementTable papers={papers} />
+          <PaperManagementTable papers={papers} destination={destination} />
 
           {totalPages > 1 ? (
             <nav aria-label="Paper management pagination" className="paper-management-pagination">
-              <button disabled={page <= 1} onClick={() => setPage((value) => value - 1)} type="button">Previous</button>
+              <button disabled={page <= 1} onClick={() => changeFilters({ page: page - 1 })} type="button">Previous</button>
               <span>Page {page} of {totalPages}</span>
-              <button disabled={page >= totalPages} onClick={() => setPage((value) => value + 1)} type="button">Next</button>
+              <button disabled={page >= totalPages} onClick={() => changeFilters({ page: page + 1 })} type="button">Next</button>
             </nav>
           ) : null}
         </section>

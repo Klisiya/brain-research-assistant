@@ -13,18 +13,19 @@ function formatUpdatedAt(value: string) {
   }).format(date)
 }
 
-function PaperActions({ paper }: { paper: ManagedPaper }) {
+type Destination = (path: string, selectedId: number) => string
+function PaperActions({ paper, destination }: { paper: ManagedPaper; destination: Destination }) {
   return (
     <div className="management-row-actions">
-      <Link to={`/manage/papers/${paper.id}/edit`}>Edit</Link>
+      <Link to={destination(`/manage/papers/${paper.id}/edit`, paper.id)}>Edit</Link>
       {paper.status === 'published' ? (
-        <Link to={`/papers/${paper.slug}`}>Preview</Link>
+        <Link to={destination(`/papers/${paper.slug}`, paper.id)}>Preview</Link>
       ) : null}
     </div>
   )
 }
 
-function PaperManagementTable({ papers }: { papers: readonly ManagedPaper[] }) {
+function PaperManagementTable({ papers, destination }: { papers: readonly ManagedPaper[]; destination: Destination }) {
   return (
     <>
       <div className="paper-management-table-shell">
@@ -41,7 +42,7 @@ function PaperManagementTable({ papers }: { papers: readonly ManagedPaper[] }) {
           </thead>
           <tbody>
             {papers.map((paper) => (
-              <tr key={paper.id}>
+              <tr key={paper.id} tabIndex={-1} data-management-row={`papers-${paper.id}`}>
                 <td>
                   <strong>{paper.title || 'Untitled paper'}</strong>
                   <span>{paper.slug}</span>
@@ -50,7 +51,7 @@ function PaperManagementTable({ papers }: { papers: readonly ManagedPaper[] }) {
                 <td>{paper.publicationType}</td>
                 <td>{formatUpdatedAt(paper.updatedAt)}</td>
                 <td>{paper.createdBy?.username || 'System'}</td>
-                <td><PaperActions paper={paper} /></td>
+                <td><PaperActions paper={paper} destination={destination} /></td>
               </tr>
             ))}
           </tbody>
@@ -59,7 +60,7 @@ function PaperManagementTable({ papers }: { papers: readonly ManagedPaper[] }) {
 
       <div className="paper-management-cards" aria-label="Managed papers">
         {papers.map((paper) => (
-          <article className="paper-management-card" key={paper.id}>
+          <article className="paper-management-card" key={paper.id} tabIndex={-1} data-management-row={`papers-${paper.id}`}>
             <div>
               <PaperStatusBadge status={paper.status} />
               <span>{paper.publicationType}</span>
@@ -69,7 +70,7 @@ function PaperManagementTable({ papers }: { papers: readonly ManagedPaper[] }) {
               <div><dt>Updated</dt><dd>{formatUpdatedAt(paper.updatedAt)}</dd></div>
               <div><dt>Created by</dt><dd>{paper.createdBy?.username || 'System'}</dd></div>
             </dl>
-            <PaperActions paper={paper} />
+            <PaperActions paper={paper} destination={destination} />
           </article>
         ))}
       </div>

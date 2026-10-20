@@ -76,8 +76,8 @@ function StudyTools({ paper, reading, attachment, compact }: { paper: Paper; rea
   </>
 }
 
-export default function PaperReadingWorkspace({ paper, reading, returnPath, citation, publishedDate, onCopyCitation, copyState }: {
-  paper: Paper; reading: PaperReadingController; returnPath: string; citation: string; publishedDate: string | null; onCopyCitation: () => void; copyState: 'copied' | 'failed' | null
+export default function PaperReadingWorkspace({ paper, reading, returnPath, backLabel, citation, publishedDate, onCopyCitation, copyState }: {
+  paper: Paper; reading: PaperReadingController; returnPath: string; backLabel?: string; citation: string; publishedDate: string | null; onCopyCitation: () => void; copyState: 'copied' | 'failed' | null
 }) {
   const { state: auth } = useAuth()
   const account = `${auth.status}:${auth.user?.id ?? ''}:${auth.user?.role ?? ''}`
@@ -99,7 +99,7 @@ export default function PaperReadingWorkspace({ paper, reading, returnPath, cita
   const compact = useCompactTools()
   const source = externalResourceUrl(paper.externalUrl)
   return <article className="pr-workspace">
-    <Link className="pr-back" to={returnPath}>← {returnPath.startsWith('/course/') ? 'Back to Module' : 'Back to Paper Library'}</Link>
+    <Link className={`pr-back${returnPath.startsWith('/manage/papers') ? ' management-return' : ''}`} to={returnPath}>← {backLabel ?? (returnPath.startsWith('/course/') ? 'Back to Module' : 'Back to Paper Library')}</Link>
     <header className="pr-header"><p className="pr-eyebrow">Paper reading</p><h1>{paper.title || 'Untitled paper'}</h1>
       {paper.authors.length > 0 && <p className="pr-authors">{paper.authors.join(', ')}</p>}
       <p className="pr-publication">{[paper.journal, paper.year, paper.publicationType].filter(Boolean).join(' · ') || 'Publication details unavailable'}</p>

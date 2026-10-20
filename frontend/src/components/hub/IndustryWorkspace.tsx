@@ -3,6 +3,8 @@ import { Link, useLocation, useNavigate, useParams, useSearchParams } from 'reac
 import { HubError, hubLabels, hubMutation, hubRequest, industryManagePath, industryPath, type HubEntry, type HubFields, type HubList, type HubRevision } from '../../api/hub'
 import type { AuthUser } from '../../types/auth'
 import { useManagementRead } from '../management/useManagementRead'
+import { makeManagementOrigin, managementReturn, withManagementOrigin, listPage } from '../management/managementOrigin'
+import { useManagementOrigin, useManagementListPosition } from '../management/useManagementOrigin'
 import ConfirmDialog from '../papers/ConfirmDialog'
 import './FacultyWorkspace.css'
 import './IndustryWorkspace.css'
@@ -38,7 +40,8 @@ function UpdateFields({ values, onChange, disabled }: { values: Fields; onChange
   </fieldset>
 }
 
-function NewUpdate() {
+function NewUpdate({ user }: { user: AuthUser }) {
+  const origin = useManagementOrigin(user, ['industry']), back = origin ? managementReturn(origin) : { path: manage, label: 'Industry Updates' }
   const navigate = useNavigate(), controller = useRef<AbortController | null>(null)
   const [values, setValues] = useState(fields()), [busy, setBusy] = useState(false), [error, setError] = useState('')
   useEffect(() => () => controller.current?.abort(), [])
@@ -47,11 +50,11 @@ function NewUpdate() {
     const request = new AbortController(); controller.current = request; setBusy(true); setError('')
     try {
       const result = await hubMutation(api, 'POST', values, request.signal)
-      if (!request.signal.aborted) navigate(industryManagePath(result.entry.id), { replace: true })
+      if (!request.signal.aborted) navigate(withManagementOrigin(industryManagePath(result.entry.id), origin), { replace: true })
     } catch (reason) { if (!request.signal.aborted) setError(reason instanceof Error ? reason.message : 'Unable to save.') }
     finally { if (controller.current === request) controller.current = null; if (!request.signal.aborted) setBusy(false) }
   }
-  return <section className="faculty-workspace industry-workspace"><Link to={manage}>← Industry Updates</Link><h1>Create Industry Update</h1>
+  return <section className="faculty-workspace industry-workspace"><Link className="management-return" to={back.path}>← {back.label}</Link><h1>Create Industry Update</h1>
     <p>Enter material provided by a real source. Save a draft and submit it for administrator review.</p>
     {error && <p role="alert">{error}</p>}<form onSubmit={event => void create(event)}><UpdateFields values={values} onChange={setValues} disabled={busy} /><button type="submit" className="faculty-primary" disabled={busy}>{busy ? 'Saving…' : 'Save Draft'}</button></form>
   </section>
@@ -64,6 +67,7 @@ function History({ entry }: { entry: HubEntry }) {
 }
 
 function Editor({ initial, user, refresh }: { initial: HubEntry; user: AuthUser; refresh: () => void }) {
+  const origin = useManagementOrigin(user, ['industry']), back = origin ? managementReturn(origin) : { path: manage, label: 'Industry Updates' }
   const navigate = useNavigate()
   const [entry, setEntry] = useState(initial), [values, setValues] = useState(fields(initial.working))
   const [busy, setBusy] = useState(false), [error, setError] = useState(''), [notice, setNotice] = useState('')
@@ -99,7 +103,7 @@ function Editor({ initial, user, refresh }: { initial: HubEntry; user: AuthUser;
       })
       if (!request.signal.aborted) {
         if (result.deleted !== true) throw new Error('Deletion could not be confirmed. Refresh the update before retrying.')
-        navigate(manage, { replace: true, state: { industryDeletion: result.cleanupPending ? 'cleanup-pending' : 'complete' } })
+        navigate(back.path, { replace: true, state: { industryDeletion: result.cleanupPending ? 'cleanup-pending' : 'complete' } })
       }
     } catch (failure) { if (!request.signal.aborted) setError(failure instanceof Error ? failure.message : 'Unable to delete update.') }
     finally { if (controller.current === request) controller.current = null; if (!request.signal.aborted) setBusy(false) }
@@ -113,7 +117,7 @@ function Editor({ initial, user, refresh }: { initial: HubEntry; user: AuthUser;
       void run(signal => hubRequest(`${api}/${entry.id}/attachments`, { method: 'POST', body: form, signal }), 'Material added to draft.')
     }
   }
-  return <section className="faculty-workspace industry-workspace"><Link to={manage}>← Industry Updates</Link><h1>Manage Industry Update</h1>
+  return <section className="faculty-workspace industry-workspace"><Link className="management-return" to={back.path}>← {back.label}</Link><h1>Manage Industry Update</h1>
     <p className="faculty-status">{hubLabels[entry.status]}{entry.published && revision && <> · {revision.state === 'pending' ? 'Pending Revision' : 'Revision'} v{revision.number}: {hubLabels[revision.state ?? 'draft']}</>}</p>
     <p>Submitted by account {entry.submittedById}. Source identity is recorded separately.</p>
     {error && <div role="alert"><p>{error}</p><button disabled={busy} onClick={refresh}>Refresh update</button><p>Refresh loads the saved version and clears unsaved changes.</p></div>}
@@ -136,7 +140,7 @@ function Editor({ initial, user, refresh }: { initial: HubEntry; user: AuthUser;
       {draft && <button disabled={busy || dirty} className="faculty-primary" onClick={() => setConfirm('submit')}>Submit for Review</button>}
       {revision?.state === 'pending' && entry.status !== 'archived' && <><button disabled={busy} onClick={() => setConfirm('withdraw')}>Withdraw to Draft</button>{user.role === 'admin' && <><button disabled={busy} onClick={() => setConfirm('approve')}>Approve & Publish</button><label>Rejection reason<textarea maxLength={2000} value={reason} disabled={busy} onChange={e => setReason(e.target.value)} /></label><button disabled={busy || !reason.trim()} onClick={() => setConfirm('reject')}>Reject</button></>}</>}
       {entry.status !== 'archived' && (revision?.state === 'rejected' || !revision && entry.published) && <button disabled={busy} onClick={() => action('draft')}>{revision?.state === 'rejected' ? 'Revise rejected update' : 'Create revision'}</button>}
-      {entry.published && entry.status !== 'archived' && <Link to={industryPath(entry.id)}>View published update →</Link>}
+      {entry.published && entry.status !== 'archived' && <Link to={withManagementOrigin(industryPath(entry.id), origin)}>View published update →</Link>}
     </div>
     <section className="industry-danger" aria-labelledby="industry-danger-title"><h2 id="industry-danger-title">Danger zone</h2>
       <p>Archive retains versions and moderation history. Permanent deletion removes this update, all versions and material links; only a minimal deletion audit receipt is retained.</p>
@@ -155,7 +159,10 @@ export default function IndustryWorkspace({ user, managed = false, create = fals
   const { entryId } = useParams(), [query] = useSearchParams()
   const requested = query.get('scope')
   const scope = managed ? user.role === 'admin' && (requested === 'all' || requested === 'review') ? requested : 'mine' : 'published'
-  const page = query.get('page') ?? '1'
+  const page = String(listPage(query.get('page')))
+  const origin = useManagementOrigin(user, ['industry'])
+  const back = origin ? managementReturn(origin) : { path: managed ? manage : published, label: 'Industry Updates' }
+  const source = new URLSearchParams({ scope, page })
   const path = entryId ? `${api}/${encodeURIComponent(entryId)}${managed ? '/manage' : ''}` : `${api}?${new URLSearchParams({ scope, page })}`
   const reader = useCallback(async (signal: AbortSignal) => {
     if (create) return null
@@ -164,25 +171,27 @@ export default function IndustryWorkspace({ user, managed = false, create = fals
     return data
   }, [path, create])
   const state = useManagementRead(`industry:${user.id}:${user.role}:${path}`, reader)
-  if (create) return <NewUpdate />
+  useManagementListPosition(state.data && 'entries' in state.data ? state.data : null, !entryId && !create)
+  if (create) return <NewUpdate user={user} />
   if (state.loading) return <p role="status" className="faculty-workspace">Loading Industry Updates…</p>
-  if (state.error) return <section className="faculty-workspace" role="alert"><h2>{state.error === 'not-found' ? 'Update not available' : state.error === 'forbidden' ? 'Access denied' : 'Industry Updates unavailable'}</h2><p>This update may be unpublished, archived, or unavailable to your account.</p><button onClick={state.retry}>Retry</button><Link to={managed ? manage : published}>Back to Industry Updates</Link></section>
+  if (state.error) return <section className="faculty-workspace" role="alert"><h2>{state.error === 'not-found' ? 'Update not available' : state.error === 'forbidden' ? 'Access denied' : 'Industry Updates unavailable'}</h2><p>This update may be unpublished, archived, or unavailable to your account.</p><button onClick={state.retry}>Retry</button><Link className="management-return" to={back.path}>{origin ? back.label : 'Back to Industry Updates'}</Link></section>
   const data = state.data
   if (!data) return null
   if ('entry' in data) {
     if (managed) return <Editor key={`${data.entry.id}:${data.entry.version}`} initial={data.entry} user={user} refresh={state.retry} />
-    return <article className="faculty-workspace industry-workspace"><Link to={published}>← Industry Updates</Link><h1>{data.entry.published?.title}</h1>{data.entry.published && <RevisionView revision={data.entry.published} />}
+    return <article className="faculty-workspace industry-workspace"><Link className="management-return" to={back.path}>← {back.label}</Link><h1>{data.entry.published?.title}</h1>{data.entry.published && <RevisionView revision={data.entry.published} />}
       {data.entry.createdAt && <p>Added to platform: <time dateTime={data.entry.createdAt}>{new Date(data.entry.createdAt).toLocaleString()}</time></p>}
     </article>
   }
   return <section className="faculty-workspace industry-workspace"><div className="faculty-list-header">{managed ? <h1>Industry Updates</h1> : <h2>Industry Updates</h2>}<div className="faculty-actions">
-    {managed ? <><Link className="faculty-primary" to={`${manage}/new`}>Create update</Link><Link to={manage}>My Industry Updates</Link>{user.role === 'admin' && <><Link to={`${manage}?scope=review`}>Review queue</Link><Link to={`${manage}?scope=all`}>All updates</Link></>}<Link to={published}>Published updates</Link></> : user.role !== 'student' && <Link to={manage}>Manage Industry Updates →</Link>}
+    {managed ? <><Link className="faculty-primary" to={withManagementOrigin(`${manage}/new`, makeManagementOrigin(user, 'industry', source))}>Create update</Link><Link to={manage}>My Industry Updates</Link>{user.role === 'admin' && <><Link to={`${manage}?scope=review`}>Review queue</Link><Link to={`${manage}?scope=all`}>All updates</Link></>}<Link to={published}>Published updates</Link></> : user.role !== 'student' && <Link to={manage}>Manage Industry Updates →</Link>}
   </div></div>
     {managed && location.state?.industryDeletion === 'complete' && <p role="status">Update permanently deleted.</p>}
     {managed && location.state?.industryDeletion === 'cleanup-pending' && <p role="status">Update permanently deleted. File access is revoked; physical file cleanup is queued for retry.</p>}
     {!data.entries.length ? <p>{managed ? 'No industry updates in this view.' : 'No industry updates have been published yet.'}</p> : <ul className="faculty-list">{data.entries.map(entry => {
       const revision = managed ? entry.working ?? entry.published : entry.published
-      return <li key={entry.id}><div><p className="faculty-status">{hubLabels[entry.status]}{managed && entry.published && entry.working && ` · Revision v${entry.working.number}: ${hubLabels[entry.working.state ?? 'draft']}`}</p><h3><Link to={managed ? industryManagePath(entry.id) : industryPath(entry.id)}>{revision?.title}</Link></h3>{revision?.sourceName && <p>Source: {revision.sourceName}</p>}</div><Link to={managed ? industryManagePath(entry.id) : industryPath(entry.id)}>{managed ? 'Manage →' : 'Open →'}</Link></li>
+      const destination = withManagementOrigin(managed ? industryManagePath(entry.id) : industryPath(entry.id), makeManagementOrigin(user, 'industry', source, entry.id))
+      return <li key={entry.id} tabIndex={-1} data-management-row={`industry-${entry.id}`}><div><p className="faculty-status">{hubLabels[entry.status]}{managed && entry.published && entry.working && ` · Revision v${entry.working.number}: ${hubLabels[entry.working.state ?? 'draft']}`}</p><h3><Link to={destination}>{revision?.title}</Link></h3>{revision?.sourceName && <p>Source: {revision.sourceName}</p>}</div><Link to={destination}>{managed ? 'Manage →' : 'Open →'}</Link></li>
     })}</ul>}
     {data.totalPages > 1 && <nav aria-label="Industry Updates pagination" className="faculty-actions">{data.page > 1 && <Link to={`?${new URLSearchParams({ ...(managed ? { scope } : { view: 'industry' }), page: String(data.page-1) })}`}>Previous page</Link>}<span>Page {data.page} of {data.totalPages}</span>{data.page < data.totalPages && <Link to={`?${new URLSearchParams({ ...(managed ? { scope } : { view: 'industry' }), page: String(data.page+1) })}`}>Next page</Link>}</nav>}
   </section>

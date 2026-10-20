@@ -1,5 +1,8 @@
 import { useEffect, useState } from 'react'
 import { Link, useLocation, useParams } from 'react-router-dom'
+import { useAuth } from '../auth/useAuth'
+import { managementReturn, withManagementOrigin } from '../components/management/managementOrigin'
+import { useManagementOrigin } from '../components/management/useManagementOrigin'
 import { fetchManagedPaperPreview, fetchPaperBySlug, PaperApiError, PaperNotFoundError } from '../api/papers'
 import PaperResources from '../components/papers/PaperResources'
 import BookmarkControl from '../components/learning/BookmarkControl'
@@ -35,7 +38,7 @@ function getReturnPath(state: unknown) {
 }
 
 function returnLabel(preview: boolean, path: string) {
-  return preview ? 'Back to Papers Management' : path.startsWith('/course/') ? 'Back to Module' : 'Back to Paper Library'
+  return preview || path.startsWith('/manage/papers') ? 'Back to Papers Management' : path.startsWith('/course/') ? 'Back to Module' : 'Back to Paper Library'
 }
 
 function getPublicationDetails(paper: Paper) {
@@ -206,7 +209,9 @@ function PaperDetailStatus({
 function PaperDetailPage({ preview = false }: { preview?: boolean }) {
   const { slug, id } = useParams<{ slug: string; id: string }>()
   const location = useLocation()
-  const returnPath = preview ? '/manage/papers' : getReturnPath(location.state)
+  const { state: auth } = useAuth()
+  const origin = useManagementOrigin(auth.status === 'authenticated' ? auth.user : null, ['papers'])
+  const returnPath = origin ? managementReturn(origin).path : preview ? '/manage/papers' : getReturnPath(location.state)
   const paperId = id ? Number(id) : null
   const validId = paperId !== null && Number.isInteger(paperId) && paperId > 0
   const [result, setResult] = useState<PaperDetailResult | null>(null)
@@ -287,7 +292,7 @@ function PaperDetailPage({ preview = false }: { preview?: boolean }) {
       <main id="paper-main" tabIndex={-1} className={`paper-detail-main${preview ? ' is-preview' : ' pr-main'}`}>
         {loading ? (
           <>
-            <Link className="paper-detail-back" to={returnPath}>
+            <Link className={`paper-detail-back${origin ? ' management-return' : ''}`} to={returnPath}>
               <span aria-hidden="true">←</span> {returnLabel(preview, returnPath)}
             </Link>
             {preview ? <PaperDetailLoadingState /> : <p className="pr-loading" role="status">Loading paper…</p>}
@@ -295,17 +300,17 @@ function PaperDetailPage({ preview = false }: { preview?: boolean }) {
         ) : error ? (
           <PaperDetailStatus error={error} onRetry={retryPaper} preview={preview} returnPath={returnPath} />
         ) : paper && !preview ? (
-          <PaperReadingWorkspace key={paper.slug} paper={paper} reading={reading} returnPath={returnPath} citation={citation} publishedDate={publishedDate} onCopyCitation={() => void copyCitation()} copyState={copyState} />
+          <PaperReadingWorkspace key={paper.slug} paper={paper} reading={reading} returnPath={returnPath} backLabel={returnLabel(preview, returnPath)} citation={citation} publishedDate={publishedDate} onCopyCitation={() => void copyCitation()} copyState={copyState} />
         ) : paper ? (
           <>
-            <Link className="paper-detail-back" to={returnPath}>
+            <Link className={`paper-detail-back${origin ? ' management-return' : ''}`} to={returnPath}>
               <span aria-hidden="true">←</span> {returnLabel(preview, returnPath)}
             </Link>
 
             {preview && isPreviewPaper(paper) ? (
               <div className="paper-preview-banner">
                 <strong>Preview Mode · {paper.status.charAt(0).toUpperCase() + paper.status.slice(1)}</strong>
-                <Link to={`/manage/papers/${paper.id}/edit`}>Back to Edit</Link>
+                <Link to={withManagementOrigin(`/manage/papers/${paper.id}/edit`, origin)}>Back to Edit</Link>
               </div>
             ) : null}
 

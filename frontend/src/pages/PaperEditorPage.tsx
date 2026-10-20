@@ -8,6 +8,8 @@ import {
   PaperApiError,
   updatePaper,
 } from '../api/papers'
+import { managementReturn, withManagementOrigin } from '../components/management/managementOrigin'
+import { useManagementOrigin } from '../components/management/useManagementOrigin'
 import AttachmentManager from '../components/papers/AttachmentManager'
 import ConfirmDialog from '../components/papers/ConfirmDialog'
 import PaperForm from '../components/papers/PaperForm'
@@ -48,6 +50,8 @@ function PaperEditorLoading() {
 function PaperEditorPage({ currentUser }: { currentUser: AuthUser }) {
   const { id } = useParams<{ id: string }>()
   const location = useLocation()
+  const origin = useManagementOrigin(currentUser, ['papers'])
+  const back = origin ? managementReturn(origin) : { path: '/manage/papers', label: 'Back to Papers Management' }
   const navigate = useNavigate()
   const isCreateMode = !id
   const paperId = id ? Number(id) : null
@@ -104,7 +108,7 @@ function PaperEditorPage({ currentUser }: { currentUser: AuthUser }) {
         ? 'Paper published successfully.'
         : 'Draft saved.'
       setNotice(message)
-      navigate(`/manage/papers/${savedPaper.id}/edit`, {
+      navigate(withManagementOrigin(`/manage/papers/${savedPaper.id}/edit`, origin), {
         replace: true,
         state: { notice: message },
       })
@@ -146,7 +150,7 @@ function PaperEditorPage({ currentUser }: { currentUser: AuthUser }) {
 
     try {
       await deletePaper(paper.id)
-      navigate('/manage/papers', { replace: true })
+      navigate(back.path, { replace: true })
     } catch (error) {
       setActionError(error instanceof PaperApiError && error.status === 403
         ? 'Only administrators can permanently delete papers.'
@@ -184,7 +188,7 @@ function PaperEditorPage({ currentUser }: { currentUser: AuthUser }) {
         ) : loadError === 'session' ? (
           <Link state={{ from: location.pathname, managementRequired: true }} to="/login">Sign In</Link>
         ) : (
-          <Link to="/manage/papers">Back to Papers Management</Link>
+          <Link className="management-return" to={back.path}>{back.label}</Link>
         )}
       </section>
     )
@@ -207,7 +211,7 @@ function PaperEditorPage({ currentUser }: { currentUser: AuthUser }) {
             <PaperStatusBadge status={paper.status} />
             <span>Current slug</span>
             <code>{paper.slug}</code>
-            <Link to={`/manage/papers/${paper.id}/preview`}>Preview</Link>
+            <Link to={withManagementOrigin(`/manage/papers/${paper.id}/preview`, origin)}>Preview</Link>
           </div>
         ) : null}
       </header>
@@ -220,6 +224,8 @@ function PaperEditorPage({ currentUser }: { currentUser: AuthUser }) {
         key={paper ? `${paper.id}:${paper.status}` : 'new-paper'}
         mode={isCreateMode ? 'create' : 'edit'}
         onSubmit={handleSave}
+        returnPath={back.path}
+        returnLabel={back.label}
       />
 
       {paper ? <AttachmentManager key={paper.id} paperId={paper.id} /> : <p className="paper-editor-notice">Save this paper before adding resources.</p>}
