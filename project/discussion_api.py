@@ -219,7 +219,7 @@ def register_discussion_api(app, db, User, Entry, Revision, Attachment, Event, D
             previous = revision_for(entry,entry.working_revision_id) or shared['published'](entry)
             if entry.archived_at or previous is None or previous.state not in {'approved','rejected'}:
                 fail('A new draft is not available.','HUB_STATE_CONFLICT',409)
-            revision = Revision(entry_id=entry.id,number=previous.number+1,title=previous.title,body=previous.body)
+            revision = Revision(entry_id=entry.id,number=shared['next_revision_number'](entry),title=previous.title,body=previous.body)
             db.session.add(revision);db.session.flush();entry.working_revision_id=revision.id
             event(entry,revision,'draft_created')
         else:
@@ -311,6 +311,17 @@ def register_discussion_api(app, db, User, Entry, Revision, Attachment, Event, D
         db.session.commit()
         return jsonify(report=report_data(report))
 
+    @app.post(base+'/entries/<int:entry_id>/discard-revision')
+    @guarded
+    def discussion_discard_revision(entry_id):
+        entry, _ = lookup(entry_id, True)
+        data = payload({'expectedVersion','confirmation'}); token(entry, data)
+        if data['confirmation'] != 'DISCARD': fail('Confirm discarding this working revision.')
+        keys = shared['discard_working_revision'](entry)
+        db.session.commit()
+        pending = app.extensions['file_asset_service'].drain_cleanup(keys)
+        return jsonify(entry=serialize(entry, True), cleanupPending=bool(pending))
+
     @app.delete(base+'/entries/<int:entry_id>')
     @guarded
     def discussion_delete(entry_id):
@@ -341,11 +352,11 @@ def register_discussion_api(app, db, User, Entry, Revision, Attachment, Event, D
             report.target_entry_id=None;report.version+=1
             db.session.add(ReportEvent(report_id=report.id,actor_id=actor().id,action='target_deleted'))
         for item in entries:
-            db.session.add(DeletionAudit(original_entry_id=item.id,actor_id=actor().id,snapshot={
+            shared['deletion_receipt'](item, {
                 'kind':'discussions','ownerId':item.owner_id,'version':item.version,'rootEntryId':entry_id,
                 'revisions':[dict(id=row.id,number=row.number,state=row.state) for row in revisions if row.entry_id==item.id],
                 'moderation':[dict(action=row.action,actorId=row.actor_id,revisionId=row.revision_id,
-                    createdAt=row.created_at.isoformat()+'Z') for row in events if row.entry_id==item.id]}))
+                    createdAt=row.created_at.isoformat()+'Z') for row in events if row.entry_id==item.id]})
             item.published_revision_id=item.working_revision_id=None
         for row in events+attachments:db.session.delete(row)
         for row in db.session.scalars(select(Discussion).where(Discussion.entry_id.in_(ids))).all():db.session.delete(row)

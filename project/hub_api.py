@@ -303,7 +303,7 @@ def register_hub_api(app, db, User, Entry, Revision, Attachment, Event, roles_re
         previous = revision_for(entry, entry.working_revision_id) or published(entry)
         if entry.archived_at or previous is None or previous.state not in {'approved', 'rejected'}:
             fail('A new draft is not available in this state.', 'HUB_STATE_CONFLICT', 409)
-        revision = Revision(entry_id=entry.id, number=previous.number+1, title=previous.title, body=previous.body,
+        revision = Revision(entry_id=entry.id, number=next_revision_number(entry), title=previous.title, body=previous.body,
                             source_name=previous.source_name, source_url=previous.source_url, source_date=previous.source_date)
         db.session.add(revision); db.session.flush()
         for item in db.session.scalars(select(Attachment).where(Attachment.revision_id == previous.id)).all():
@@ -348,9 +348,69 @@ def register_hub_api(app, db, User, Entry, Revision, Attachment, Event, roles_re
             event(entry, revision, {'submit':'submitted','withdraw':'withdrawn','approve':'approved','reject':'rejected'}[action], revision.review_note)
         return saved(entry)
 
-    @app.delete('/api/hub/industry/entries/<int:entry_id>')
+    def deletion_receipt(entry, snapshot, discard=None):
+        # One receipt per entry already exists in the schema. Revision cleanup
+        # appends minimal facts; later whole-entry deletion preserves these facts.
+        receipt = db.session.scalar(select(DeletionAudit).where(
+            DeletionAudit.original_entry_id == entry.id).with_for_update())
+        discarded = list((receipt.snapshot or {}).get('discardedRevisions', [])) if receipt else []
+        if discard is not None:
+            discarded.append(discard)
+        snapshot = dict(operation='revision_discarded' if discard else 'entry_deleted', **snapshot)
+        if discarded:
+            snapshot['discardedRevisions'] = discarded
+        if receipt is None:
+            db.session.add(DeletionAudit(original_entry_id=entry.id, actor_id=actor().id, snapshot=snapshot))
+        else:
+            receipt.actor_id, receipt.created_at, receipt.snapshot = actor().id, datetime.utcnow(), snapshot
+
+    def next_revision_number(entry):
+        highest = db.session.scalar(select(func.max(Revision.number)).where(Revision.entry_id == entry.id)) or 0
+        receipt = db.session.scalar(select(DeletionAudit).where(DeletionAudit.original_entry_id == entry.id))
+        discarded = (receipt.snapshot or {}).get('discardedRevisions', []) if receipt else []
+        return max([highest, *[row['number'] for row in discarded]]) + 1
+
+    def discard_working_revision(entry):
+        revision = revision_for(entry, entry.working_revision_id)
+        if (entry.archived_at or approved_snapshot(entry) is None or revision is None or
+                revision.id == entry.published_revision_id or revision.state not in {'draft', 'rejected'}):
+            fail('Only a Draft or Rejected working revision can be discarded. Withdraw pending revisions first.', 'HUB_STATE_CONFLICT', 409)
+        items = db.session.scalars(select(Attachment).where(Attachment.revision_id == revision.id)).all()
+        asset_ids = [row.asset_id for row in items]
+        keys = [row.asset.storage_key for row in items if row.asset.storage_key]
+        deletion_receipt(entry, dict(kind=entry.kind, ownerId=entry.owner_id, version=entry.version,
+            publishedRevisionId=entry.published_revision_id), discard=dict(id=revision.id, number=revision.number,
+            state=revision.state, actorId=actor().id, createdAt=datetime.utcnow().isoformat()+'Z'))
+        # Retain moderation history without a dangling FK to the removed revision.
+        for row in db.session.scalars(select(Event).where(Event.revision_id == revision.id)).all():
+            row.revision_id = None
+        for row in items:
+            db.session.delete(row)
+        entry.working_revision_id = None
+        entry.version += 1
+        entry.updated_at = datetime.utcnow()
+        db.session.flush()
+        db.session.delete(revision)
+        assets.retire_unreferenced(asset_ids)
+        return keys
+
+    @app.post('/api/hub/industry/entries/<int:entry_id>/discard-revision')
+    @app.post('/api/hub/entries/<int:entry_id>/discard-revision')
     @guarded
-    def industry_delete(entry_id):
+    def hub_discard_revision(entry_id):
+        entry = entry_for(entry_id, manage=True)
+        data = payload({'expectedVersion', 'confirmation'}); token(entry, data)
+        if data['confirmation'] != 'DISCARD':
+            fail('Confirm discarding this working revision.')
+        keys = discard_working_revision(entry)
+        db.session.commit()
+        pending = assets.drain_cleanup(keys)
+        return jsonify(entry=serialize(entry, manage=True), cleanupPending=bool(pending))
+
+    @app.delete('/api/hub/industry/entries/<int:entry_id>')
+    @app.delete('/api/hub/entries/<int:entry_id>')
+    @guarded
+    def hub_delete(entry_id):
         entry = entry_for(entry_id, manage=True)
         data = payload({'expectedVersion', 'confirmation'})
         token(entry, data)
@@ -363,8 +423,8 @@ def register_hub_api(app, db, User, Entry, Revision, Attachment, Event, roles_re
                               or any(row.action == 'approved' for row in events))
         current = revision_for(entry, entry.working_revision_id)
         if ever_published:
-            if account_role(actor().role) != 'admin':
-                fail('Only administrators can permanently delete previously published updates.', 'FORBIDDEN', 403)
+            if request_kind() != 'industry' or account_role(actor().role) != 'admin':
+                fail('Previously published content cannot be deleted as a draft.', 'FORBIDDEN', 403)
         elif current is None or current.state not in {'draft', 'rejected'}:
             fail('Withdraw pending updates to Draft before deleting.', 'HUB_STATE_CONFLICT', 409)
         ids = [row.id for row in revisions]
@@ -372,15 +432,15 @@ def register_hub_api(app, db, User, Entry, Revision, Attachment, Event, roles_re
         asset_ids = [row.asset_id for row in attachments]
         keys = [row.asset.storage_key for row in attachments if row.asset.storage_key]
         # Keep an attributable receipt, not a hidden copy of deleted content/files.
-        db.session.add(DeletionAudit(original_entry_id=entry.id, actor_id=actor().id, snapshot={
-            'kind': 'industry', 'ownerId': entry.owner_id, 'version': entry.version,
+        deletion_receipt(entry, {
+            'kind': entry.kind, 'ownerId': entry.owner_id, 'version': entry.version,
             'everPublished': ever_published, 'archived': entry.archived_at is not None,
             'publishedRevisionId': entry.published_revision_id, 'workingRevisionId': entry.working_revision_id,
             'revisions': [{'id': row.id, 'number': row.number, 'state': row.state} for row in revisions],
             'attachmentCount': len(attachments),
             'moderation': [{'action': row.action, 'actorId': row.actor_id, 'revisionId': row.revision_id,
                             'createdAt': row.created_at.isoformat()+'Z'} for row in events],
-        }))
+        })
         # Explicit ordering honors RESTRICT constraints; the guard makes all changes atomic.
         for row in events:
             db.session.delete(row)
@@ -486,4 +546,5 @@ def register_hub_api(app, db, User, Entry, Revision, Attachment, Event, roles_re
     # Discussion-specific publication/parent rules live in their own adapter.
     app.extensions['hub_moderation'] = dict(guarded=guarded, actor=actor, fail=fail,
         payload=payload, token=token, revision_for=revision_for, working=working,
-        event=event, status=status, published=published, approved_snapshot=approved_snapshot)
+        event=event, status=status, published=published, approved_snapshot=approved_snapshot,
+        deletion_receipt=deletion_receipt, discard_working_revision=discard_working_revision, next_revision_number=next_revision_number)

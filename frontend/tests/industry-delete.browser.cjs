@@ -33,11 +33,12 @@ async function layout(page, name, width) {
 async function deleteInUI(page, label, width, retry=false) {
   const trigger = page.getByRole('button',{name:label,exact:true}); await trigger.click();
   const dialog = page.getByRole('dialog'), confirm = dialog.getByRole('button',{name:label,exact:true});
-  await dialog.waitFor(); check('DELETE required '+width,await confirm.isDisabled());
-  await dialog.getByLabel('Type DELETE to continue').fill('delete'); check('case-sensitive confirmation '+width,await confirm.isDisabled());
+  await dialog.waitFor(); const permanent=label==='Delete permanently';
+  if(permanent){check('DELETE required '+width,await confirm.isDisabled());await dialog.getByLabel('Type DELETE to continue').fill('delete');check('case-sensitive confirmation '+width,await confirm.isDisabled());}
+  else check('draft uses explicit button confirmation '+width,await confirm.isEnabled()&&await dialog.locator('input').count()===0);
   await page.keyboard.press('Escape'); await dialog.waitFor({state:'hidden'});
   check('Escape focus restore '+width,await trigger.evaluate(el=>el===document.activeElement&&getComputedStyle(el).outlineStyle!=='none'));
-  await trigger.click(); await dialog.getByLabel('Type DELETE to continue').fill('DELETE');
+  await trigger.click(); if(permanent)await dialog.getByLabel('Type DELETE to continue').fill('DELETE');
   await page.keyboard.press('Tab'); check('dialog keyboard focus '+width,await dialog.evaluate(el=>el.contains(document.activeElement)));
   await layout(page,'delete-dialog-'+label.replaceAll(' ','-'),width);
   if(retry) {
@@ -67,13 +68,13 @@ async function deleteInUI(page, label, width, retry=false) {
     let draft=await create(teacher,'Draft '+width);
     check('foreign teacher delete denied '+width,(await request(other,`${api}/${draft.id}`,'DELETE',{expectedVersion:draft.version,confirmation:'DELETE'})).status()===404);
     await page.goto(base+manage+'/'+draft.id);await page.getByRole('heading',{name:'Danger zone',exact:true}).waitFor();
-    await layout(page,'draft-danger',width);await deleteInUI(page,'Delete update',width,width===390);
+    await layout(page,'draft-danger',width);await deleteInUI(page,'Delete draft',width,width===390);
     check('deleted draft manage denied '+width,(await teacher.request.get(base+api+'/'+draft.id+'/manage')).status()===404);
     let pending=await action(teacher,await create(teacher,'Rejected '+width),'submit');
     await page.goto(base+manage+'/'+pending.id);await page.getByText('Withdraw this pending update to Draft before deleting it.',{exact:true}).waitFor();
-    check('pending has no Delete '+width,await page.getByRole('button',{name:'Delete update',exact:true}).count()===0);
+    check('pending has no Delete '+width,await page.getByRole('button',{name:'Delete draft',exact:true}).count()===0);
     let rejected=await action(admin,pending,'reject',{reviewNote:'TEST ONLY invalid'});
-    await page.reload();await page.getByRole('button',{name:'Delete update',exact:true}).waitFor();await deleteInUI(page,'Delete update',width);
+    await page.reload();await page.getByRole('button',{name:'Delete draft',exact:true}).waitFor();await deleteInUI(page,'Delete draft',width);
     let published=await create(teacher,'Published '+width);
     const upload=await request(teacher,`${api}/${published.id}/attachments`,'POST',null,{
       expectedVersion:String(published.version),displayName:'TEST ONLY delete PDF',attachmentType:'pdf',
@@ -95,8 +96,8 @@ async function deleteInUI(page, label, width, retry=false) {
   const pending=await action(teacher,await create(teacher,'Withdraw'),'submit');
   await page.goto(base+manage+'/'+pending.id);await page.getByRole('button',{name:'Withdraw to Draft',exact:true}).click();
   await page.getByRole('dialog').getByRole('button',{name:'Confirm',exact:true}).click();
-  await page.getByRole('button',{name:'Delete update',exact:true}).waitFor();check('withdraw unlocks deletion');
-  await deleteInUI(page,'Delete update',1440);
+  await page.getByRole('button',{name:'Delete draft',exact:true}).waitFor();check('withdraw unlocks deletion');
+  await deleteInUI(page,'Delete draft',1440);
   const anonymous=await browser.newContext();check('anonymous direct DELETE denied',(await request(anonymous,api+'/1','DELETE',{expectedVersion:1,confirmation:'DELETE'})).status()===401);await anonymous.close();
   check('Faculty still available',(await learner.request.get(base+'/api/hub/entries/'+fixture.faculty.id)).status()===200);
   check('zero page errors',errors.length===0);check('zero automatic learning writes',learningWrites.length===0);

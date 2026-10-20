@@ -1,9 +1,10 @@
 import { useId, useRef, useState, type FormEvent } from 'react'
 import type { AttachmentAccessLevel, AttachmentFileInput, AttachmentFileType, AttachmentLinkInput, ManagedPaperAttachment } from '../../types/paper'
+import { useUnsavedChanges } from '../management/useUnsavedChanges'
 import { ACCESS_HELP, ACCESS_LABELS, ATTACHMENT_LABELS, FILE_ACCEPT } from './attachmentPresentation'
 type Input = AttachmentFileInput | AttachmentLinkInput
-export default function AttachmentForm({ existing, link, busy, primaryTypes, onSubmit, onCancel }: {
-  existing?: ManagedPaperAttachment; link: boolean; busy: boolean; primaryTypes: AttachmentFileType[]
+export default function AttachmentForm({ existing, link, busy, primaryTypes, onSubmit, onCancel, exitScope }: {
+  exitScope: string; existing?: ManagedPaperAttachment; link: boolean; busy: boolean; primaryTypes: AttachmentFileType[]
   onSubmit: (input: Input) => void; onCancel: () => void
 }) {
   const id = useId(), fileInput = useRef<HTMLInputElement>(null)
@@ -14,6 +15,9 @@ export default function AttachmentForm({ existing, link, busy, primaryTypes, onS
   const [order, setOrder] = useState(String(existing?.sortOrder ?? 0))
   const [url, setUrl] = useState(existing?.externalUrl ?? '')
   const [error, setError] = useState<string | null>(null)
+  const [fileSelected, setFileSelected] = useState(false)
+  const dirty = name !== (existing?.displayName ?? '') || description !== (existing?.description ?? '') || access !== (existing?.accessLevel ?? 'public') || order !== String(existing?.sortOrder ?? 0) || url !== (existing?.externalUrl ?? '') || fileSelected
+  const requestExit = useUnsavedChanges(dirty, busy, exitScope)
   const primaryExists = !existing && primaryTypes.includes(kind)
   const submit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
@@ -35,12 +39,12 @@ export default function AttachmentForm({ existing, link, busy, primaryTypes, onS
       <div className="resource-form-grid">
         {!link ? <>
           <div className="resource-field"><label htmlFor={`${id}-type`}>Attachment Type</label>
-            <select id={`${id}-type`} value={kind} disabled={Boolean(existing)} onChange={event => { setKind(event.target.value as AttachmentFileType); setError(null) }}>
+            <select id={`${id}-type`} value={kind} disabled={Boolean(existing)} onChange={event => { const next = event.target.value as AttachmentFileType; const change = () => { setKind(next); setFileSelected(false); setError(null) }; if (fileSelected) requestExit(change, exitScope); else change() }}>
               {(Object.keys(FILE_ACCEPT) as AttachmentFileType[]).map(type => <option value={type} key={type}>{ATTACHMENT_LABELS[type]}</option>)}
             </select>
           </div>
           <div className="resource-field"><label htmlFor={`${id}-file`}>File</label>
-            <input key={kind} ref={fileInput} id={`${id}-file`} type="file" accept={FILE_ACCEPT[kind]} required aria-describedby={`${id}-file-help`} />
+            <input key={kind} ref={fileInput} id={`${id}-file`} type="file" onChange={event => setFileSelected(Boolean(event.target.files?.length))} accept={FILE_ACCEPT[kind]} required aria-describedby={`${id}-file-help`} />
             <small id={`${id}-file-help`}>{kind === 'cover' ? 'JPG, JPEG, PNG or WEBP · up to 8 MB' : kind === 'document' ? 'DOCX · up to 30 MB' : kind === 'slides' ? 'PPTX · up to 50 MB' : 'PDF · up to 50 MB'}. Files are validated on upload.</small>
           </div>
         </> : <div className="resource-field is-wide"><label htmlFor={`${id}-url`}>External URL</label>
@@ -66,7 +70,7 @@ export default function AttachmentForm({ existing, link, busy, primaryTypes, onS
       {!link && primaryExists ? <p role="status">This paper already has a {ATTACHMENT_LABELS[kind]}. Use Replace on the existing resource below.</p> : null}
       {error ? <p className="resource-error" role="alert">{error}</p> : null}
       <div className="resource-actions">
-        <button onClick={onCancel} type="button">Cancel</button>
+        <button onClick={() => requestExit(onCancel, exitScope)} type="button">Cancel</button>
         <button className="is-primary" disabled={!link && primaryExists} type="submit">{busy ? 'Working...' : existing ? 'Review Replacement' : link ? 'Add Link' : 'Upload Resource'}</button>
       </div>
     </fieldset>

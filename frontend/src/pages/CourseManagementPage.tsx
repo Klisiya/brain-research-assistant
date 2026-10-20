@@ -8,15 +8,26 @@ import ManagementRequestState from '../components/management/ManagementRequestSt
 import { useAuth } from '../auth/useAuth'
 import type { AuthUser } from '../types/auth'
 import CourseResourcesEditor, { type CourseRun } from '../components/courses/CourseResourcesEditor'
+import { useUnsavedChanges, useEditorMounted } from '../components/management/useUnsavedChanges'
+import { UnsavedChangesScope } from '../components/management/UnsavedChangesProvider'
 import './CourseManagementPage.css'
 
 function ContentEditor({ row, base, module, run, busy }: { row: ManagedCourse | ManagedModule; base: string; module?: boolean; run: CourseRun; busy: boolean }) {
   const [description,setDescription]=useState(row.description),[status,setStatus]=useState(row.status),[focus,setFocus]=useState('learningFocus' in row?row.learningFocus:''),[category,setCategory]=useState('category' in row?row.category:'')
-  const submit=(e:FormEvent)=>{e.preventDefault();void run(()=>courseWrite(base,'PATCH',{description,status,expectedUpdatedAt:row.updatedAt,...(module?{learningFocus:focus,category}:{})}))}
+  const value=JSON.stringify({description,status,focus,category}),[baseline,setBaseline]=useState(value),isMounted=useEditorMounted()
+  const [token,setToken]=useState(row.updatedAt),[observed,setObserved]=useState(row.updatedAt)
+  // A refresh may update a pristine form; a dirty form retains its original edit token.
+  if(!busy && value===baseline && row.updatedAt!==observed){const nextFocus='learningFocus' in row?row.learningFocus:'',nextCategory='category' in row?row.category:'';setObserved(row.updatedAt);setToken(row.updatedAt);setDescription(row.description);setStatus(row.status);setFocus(nextFocus);setCategory(nextCategory);setBaseline(JSON.stringify({description:row.description,status:row.status,focus:nextFocus,category:nextCategory}))}
+  useUnsavedChanges(value !== baseline,busy)
+  const submit=async(e:FormEvent)=>{e.preventDefault();await run(async()=>{
+    await courseWrite(base,'PATCH',{description,status,expectedUpdatedAt:token,...(module?{learningFocus:focus,category}:{})})
+    const result=await courseRequest<{course:ManagedCourse;module?:ManagedModule}>(base+'/manage'),fresh=module?result.module!:result.course
+    if(isMounted()){const nextFocus='learningFocus' in fresh?fresh.learningFocus:'',nextCategory='category' in fresh?fresh.category:'';setDescription(fresh.description);setStatus(fresh.status);setFocus(nextFocus);setCategory(nextCategory);setToken(fresh.updatedAt);setBaseline(JSON.stringify({description:fresh.description,status:fresh.status,focus:nextFocus,category:nextCategory}))}
+  })}
   return <section className="course-editor-panel"><h2>{module?'Module metadata':'Course metadata'}</h2><form onSubmit={submit}>
-    <label htmlFor={`${base}-description`}>Description</label><textarea id={`${base}-description`} rows={5} maxLength={6000} value={description} onChange={e=>setDescription(e.target.value)} />
-    {module&&<><label htmlFor={`${base}-focus`}>Learning focus</label><textarea id={`${base}-focus`} rows={4} maxLength={6000} value={focus} onChange={e=>setFocus(e.target.value)} /><label>Category<input maxLength={150} value={category} onChange={e=>setCategory(e.target.value)} /></label></>}
-    <label htmlFor={`${base}-status`}>Publication status</label><select id={`${base}-status`} value={status} onChange={e=>setStatus(e.target.value)}><option value="draft">Draft</option><option value="published">Published</option><option value="archived">Archived</option></select>
+    <label htmlFor={`${base}-description`}>Description</label><textarea disabled={busy} id={`${base}-description`} rows={5} maxLength={6000} value={description} onChange={e=>setDescription(e.target.value)} />
+    {module&&<><label htmlFor={`${base}-focus`}>Learning focus</label><textarea disabled={busy} id={`${base}-focus`} rows={4} maxLength={6000} value={focus} onChange={e=>setFocus(e.target.value)} /><label>Category<input disabled={busy} maxLength={150} value={category} onChange={e=>setCategory(e.target.value)} /></label></>}
+    <label htmlFor={`${base}-status`}>Publication status</label><select disabled={busy} id={`${base}-status`} value={status} onChange={e=>setStatus(e.target.value)}><option value="draft">Draft</option><option value="published">Published</option><option value="archived">Archived</option></select>
     <button type="submit" disabled={busy}>{module?'Save module':'Save course'}</button>
   </form></section>
 }
@@ -43,15 +54,17 @@ function StaffEditor({base,admin,run,busy}:{base:string;admin:boolean;run:Course
 }
 export default function CourseManagementPage({currentUser}:{currentUser:AuthUser}) {
   const {courseId}=useParams(),id=courseId?Number(courseId):null,{refreshAuth}=useAuth()
-  const reader=useCallback((signal:AbortSignal)=>courseRequest<{course?:ManagedCourse;courses?:ManagedCourse[]}>(id===null?'/api/courses/manage':`/api/courses/${id}/manage`,{signal}),[id]),state=useCourseRead(`course-workspace:${id}:${currentUser.id}:${currentUser.role}`,reader)
+  const reader=useCallback((signal:AbortSignal)=>courseRequest<{course?:ManagedCourse;courses?:ManagedCourse[]}>(id===null?'/api/courses/manage':`/api/courses/${id}/manage`,{signal}),[id]),state=useCourseRead(`course-workspace:${id}:${currentUser.id}:${currentUser.role}`,reader,true)
   const [selected,setSelected]=useState(0),[busy,setBusy]=useState(false),[message,setMessage]=useState(''),[error,setError]=useState('')
-  const run:CourseRun=async action=>{setBusy(true);setError('');setMessage('');try{await action();state.retry();setMessage('Changes saved.');return true}catch(e){setError(e instanceof Error?e.message:'Unable to save.');if(e instanceof CourseManagementError&&[401,403].includes(e.status))await refreshAuth();return false}finally{setBusy(false)}}
+  const requestExit = useUnsavedChanges(false,busy), isMounted = useEditorMounted()
+  const run:CourseRun=async action=>{setBusy(true);setError('');setMessage('');try{await action();if(!isMounted())return false;state.retry();setMessage('Changes saved.');return true}catch(e){if(!isMounted())return false;setError(e instanceof Error?e.message:'Unable to save.');if(e instanceof CourseManagementError&&[401,403].includes(e.status))await refreshAuth();return false}finally{if(isMounted())setBusy(false)}}
   const course=state.data?.course,module=course?.modules.find(m=>m.id===selected)??course?.modules[0],base=`/api/courses/${id}`,moduleBase=`${base}/modules/${module?.id}`
-  return <div className="course-management"><header><p>Management · Internal course maintenance</p><h1>{course?.title||'Course Maintenance'}</h1><Link to="/manage/courses">Assigned courses</Link>{course&&<Link to={coursePath(course.slug)}>View public course</Link>}</header><p>Existing internal maintenance tools. Teaching content is maintained through the code and data layer.</p><p role="status" aria-live="polite">{message}</p>{error&&<p role="alert" className="course-editor-error">{error}</p>}<button type="button" onClick={state.retry}>Refresh workspace</button>
-    {state.loading?<p role="status">Loading course workspace…</p>:state.error?<ManagementRequestState error={state.error} subject="Course" retry={state.retry} />:course?<>
-      <ContentEditor key={`${course.id}:${course.updatedAt}`} row={course} base={base} run={run} busy={busy} /><StaffEditor base={base} admin={currentUser.role==='admin'} run={run} busy={busy} /><CourseResourcesEditor base={base+'/resources'} run={run} busy={busy} title="Course resources" />
-      <section className="course-editor-panel"><h2>Learning modules</h2><label htmlFor="managed-module">Module to maintain</label><select id="managed-module" value={module?.id??''} onChange={e=>setSelected(Number(e.target.value))}>{course.modules.map(m=><option key={m.id} value={m.id}>Module {m.number} · {m.title}</option>)}</select>{module&&<><p>{module.title}</p><p lang="zh">{module.titleZh}</p><p>{module.durationHours} Hours</p><Link to={modulePath(course.slug,module.slug)}>View public module</Link></>}</section>
-      {module&&<div key={module.id}><ContentEditor key={module.updatedAt} row={module} base={moduleBase} module run={run} busy={busy} /><ReadingsEditor base={moduleBase} run={run} busy={busy} /><CourseResourcesEditor base={moduleBase+'/resources'} run={run} busy={busy} title="Module resources" /></div>}
+  return <div className="course-management"><header><p>Management · Internal course maintenance</p><h1>{course?.title||'Course Maintenance'}</h1><Link to="/manage/courses">Assigned courses</Link>{course&&<Link to={coursePath(course.slug)}>View public course</Link>}</header><p>Existing internal maintenance tools. Teaching content is maintained through the code and data layer.</p><p role="status" aria-live="polite">{message}</p>{error&&<p role="alert" className="course-editor-error">{error}</p>}<button type="button" onClick={()=>requestExit(state.reload)}>Refresh workspace</button>
+    {state.error && course && <p role="alert">Workspace refresh failed. Your local edits are preserved. Use Refresh workspace to try again.</p>}
+    {state.loading?<p role="status">Loading course workspace…</p>:state.error&&!course?<ManagementRequestState error={state.error} subject="Course" retry={state.retry} />:course?<>
+      <ContentEditor key={`course-${course.id}`} row={course} base={base} run={run} busy={busy} /><StaffEditor base={base} admin={currentUser.role==='admin'} run={run} busy={busy} /><CourseResourcesEditor base={base+'/resources'} run={run} busy={busy} title="Course resources" />
+      <section className="course-editor-panel"><h2>Learning modules</h2><label htmlFor="managed-module">Module to maintain</label><select id="managed-module" value={module?.id??''} onChange={e=>{const next=Number(e.target.value);requestExit(()=>setSelected(next),`module-${module?.id}`)}}>{course.modules.map(m=><option key={m.id} value={m.id}>Module {m.number} · {m.title}</option>)}</select>{module&&<><p>{module.title}</p><p lang="zh">{module.titleZh}</p><p>{module.durationHours} Hours</p><Link to={modulePath(course.slug,module.slug)}>View public module</Link></>}</section>
+      {module&&<UnsavedChangesScope key={`module-${module.id}`} name={`module-${module.id}`}><div><ContentEditor key={module.id} row={module} base={moduleBase} module run={run} busy={busy} /><ReadingsEditor base={moduleBase} run={run} busy={busy} /><CourseResourcesEditor base={moduleBase+'/resources'} run={run} busy={busy} title="Module resources" /></div></UnsavedChangesScope>}
     </>:<div className="course-manage-list">{state.data?.courses?.length?state.data.courses.map(c=><Link key={c.id} to={`/manage/courses/${c.id}`}><h2>{c.title || 'Course Overview'}</h2><p>{c.status} · {c.moduleCount} Modules</p><span>Manage course →</span></Link>):<p>No courses have been assigned to your account.</p>}</div>}
   </div>
 }

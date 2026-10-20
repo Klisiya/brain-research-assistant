@@ -1,10 +1,11 @@
-import { useCallback, useEffect, useId, useRef, useState, type FormEvent } from 'react'
+import { useCallback, useId, useRef, useState, type FormEvent } from 'react'
 import { Link, useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { HubError, hubLabels, hubMutation, hubRequest, industryManagePath, industryPath, type HubEntry, type HubFields, type HubList, type HubRevision } from '../../api/hub'
 import type { AuthUser } from '../../types/auth'
 import { useManagementRead } from '../management/useManagementRead'
 import { makeManagementOrigin, managementReturn, withManagementOrigin, listPage } from '../management/managementOrigin'
 import { useManagementOrigin, useManagementListPosition } from '../management/useManagementOrigin'
+import { useUnsavedChanges, useEditorMounted } from '../management/useUnsavedChanges'
 import ConfirmDialog from '../papers/ConfirmDialog'
 import './FacultyWorkspace.css'
 import './IndustryWorkspace.css'
@@ -13,7 +14,7 @@ const api = '/api/hub/industry/entries'
 const manage = '/manage/hub/industry'
 const published = '/innovation-hub?view=industry'
 type Fields = HubFields & { sourceDate: string }
-type Action = 'submit' | 'withdraw' | 'approve' | 'reject' | 'archive' | 'draft'
+type Action = 'submit' | 'withdraw' | 'approve' | 'reject' | 'archive' | 'draft' | 'discard-revision'
 const fields = (revision?: HubRevision | null): Fields => ({ title: revision?.title ?? '', body: revision?.body ?? '', sourceName: revision?.sourceName ?? '', sourceUrl: revision?.sourceUrl ?? '', sourceDate: revision?.sourceDate ?? '' })
 
 function RevisionView({ revision }: { revision: HubRevision }) {
@@ -44,15 +45,16 @@ function NewUpdate({ user }: { user: AuthUser }) {
   const origin = useManagementOrigin(user, ['industry']), back = origin ? managementReturn(origin) : { path: manage, label: 'Industry Updates' }
   const navigate = useNavigate(), controller = useRef<AbortController | null>(null)
   const [values, setValues] = useState(fields()), [busy, setBusy] = useState(false), [error, setError] = useState('')
-  useEffect(() => () => controller.current?.abort(), [])
+  useUnsavedChanges(JSON.stringify(values) !== JSON.stringify(fields()), busy)
+  const isMounted = useEditorMounted()
   async function create(event: FormEvent) {
     event.preventDefault(); if (controller.current) return
     const request = new AbortController(); controller.current = request; setBusy(true); setError('')
     try {
       const result = await hubMutation(api, 'POST', values, request.signal)
-      if (!request.signal.aborted) navigate(withManagementOrigin(industryManagePath(result.entry.id), origin), { replace: true })
-    } catch (reason) { if (!request.signal.aborted) setError(reason instanceof Error ? reason.message : 'Unable to save.') }
-    finally { if (controller.current === request) controller.current = null; if (!request.signal.aborted) setBusy(false) }
+      if (isMounted() && !request.signal.aborted) navigate(withManagementOrigin(industryManagePath(result.entry.id), origin), { replace: true })
+    } catch (reason) { if (isMounted() && !request.signal.aborted) setError(reason instanceof Error ? reason.message : 'Unable to save.') }
+    finally { if (controller.current === request) controller.current = null; if (isMounted() && !request.signal.aborted) setBusy(false) }
   }
   return <section className="faculty-workspace industry-workspace"><Link className="management-return" to={back.path}>← {back.label}</Link><h1>Create Industry Update</h1>
     <p>Enter material provided by a real source. Save a draft and submit it for administrator review.</p>
@@ -74,24 +76,28 @@ function Editor({ initial, user, refresh }: { initial: HubEntry; user: AuthUser;
   const [confirm, setConfirm] = useState<Action | 'delete' | null>(null), [reason, setReason] = useState('')
   const [materialName, setMaterialName] = useState(''), [materialType, setMaterialType] = useState('pdf'), [url, setUrl] = useState('')
   const file = useRef<HTMLInputElement>(null), controller = useRef<AbortController | null>(null)
-  useEffect(() => () => controller.current?.abort(), [])
+  const isMounted = useEditorMounted()
   const revision = entry.working, draft = revision?.state === 'draft' && entry.status !== 'archived'
+  const canDiscard = entry.published && entry.status !== 'archived' && revision && ['draft','rejected'].includes(revision.state ?? '')
   const canDelete = entry.published ? user.role === 'admin' : revision?.state === 'draft' || revision?.state === 'rejected'
   const dirty = JSON.stringify(values) !== JSON.stringify(fields(revision))
-  async function run(operation: (signal: AbortSignal) => Promise<{ entry: HubEntry }>, message: string) {
+  const [fileSelected, setFileSelected] = useState(false)
+  const requestExit = useUnsavedChanges((draft && dirty) || Boolean(reason), busy)
+  const materialExit = useUnsavedChanges(Boolean(materialName || url || fileSelected), busy, 'hub-material')
+  async function run(operation: (signal: AbortSignal) => Promise<{ entry: HubEntry }>, message: string, resetMaterials = false) {
     if (controller.current) return
     const request = new AbortController(); controller.current = request; setBusy(true); setError(''); setNotice('')
     try {
       const result = await operation(request.signal)
-      if (!request.signal.aborted) {
+      if (isMounted() && !request.signal.aborted) {
         setEntry(result.entry); setValues(fields(result.entry.working)); setNotice(message); setConfirm(null)
-        setMaterialName(''); setUrl(''); if (file.current) file.current.value = ''
+        setReason(''); if (resetMaterials) { setMaterialName(''); setUrl(''); setFileSelected(false); if (file.current) file.current.value = '' }
       }
-    } catch (failure) { if (!request.signal.aborted) setError(failure instanceof Error ? failure.message : 'Unable to save.') }
-    finally { if (controller.current === request) controller.current = null; if (!request.signal.aborted) setBusy(false) }
+    } catch (failure) { if (isMounted() && !request.signal.aborted) setError(failure instanceof Error ? failure.message : 'Unable to save.') }
+    finally { if (controller.current === request) controller.current = null; if (isMounted() && !request.signal.aborted) setBusy(false) }
   }
   function action(value: Action) {
-    void run(signal => hubMutation(`${api}/${entry.id}/${value}`, 'POST', { expectedVersion: entry.version, ...(value === 'reject' ? { reviewNote: reason } : {}) }, signal), value === 'approve' ? 'Approved and published.' : 'Update saved.')
+    void run(signal => hubMutation(`${api}/${entry.id}/${value}`, 'POST', { expectedVersion: entry.version, ...(value === 'discard-revision' ? { confirmation: 'DISCARD' } : {}), ...(value === 'reject' ? { reviewNote: reason } : {}) }, signal), value === 'discard-revision' ? 'Revision discarded. The published version is unchanged.' : value === 'approve' ? 'Approved and published.' : 'Update saved.', value === 'discard-revision')
   }
   async function deleteUpdate() {
     if (controller.current) return
@@ -101,33 +107,33 @@ function Editor({ initial, user, refresh }: { initial: HubEntry; user: AuthUser;
         method: 'DELETE', signal: request.signal, headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ expectedVersion: entry.version, confirmation: 'DELETE' }),
       })
-      if (!request.signal.aborted) {
+      if (isMounted() && !request.signal.aborted) {
         if (result.deleted !== true) throw new Error('Deletion could not be confirmed. Refresh the update before retrying.')
         navigate(back.path, { replace: true, state: { industryDeletion: result.cleanupPending ? 'cleanup-pending' : 'complete' } })
       }
-    } catch (failure) { if (!request.signal.aborted) setError(failure instanceof Error ? failure.message : 'Unable to delete update.') }
-    finally { if (controller.current === request) controller.current = null; if (!request.signal.aborted) setBusy(false) }
+    } catch (failure) { if (isMounted() && !request.signal.aborted) setError(failure instanceof Error ? failure.message : 'Unable to delete update.') }
+    finally { if (controller.current === request) controller.current = null; if (isMounted() && !request.signal.aborted) setBusy(false) }
   }
   function upload(event: FormEvent) {
     event.preventDefault()
-    if (materialType === 'external_link') void run(signal => hubMutation(`${api}/${entry.id}/attachments`, 'POST', { expectedVersion: entry.version, displayName: materialName, externalUrl: url }, signal), 'Link added to draft.')
+    if (materialType === 'external_link') void run(signal => hubMutation(`${api}/${entry.id}/attachments`, 'POST', { expectedVersion: entry.version, displayName: materialName, externalUrl: url }, signal), 'Link added to draft.', true)
     else if (file.current?.files?.[0]) {
       const form = new FormData()
       form.set('expectedVersion', String(entry.version)); form.set('displayName', materialName); form.set('attachmentType', materialType); form.set('file', file.current.files[0])
-      void run(signal => hubRequest(`${api}/${entry.id}/attachments`, { method: 'POST', body: form, signal }), 'Material added to draft.')
+      void run(signal => hubRequest(`${api}/${entry.id}/attachments`, { method: 'POST', body: form, signal }), 'Material added to draft.', true)
     }
   }
   return <section className="faculty-workspace industry-workspace"><Link className="management-return" to={back.path}>← {back.label}</Link><h1>Manage Industry Update</h1>
     <p className="faculty-status">{hubLabels[entry.status]}{entry.published && revision && <> · {revision.state === 'pending' ? 'Pending Revision' : 'Revision'} v{revision.number}: {hubLabels[revision.state ?? 'draft']}</>}</p>
     <p>Submitted by account {entry.submittedById}. Source identity is recorded separately.</p>
-    {error && <div role="alert"><p>{error}</p><button disabled={busy} onClick={refresh}>Refresh update</button><p>Refresh loads the saved version and clears unsaved changes.</p></div>}
+    {error && <div role="alert"><p>{error}</p><button disabled={busy} onClick={() => requestExit(refresh)}>Refresh update</button><p>Refresh loads the saved version and clears unsaved changes.</p></div>}
     {notice && <p role="status">{notice}</p>}{revision?.reviewNote && <p>Review feedback: {revision.reviewNote}</p>}
     {draft && <><form onSubmit={event => { event.preventDefault(); void run(signal => hubMutation(`${api}/${entry.id}`, 'PATCH', { ...values, expectedVersion: entry.version }, signal), 'Draft saved.') }}><UpdateFields values={values} onChange={setValues} disabled={busy} /><button type="submit" disabled={busy} className="faculty-primary">Save Draft</button></form>
       {dirty && <p>Save changes before adding materials or submitting for review.</p>}
       <form className="faculty-upload" onSubmit={upload}><fieldset disabled={busy || dirty}><legend>Add material</legend>
         <label>Material name<input required maxLength={300} value={materialName} onChange={e => setMaterialName(e.target.value)} /></label>
-        <label>Material type<select value={materialType} onChange={e => setMaterialType(e.target.value)}><option value="pdf">PDF</option><option value="slides">PPT / PPTX</option><option value="document">Word (DOC / DOCX)</option><option value="cover">Image (PNG / JPEG / WebP)</option><option value="external_link">External link</option></select></label>
-        {materialType === 'external_link' ? <label>Link URL<input required type="url" maxLength={1500} value={url} onChange={e => setUrl(e.target.value)} /></label> : <label>File<input required type="file" ref={file} accept={{ pdf: '.pdf', slides: '.ppt,.pptx', document: '.doc,.docx', cover: '.png,.jpg,.jpeg,.webp' }[materialType]} /></label>}
+        <label>Material type<select value={materialType} onChange={e => {const next = e.target.value; const change = () => { setMaterialType(next); setUrl(''); setFileSelected(false); if (file.current) file.current.value = '' }; if (url || fileSelected) materialExit(change, 'hub-material'); else change()}}><option value="pdf">PDF</option><option value="slides">PPT / PPTX</option><option value="document">Word (DOC / DOCX)</option><option value="cover">Image (PNG / JPEG / WebP)</option><option value="external_link">External link</option></select></label>
+        {materialType === 'external_link' ? <label>Link URL<input key="material-url" required type="url" maxLength={1500} value={url} onChange={e => setUrl(e.target.value)} /></label> : <label>File<input key="material-file" required type="file" ref={file} onChange={event => setFileSelected(Boolean(event.target.files?.length))} accept={{ pdf: '.pdf', slides: '.ppt,.pptx', document: '.doc,.docx', cover: '.png,.jpg,.jpeg,.webp' }[materialType]} /></label>}
         <p>PDF/PPT: up to 50 MB; Word: 30 MB; images: 8 MB. No video, encrypted files, or macros. In-page preview is unavailable.</p><button type="submit">Add material</button>
       </fieldset></form>
       {revision && revision.attachments.length > 0 && <ul className="faculty-attachments" aria-label="Draft materials">{revision.attachments.map(item => <li key={item.id}><span>{item.displayName}</span><button disabled={busy || dirty} aria-label={`Remove ${item.displayName}`} onClick={() => void run(signal => hubMutation(`${api}/${entry.id}/attachments/${item.id}`, 'DELETE', { expectedVersion: entry.version }, signal), 'Material removed from draft.')}>Remove</button></li>)}</ul>}
@@ -137,7 +143,7 @@ function Editor({ initial, user, refresh }: { initial: HubEntry; user: AuthUser;
       {revision && !draft && <div><h2>{revision.state === 'pending' ? 'Pending revision' : 'Working revision'} v{revision.number}</h2><p>This revision is not visible to learners.</p><RevisionView revision={revision} /></div>}
     </section>}
     <div className="faculty-actions">
-      {draft && <button disabled={busy || dirty} className="faculty-primary" onClick={() => setConfirm('submit')}>Submit for Review</button>}
+      {draft && <button disabled={busy || dirty} className="faculty-primary" onClick={() => materialExit(() => { setMaterialName(''); setUrl(''); setFileSelected(false); if (file.current) file.current.value = ''; setConfirm('submit') }, 'hub-material')}>Submit for Review</button>}
       {revision?.state === 'pending' && entry.status !== 'archived' && <><button disabled={busy} onClick={() => setConfirm('withdraw')}>Withdraw to Draft</button>{user.role === 'admin' && <><button disabled={busy} onClick={() => setConfirm('approve')}>Approve & Publish</button><label>Rejection reason<textarea maxLength={2000} value={reason} disabled={busy} onChange={e => setReason(e.target.value)} /></label><button disabled={busy || !reason.trim()} onClick={() => setConfirm('reject')}>Reject</button></>}</>}
       {entry.status !== 'archived' && (revision?.state === 'rejected' || !revision && entry.published) && <button disabled={busy} onClick={() => action('draft')}>{revision?.state === 'rejected' ? 'Revise rejected update' : 'Create revision'}</button>}
       {entry.published && entry.status !== 'archived' && <Link to={withManagementOrigin(industryPath(entry.id), origin)}>View published update →</Link>}
@@ -145,12 +151,14 @@ function Editor({ initial, user, refresh }: { initial: HubEntry; user: AuthUser;
     <section className="industry-danger" aria-labelledby="industry-danger-title"><h2 id="industry-danger-title">Danger zone</h2>
       <p>Archive retains versions and moderation history. Permanent deletion removes this update, all versions and material links; only a minimal deletion audit receipt is retained.</p>
       <div className="faculty-actions">
-        {user.role === 'admin' && entry.status !== 'archived' && <button disabled={busy || dirty} onClick={() => setConfirm('archive')}>Archive update</button>}
-        {canDelete && <button className="industry-delete" disabled={busy} onClick={() => { setError(''); setConfirm('delete') }}>{entry.published ? 'Delete permanently' : 'Delete update'}</button>}
+        {user.role === 'admin' && entry.status !== 'archived' && <button disabled={busy || dirty} onClick={() => materialExit(() => { setMaterialName(''); setUrl(''); setFileSelected(false); if (file.current) file.current.value = ''; setConfirm('archive') }, 'hub-material')}>Archive update</button>}
+        {canDiscard && <button className="industry-delete" disabled={busy} onClick={()=>{setError('');setConfirm('discard-revision')}}>Discard revision</button>}
+        {canDelete && <button className="industry-delete" disabled={busy} onClick={() => { setError(''); setConfirm('delete') }}>{entry.published ? 'Delete permanently' : 'Delete draft'}</button>}
       </div>
       {!canDelete && <p>{entry.published ? 'Previously published updates can only be permanently deleted by an administrator.' : 'Withdraw this pending update to Draft before deleting it.'}</p>}
     </section><History entry={entry} />
-    {confirm === 'delete' ? <ConfirmDialog title="Permanently delete update?" confirmLabel={entry.published ? 'Delete permanently' : 'Delete update'} description="This cannot be undone. All revisions and material links will be removed, including any published version. Shared files used by other content are preserved. Unsaved changes will be discarded." confirmationText="DELETE" tone="danger" busy={busy} error={error} onCancel={() => setConfirm(null)} onConfirm={() => void deleteUpdate()} /> : confirm && <ConfirmDialog title={`${confirm === 'approve' ? 'Approve and publish' : confirm[0].toUpperCase()+confirm.slice(1)} update?`} confirmLabel={confirm === 'approve' ? 'Approve & Publish' : 'Confirm'} description={confirm === 'archive' ? 'This update will no longer be visible to learners or in search. History is retained.' : 'This action applies to the saved revision. Only approval replaces the published version.'} confirmationText={confirm === 'archive' ? 'ARCHIVE' : undefined} tone={confirm === 'archive' ? 'danger' : 'neutral'} busy={busy} error={error} onCancel={() => setConfirm(null)} onConfirm={() => action(confirm)} />}
+    {confirm === 'delete' ? <ConfirmDialog title={entry.published ? 'Permanently delete update?' : 'Delete this draft?'} confirmLabel={entry.published ? 'Delete permanently' : 'Delete draft'} description={entry.published ? 'This cannot be undone. All revisions and material links will be removed, including any published version. Shared files used by other content are preserved. Unsaved changes will be discarded.' : 'This permanently removes the saved draft. This action cannot be undone. Any unsaved local changes will also be discarded.'} confirmationText={entry.published ? 'DELETE' : undefined} tone="danger" busy={busy} error={error} onCancel={() => setConfirm(null)} onConfirm={() => void deleteUpdate()} /> : confirm === 'discard-revision' ? <ConfirmDialog title="Discard this revision?" description="The current published version will remain available. Only this draft revision will be removed. Any unsaved local changes will also be discarded." cancelLabel="Keep revision" confirmLabel="Discard revision" tone="danger" busy={busy} error={error} onCancel={()=>setConfirm(null)} onConfirm={()=>action('discard-revision')} /> : confirm && <ConfirmDialog title={`${confirm === 'approve' ? 'Approve and publish' : confirm[0].toUpperCase()+confirm.slice(1)} update?`} confirmLabel={confirm === 'approve' ? 'Approve & Publish' : 'Confirm'} description={confirm === 'archive' ? 'This update will no longer be visible to learners or in search. History is retained.' : 'This action applies to the saved revision. Only approval replaces the published version.'} confirmationText={confirm === 'archive' ? 'ARCHIVE' : undefined} tone={confirm === 'archive' ? 'danger' : 'neutral'} busy={busy} error={error} onCancel={() => setConfirm(null)} onConfirm={() => action(confirm)} />}
+
   </section>
 }
 

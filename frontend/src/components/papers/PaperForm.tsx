@@ -9,7 +9,7 @@ import type {
   PaperStatus,
   PaperWriteInput,
 } from '../../types/paper'
-import ConfirmDialog from './ConfirmDialog'
+import { useUnsavedChanges, useEditorMounted } from '../management/useUnsavedChanges'
 
 type PaperFormMode = 'create' | 'edit'
 
@@ -255,10 +255,11 @@ function PaperForm({ initialPaper, mode, onSubmit, returnPath = '/manage/papers'
   const [fieldErrors, setFieldErrors] = useState<PaperFormErrors>({})
   const [formError, setFormError] = useState<string | null>(null)
   const [submittingAction, setSubmittingAction] = useState<PaperStatus | null>(null)
-  const [showDiscardDialog, setShowDiscardDialog] = useState(false)
   const isDirty = JSON.stringify(values) !== baseline
   const currentStatus = initialPaper?.status ?? 'draft'
   const isSubmitting = submittingAction !== null
+  const requestExit = useUnsavedChanges(isDirty, isSubmitting)
+  const isMounted = useEditorMounted()
 
   const updateValue = <Field extends PaperFormField>(
     field: Field,
@@ -289,11 +290,13 @@ function PaperForm({ initialPaper, mode, onSubmit, returnPath = '/manage/papers'
 
     try {
       const savedPaper = await onSubmit(validation.input)
+      if (!isMounted()) return
       const savedValues = getInitialValues(savedPaper)
       setValues(savedValues)
       setBaseline(JSON.stringify(savedValues))
       setFieldErrors({})
     } catch (error) {
+      if (!isMounted()) return
       if (error instanceof PaperApiError) {
         if (error.code === 'VALIDATION_ERROR' && error.field && FORM_FIELDS.includes(error.field as PaperFormField)) {
           setFieldErrors({ [error.field]: error.message } as PaperFormErrors)
@@ -309,7 +312,7 @@ function PaperForm({ initialPaper, mode, onSubmit, returnPath = '/manage/papers'
         setFormError('The paper could not be saved right now. Please try again.')
       }
     } finally {
-      setSubmittingAction(null)
+      if (isMounted()) setSubmittingAction(null)
     }
   }
 
@@ -318,13 +321,7 @@ function PaperForm({ initialPaper, mode, onSubmit, returnPath = '/manage/papers'
     void submitWithStatus(mode === 'create' ? 'draft' : currentStatus)
   }
 
-  const handleBack = () => {
-    if (isDirty) {
-      setShowDiscardDialog(true)
-      return
-    }
-    navigate(returnPath)
-  }
+  const handleBack = () => requestExit(() => navigate(returnPath))
 
   return (
     <>
@@ -588,17 +585,6 @@ function PaperForm({ initialPaper, mode, onSubmit, returnPath = '/manage/papers'
           </div>
         </div>
       </form>
-
-      {showDiscardDialog ? (
-        <ConfirmDialog
-          confirmLabel="Discard"
-          description="Your unsaved edits will be lost."
-          onCancel={() => setShowDiscardDialog(false)}
-          onConfirm={() => navigate(returnPath)}
-          title="Discard unsaved changes?"
-          tone="danger"
-        />
-      ) : null}
     </>
   )
 }

@@ -32,3 +32,5 @@
   .faculty-list > li > div, .faculty-attachments > li > span { flex-basis: 100%; }
   .faculty-actions a, .faculty-actions button { flex-grow: 1; }
 }
+
+.faculty-danger { margin-top: 32px; padding-top: 20px; border-top: 1px solid #304455; }

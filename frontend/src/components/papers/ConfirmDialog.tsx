@@ -1,6 +1,7 @@
 import { useEffect, useId, useRef, useState } from 'react'
 
 type ConfirmDialogProps = {
+  cancelLabel?: string
   busy?: boolean
   confirmLabel: string
   confirmationText?: string
@@ -13,6 +14,7 @@ type ConfirmDialogProps = {
 }
 
 function ConfirmDialog({
+  cancelLabel = 'Cancel',
   busy = false,
   confirmLabel,
   confirmationText,
@@ -86,7 +88,7 @@ function ConfirmDialog({
         ) : null}
 
         <div className="confirm-dialog-actions">
-          <button disabled={busy} onClick={onCancel} type="button">Cancel</button>
+          <button autoFocus={cancelLabel === 'Keep editing'} disabled={busy} onClick={onCancel} type="button">{cancelLabel}</button>
           <button
             className={tone === 'danger' ? 'is-danger' : 'is-primary'}
             disabled={busy || !canConfirm}

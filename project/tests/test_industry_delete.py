@@ -146,7 +146,8 @@ class IndustryDeleteTests(unittest.TestCase):
         self.assertEqual(self.client.delete(f"{BASE}/{entry['id']}?kind=faculty", json={'expectedVersion':entry['version'],'confirmation':'DELETE'}).status_code, 400)
         faculty = self.client.post('/api/hub/entries', json={'title':'TEST ONLY faculty'}).json['entry']
         self.assertEqual(self.delete(faculty).status_code, 404)
-        self.assertEqual(self.client.delete(f"/api/hub/entries/{faculty['id']}", json={'expectedVersion':faculty['version'],'confirmation':'DELETE'}).status_code, 405)
+        self.assertEqual(self.client.delete(f"/api/hub/entries/{entry['id']}", json={'expectedVersion':entry['version'],'confirmation':'DELETE'}).status_code, 404)
+        self.assertEqual(self.client.delete(f"/api/hub/entries/{faculty['id']}", json={'expectedVersion':faculty['version'],'confirmation':'DELETE'}).status_code, 200)
         raw = app.test_client()
         with raw.session_transaction() as session:
             session['_user_id'] = '1:1'; session['auth_version'] = 1; session['_fresh'] = True

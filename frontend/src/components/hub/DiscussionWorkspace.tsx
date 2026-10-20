@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useId, useRef, useState, type FormEvent } from 'react'
+import { useCallback, useId, useRef, useState, type FormEvent } from 'react'
 import { Link, Navigate, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { discussionRead, discussionMutation, discussionPath, discussionManagePath, discussionsHome, type Discussion, type DiscussionRevision, type DiscussionReport, type DiscussionEvent, type Page } from '../../api/discussions'
 import { hubLabels } from '../../api/hub'
@@ -6,6 +6,7 @@ import type { AuthUser } from '../../types/auth'
 import { useManagementRead } from '../management/useManagementRead'
 import { makeManagementOrigin, managementReturn, withManagementOrigin, listPage, type ManagementOrigin } from '../management/managementOrigin'
 import { useManagementOrigin, useManagementListPosition } from '../management/useManagementOrigin'
+import { useUnsavedChanges, useEditorMounted } from '../management/useUnsavedChanges'
 import ConfirmDialog from '../papers/ConfirmDialog'
 import './FacultyWorkspace.css'
 import './DiscussionWorkspace.css'
@@ -14,13 +15,14 @@ export type DiscussionMode = 'read' | 'create' | 'manage' | 'review' | 'reports'
 function useMutation() {
   const controller = useRef<AbortController | null>(null)
   const [busy,setBusy] = useState(false), [error,setError] = useState(''), [notice,setNotice] = useState('')
-  useEffect(() => () => controller.current?.abort(),[])
+  const isMounted = useEditorMounted()
+  useUnsavedChanges(false, busy)
   async function run<T>(path: string, data: unknown, done: (result: T) => void, method = 'POST') {
     if (controller.current) return
     const request = new AbortController();controller.current=request;setBusy(true);setError('');setNotice('')
-    try { const result = await discussionMutation<T>(path,method,data,request.signal);if (!request.signal.aborted) done(result) }
-    catch (failure) { if (!request.signal.aborted) setError(failure instanceof Error ? failure.message : 'Unable to save discussion.') }
-    finally { if (controller.current === request) controller.current=null;if (!request.signal.aborted) setBusy(false) }
+    try { const result = await discussionMutation<T>(path,method,data,request.signal);if (isMounted() && !request.signal.aborted) done(result) }
+    catch (failure) { if (isMounted() && !request.signal.aborted) setError(failure instanceof Error ? failure.message : 'Unable to save discussion.') }
+    finally { if (controller.current === request) controller.current=null;if (isMounted() && !request.signal.aborted) setBusy(false) }
   }
   return { busy,error,notice,setNotice,clearError:()=>setError(''),run }
 }
@@ -44,6 +46,7 @@ function Pager({ page, totalPages, change }: { page: number; totalPages: number;
 function NewContent({ threadId, origin }: { threadId?: number; origin?: ManagementOrigin | null }) {
   const navigate=useNavigate(), mutation=useMutation()
   const [title,setTitle]=useState(''), [body,setBody]=useState('')
+  useUnsavedChanges(Boolean(title || body), mutation.busy)
   function submit(event: FormEvent) { event.preventDefault();void mutation.run<{entry:Discussion}>(threadId ? `/entries/${threadId}/replies` : '/entries',threadId ? {body} : {title,body},result=>navigate(withManagementOrigin(discussionManagePath(result.entry.id), origin ?? null))) }
   return <section aria-label={threadId ? 'Create reply' : 'Create thread'}><h2>{threadId ? 'Reply to this thread' : 'Create Thread'}</h2><form onSubmit={submit}><Fields reply={Boolean(threadId)} title={title} body={body} setTitle={setTitle} setBody={setBody} busy={mutation.busy} /><button className="faculty-primary" disabled={mutation.busy} type="submit">Save Draft</button></form><Feedback mutation={mutation}/></section>
 }
@@ -62,7 +65,8 @@ function HistoryContent({ path, report }: { path: string; report: boolean }) {
 function ReportControl({ entry }: { entry: Discussion }) {
   const [open,setOpen]=useState(false),[reason,setReason]=useState(''),[detail,setDetail]=useState(''),[sent,setSent]=useState(false)
   const mutation=useMutation(),id=useId()
-  return <div className="discussion-report-control"><button disabled={mutation.busy} onClick={()=>setOpen(value=>!value)}>Report {entry.type}</button>{open && (sent ? <p role="status">Report submitted for administrator review. Content is unchanged.</p> : <form onSubmit={event=>{event.preventDefault();void mutation.run(`/entries/${entry.id}/reports`,{reason,detail},()=>{setSent(true);setReason('');setDetail('')})}}>
+  const requestExit = useUnsavedChanges(open && !sent && Boolean(reason || detail), mutation.busy, `report-${id}`)
+  return <div className="discussion-report-control"><button disabled={mutation.busy} onClick={()=>open ? requestExit(()=>{setOpen(false);setReason('');setDetail('')}, `report-${id}`) : setOpen(true)}>Report {entry.type}</button>{open && (sent ? <p role="status">Report submitted for administrator review. Content is unchanged.</p> : <form onSubmit={event=>{event.preventDefault();void mutation.run(`/entries/${entry.id}/reports`,{reason,detail},()=>{setSent(true);setReason('');setDetail('')})}}>
     <label htmlFor={`${id}-reason`}>Reason</label><input id={`${id}-reason`} required maxLength={200} value={reason} disabled={mutation.busy} onChange={event=>setReason(event.target.value)}/>
     <label htmlFor={`${id}-detail`}>Detail (optional)</label><textarea id={`${id}-detail`} maxLength={2000} value={detail} disabled={mutation.busy} onChange={event=>setDetail(event.target.value)}/><button disabled={mutation.busy}>Submit report</button><Feedback mutation={mutation}/>
   </form>)}</div>
@@ -74,14 +78,16 @@ function Editor({ initial, user, refresh }: { initial: Discussion; user: AuthUse
   const [confirm,setConfirm]=useState<string|null>(null),[reason,setReason]=useState('')
   const mutation=useMutation(),navigate=useNavigate(),draft=entry.working?.state==='draft' && entry.status!=='archived',id=useId()
   const dirty=title!==(entry.working?.title??'') || body!==(entry.working?.body??'')
+  const requestExit = useUnsavedChanges((draft && dirty) || Boolean(reason), mutation.busy)
   function saved(result:{entry:Discussion}) { setEntry(result.entry);setTitle(result.entry.working?.title??'');setBody(result.entry.working?.body??'');setReason('');setConfirm(null);mutation.setNotice('Discussion saved.') }
   function action(value:string) {
     if(value==='delete') void mutation.run<{deleted:boolean}>(`/entries/${entry.id}`,{expectedVersion:entry.version,confirmation:'DELETE'},result=>{if(result.deleted)navigate(back,{replace:true})},'DELETE')
+    else if(value==='discard-revision') void mutation.run(`/entries/${entry.id}/discard-revision`,{expectedVersion:entry.version,confirmation:'DISCARD'},(result:{entry:Discussion})=>{saved(result);mutation.setNotice('Revision discarded. The published version is unchanged.')})
     else void mutation.run(`/entries/${entry.id}/${value}`,{expectedVersion:entry.version,...(value==='reject'?{reviewNote:reason}:{})},saved)
   }
   return <><h1>Manage {entry.type==='reply' ? 'Reply' : 'Thread'}</h1><p className="faculty-status">{hubLabels[entry.status??'draft']}{entry.published && entry.working && ` · Working revision v${entry.working.number}: ${entry.working.state}`}</p><p>Author: {entry.author}</p>
     {entry.threadId && <Link to={withManagementOrigin(discussionPath(entry.threadId), origin)}>Back to Thread →</Link>}
-    <Feedback mutation={mutation}/>{mutation.error && <><button disabled={mutation.busy} onClick={refresh}>Refresh saved version</button><p>Refresh clears unsaved changes.</p></>}
+    <Feedback mutation={mutation}/>{mutation.error && <><button disabled={mutation.busy} onClick={()=>requestExit(refresh)}>Refresh saved version</button><p>Refresh clears unsaved changes.</p></>}
     {entry.working?.reviewNote && <p>Review feedback: {entry.working.reviewNote}</p>}
     {draft && <form onSubmit={event=>{event.preventDefault();void mutation.run(`/entries/${entry.id}`,{expectedVersion:entry.version,body,...(entry.type==='thread'?{title}:{})},saved,'PATCH')}}><Fields reply={entry.type==='reply'} title={title} body={body} setTitle={setTitle} setBody={setBody} busy={mutation.busy}/><button disabled={mutation.busy} type="submit">Save Draft</button></form>}
     {entry.published && <section><h2>Current published version</h2><Revision value={entry.published}/></section>}
@@ -94,10 +100,12 @@ function Editor({ initial, user, refresh }: { initial: Discussion; user: AuthUse
     </div>
     <section className="discussion-danger"><h2>Danger zone</h2><p>Archive retains history. Permanent deletion removes all versions. Deleting a thread also removes its replies; report records retain an unavailable target and audit history.</p><div className="faculty-actions">
       {user.role==='admin' && entry.published && entry.status!=='archived' && <button disabled={mutation.busy||dirty} onClick={()=>setConfirm('archive')}>Archive content</button>}
+      {entry.published && entry.status!=='archived' && ['draft','rejected'].includes(entry.working?.state??'') && <button disabled={mutation.busy} onClick={()=>setConfirm('discard-revision')}>Discard revision</button>}
       {(entry.published ? user.role==='admin' : ['draft','rejected'].includes(entry.working?.state??'')) && <button disabled={mutation.busy} onClick={()=>setConfirm('delete')}>{entry.published ? 'Delete permanently' : 'Delete draft'}</button>}
     </div></section>
     {user.role==='admin' && <History path={`/entries/${entry.id}/history`}/>}
-    {confirm && <ConfirmDialog title={`${confirm==='delete' ? 'Permanently delete' : confirm==='publish' ? 'Publish own' : confirm[0].toUpperCase()+confirm.slice(1)} ${entry.type}?`} confirmLabel={confirm==='delete'?'Delete permanently':confirm==='approve'?'Approve & Publish':'Confirm'} description={confirm==='delete'?'This cannot be undone. All revisions and any replies will be removed.':'Only approved content is visible to other readers. Pending edits preserve the current published version.'} confirmationText={confirm==='delete'?'DELETE':confirm==='archive'?'ARCHIVE':undefined} tone={['delete','archive'].includes(confirm)?'danger':'neutral'} busy={mutation.busy} error={mutation.error} onCancel={()=>setConfirm(null)} onConfirm={()=>action(confirm)}/>}
+    {confirm==='discard-revision' ? <ConfirmDialog title="Discard this revision?" description="The current published version will remain available. Only this draft revision will be removed. Any unsaved local changes will also be discarded." cancelLabel="Keep revision" confirmLabel="Discard revision" tone="danger" busy={mutation.busy} error={mutation.error} onCancel={()=>setConfirm(null)} onConfirm={()=>action('discard-revision')}/> : confirm==='delete' && !entry.published ? <ConfirmDialog title="Delete this draft?" description="This permanently removes the saved draft. This action cannot be undone. Any unsaved local changes will also be discarded." confirmLabel="Delete draft" tone="danger" busy={mutation.busy} error={mutation.error} onCancel={()=>setConfirm(null)} onConfirm={()=>action('delete')}/> : confirm && <ConfirmDialog title={`${confirm==='delete' ? 'Permanently delete' : confirm==='publish' ? 'Publish own' : confirm[0].toUpperCase()+confirm.slice(1)} ${entry.type}?`} confirmLabel={confirm==='delete'?'Delete permanently':confirm==='approve'?'Approve & Publish':'Confirm'} description={confirm==='delete'?'This cannot be undone. All revisions and any replies will be removed.':'Only approved content is visible to other readers. Pending edits preserve the current published version.'} confirmationText={confirm==='delete'?'DELETE':confirm==='archive'?'ARCHIVE':undefined} tone={['delete','archive'].includes(confirm)?'danger':'neutral'} busy={mutation.busy} error={mutation.error} onCancel={()=>setConfirm(null)} onConfirm={()=>action(confirm)}/>}
+
   </>
 }
 function Replies({ entry, origin }: { entry:Discussion; origin: ManagementOrigin | null }) {

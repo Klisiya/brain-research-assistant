@@ -10,6 +10,7 @@ import {
 } from '../api/papers'
 import { managementReturn, withManagementOrigin } from '../components/management/managementOrigin'
 import { useManagementOrigin } from '../components/management/useManagementOrigin'
+import { useUnsavedChanges, useEditorMounted } from '../components/management/useUnsavedChanges'
 import AttachmentManager from '../components/papers/AttachmentManager'
 import ConfirmDialog from '../components/papers/ConfirmDialog'
 import PaperForm from '../components/papers/PaperForm'
@@ -64,6 +65,8 @@ function PaperEditorPage({ currentUser }: { currentUser: AuthUser }) {
   const [actionError, setActionError] = useState<string | null>(null)
   const [dialog, setDialog] = useState<'archive' | 'delete' | null>(null)
   const [isActionPending, setIsActionPending] = useState(false)
+  useUnsavedChanges(false, isActionPending)
+  const isMounted = useEditorMounted()
 
   useEffect(() => {
     if (isCreateMode || !isValidPaperId || paperId === null) return undefined
@@ -104,6 +107,7 @@ function PaperEditorPage({ currentUser }: { currentUser: AuthUser }) {
 
     if (isCreateMode) {
       const savedPaper = await createPaper(input)
+      if (!isMounted()) return savedPaper
       const message = input.status === 'published'
         ? 'Paper published successfully.'
         : 'Draft saved.'
@@ -117,6 +121,7 @@ function PaperEditorPage({ currentUser }: { currentUser: AuthUser }) {
 
     if (!paperId) throw new Error('Paper id is unavailable')
     const savedPaper = await updatePaper(paperId, input)
+    if (!isMounted()) return savedPaper
     setResult({ error: null, paper: savedPaper, requestId })
     setNotice(input.status === 'published' && paper?.status !== 'published'
       ? 'Paper published successfully.'
@@ -131,15 +136,17 @@ function PaperEditorPage({ currentUser }: { currentUser: AuthUser }) {
 
     try {
       const archivedPaper = await archivePaper(paper.id)
+      if (!isMounted()) return
       setResult({ error: null, paper: archivedPaper, requestId })
       setNotice('Paper archived successfully.')
       setDialog(null)
     } catch (error) {
+      if (!isMounted()) return
       setActionError(error instanceof PaperApiError && error.status === 403
         ? 'You do not have permission to archive this paper.'
         : 'The paper could not be archived right now.')
     } finally {
-      setIsActionPending(false)
+      if (isMounted()) setIsActionPending(false)
     }
   }
 
@@ -150,12 +157,14 @@ function PaperEditorPage({ currentUser }: { currentUser: AuthUser }) {
 
     try {
       await deletePaper(paper.id)
+      if (!isMounted()) return
       navigate(back.path, { replace: true })
     } catch (error) {
+      if (!isMounted()) return
       setActionError(error instanceof PaperApiError && error.status === 403
         ? 'Only administrators can permanently delete papers.'
         : 'The paper could not be deleted right now.')
-      setIsActionPending(false)
+      if (isMounted()) setIsActionPending(false)
       setDialog(null)
     }
   }

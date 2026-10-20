@@ -35,6 +35,7 @@ import DiscussionWorkspace from './components/hub/DiscussionWorkspace'
 import AccountCredentialPage from './pages/AccountCredentialPage'
 import ManagementPage from './pages/ManagementPage'
 import './App.css'
+import UnsavedChangesProvider from './components/management/UnsavedChangesProvider'
 
 function HomePage() {
   const { hash } = useLocation()
@@ -68,7 +69,7 @@ function HomePage() {
 
 function App() {
   return (
-    <Routes>
+    <UnsavedChangesProvider><Routes>
       <Route element={<HomePage />} path="/" />
       <Route element={<AboutPage />} path="/about" />
       <Route element={<SearchPage />} path="/search" />
@@ -143,7 +144,7 @@ function App() {
       <Route element={<PapersManagementGuard>{user => <FacultyWorkspace user={user} managed />}</PapersManagementGuard>} path="/manage/hub/:entryId" />
       <Route element={<BrainRegionPage />} path="/brain-region/:slug" />
       <Route element={<NotFoundPage />} path="*" />
-    </Routes>
+    </Routes></UnsavedChangesProvider>
   )
 }
 
