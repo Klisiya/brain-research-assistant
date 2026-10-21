@@ -6,15 +6,16 @@ import Navbar from '../components/Navbar'
 import Footer from '../components/Footer'
 import PageParticleBackground from '../components/PageParticleBackground'
 import { useAuth } from '../auth/useAuth'
+import { makeSearchOrigin, withSearchOrigin, type SearchOrigin } from '../components/search/searchOrigin'
 import './SearchPage.css'
 
 const labels: Record<SearchType, string> = { all: 'All', papers: 'Papers', courses: 'Courses', modules: 'Modules', research: 'Research Areas', hub: 'Innovation Hub' }
 const badges = { papers: 'Paper', courses: 'Course', modules: 'Module', research: 'Research Area', hub: 'Faculty Resource' }
-function ResultCard({ item }: { item: SearchResult }) {
+function ResultCard({ item, origin }: { item: SearchResult; origin: SearchOrigin | null }) {
   const badge = item.type === 'hub' && item.metadata.kind === 'discussions' ? 'Discussion' : item.type === 'hub' && item.metadata.kind === 'industry' ? 'Industry Update' : badges[item.type]
   return <li className="global-search-card">
     <p className="global-search-eyebrow">{badge}{item.type === 'modules' && ` · Module ${String(item.metadata.number).padStart(2, '0')}`}{item.type === 'research' && ` · ${item.code}`}</p>
-    <h2><Link to={searchResultPath(item)}>{item.title || badge}</Link></h2>
+    <h2><Link to={withSearchOrigin(searchResultPath(item), origin)}>{item.title || badge}</Link></h2>
     {(item.type === 'courses' || item.type === 'modules') && item.titleZh && <p className="global-search-secondary" lang="zh">{item.titleZh}</p>}
     {item.type === 'papers' && <p className="global-search-secondary">{[item.metadata.authors.join(', '), item.metadata.year, item.metadata.journal].filter(v => v !== null && v !== '').join(' · ')}</p>}
     {item.type === 'modules' && <p className="global-search-secondary">{[item.metadata.courseTitle, item.metadata.category, `${item.metadata.durationHours} Hours`].filter(Boolean).join(' · ')}</p>}
@@ -37,6 +38,7 @@ export default function SearchPage() {
     if (q) navigate(searchPath(q, params.type))
   }
   const data = state.data
+  const origin = makeSearchOrigin(url, auth)
   return <div className="app-shell global-search-page"><PageParticleBackground /><Navbar />
     <main className="global-search-main">
       <header className="global-search-header"><p className="global-search-eyebrow">Explore published knowledge</p><h1>Search Brain Research</h1><p>Find papers, courses, learning modules, and research areas.</p></header>
@@ -54,7 +56,7 @@ export default function SearchPage() {
           : state.loading ? <p className="global-search-status" role="status">Searching published content…</p>
           : state.error ? <div className="global-search-status" role="alert"><h2>Search unavailable</h2><p>We could not load your results. Please try again.</p><button onClick={state.retry} type="button">Retry</button></div>
           : data && <><p role="status" className="global-search-count">{data.total} {data.total === 1 ? 'result' : 'results'} for “{params.q}”</p>
-            {data.items.length ? <ul className="global-search-list">{data.items.map(item => <ResultCard item={item} key={item.key} />)}</ul> : <div className="global-search-status"><h2>{data.total ? 'No results on this page' : `No results found for “${params.q}”`}</h2><p>{data.total ? 'Return to the first page to view matching content.' : 'Try another query or content type.'}</p>{data.total > 0 && <Link to={searchPath(params.q, params.type)}>First page</Link>}</div>}
+            {data.items.length ? <ul className="global-search-list">{data.items.map(item => <ResultCard item={item} origin={origin} key={item.key} />)}</ul> : <div className="global-search-status"><h2>{data.total ? 'No results on this page' : `No results found for “${params.q}”`}</h2><p>{data.total ? 'Return to the first page to view matching content.' : 'Try another query or content type.'}</p>{data.total > 0 && <Link to={searchPath(params.q, params.type)}>First page</Link>}</div>}
             {data.totalPages > 0 && params.page <= data.totalPages && <nav className="global-search-pagination" aria-label="Search pagination">{params.page > 1 && <Link rel="prev" to={searchPath(params.q, params.type, params.page - 1)}>Previous page</Link>}<span>Page {params.page} of {data.totalPages}</span>{params.page < data.totalPages && <Link rel="next" to={searchPath(params.q, params.type, params.page + 1)}>Next page</Link>}</nav>}
           </>}
       </section>

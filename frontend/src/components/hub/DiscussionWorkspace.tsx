@@ -6,6 +6,7 @@ import type { AuthUser } from '../../types/auth'
 import { useManagementRead } from '../management/useManagementRead'
 import { makeManagementOrigin, managementReturn, withManagementOrigin, listPage, type ManagementOrigin } from '../management/managementOrigin'
 import { useManagementOrigin, useManagementListPosition } from '../management/useManagementOrigin'
+import { useSearchReturn } from '../search/useSearchReturn'
 import { useUnsavedChanges, useEditorMounted } from '../management/useUnsavedChanges'
 import ConfirmDialog from '../papers/ConfirmDialog'
 import './FacultyWorkspace.css'
@@ -134,7 +135,8 @@ function Reports({ user }: {user:AuthUser}) {
 export default function DiscussionWorkspace({user,mode='read'}:{user:AuthUser;mode?:DiscussionMode}) {
   const {entryId}=useParams(),[query,setQuery]=useSearchParams()
   const origin = useManagementOrigin(user, ['discussions', 'reports'])
-  const back = origin ? managementReturn(origin) : { path: discussionsHome, label: 'Learner Discussions' }
+  const searchBack = useSearchReturn(Boolean(entryId) && mode === 'read' && !origin)
+  const back = origin ? managementReturn(origin) : searchBack ?? { path: discussionsHome, label: 'Learner Discussions' }
   const isIndex=mode==='read'&&!entryId
   const isReviewIndex=mode==='review'&&!entryId
   const Heading=isIndex?'h2':'h1'

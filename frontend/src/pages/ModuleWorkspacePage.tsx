@@ -8,6 +8,7 @@ import { useCourseRead } from '../hooks/useCourseRead'
 import { useLearningCourse, type LearningController } from '../hooks/useLearningCourse'
 import Navbar from '../components/Navbar'
 import BookmarkControl from '../components/learning/BookmarkControl'
+import { useSearchReturn } from '../components/search/useSearchReturn'
 import { ResourceLearning } from '../components/learning/LearningControls'
 import ModuleResourceViewer, { ResourceFallback } from '../components/modules/ModuleResourceViewer'
 import './ModuleWorkspacePage.css'
@@ -56,6 +57,7 @@ function WorkspaceDrawer({ title, onClose, children }: { title: string; onClose:
 }
 
 export default function ModuleWorkspacePage() {
+  const searchBack = useSearchReturn()
   const { courseSlug = '', moduleSlug = '' } = useParams()
   const { state: auth } = useAuth()
   const account = `${auth.status}:${auth.user?.id ?? ''}`
@@ -82,7 +84,7 @@ export default function ModuleWorkspacePage() {
 
   const contents = data && <nav className="mw-content-nav" aria-label="Module materials">
     <h2>Contents</h2>
-    {data.resources.length > 0 && <><h3>Resources</h3><ul>{data.resources.map(row => <li key={row.id}><button type="button" aria-current={resource?.id === row.id ? 'true' : undefined} onClick={() => { setSearch({ resource: String(row.id) }, { replace: true }); closePanel() }}><span>{row.displayName}</span><small>{row.attachmentType.replaceAll('_', ' ')} · v{row.version}</small></button></li>)}</ul></>}
+    {data.resources.length > 0 && <><h3>Resources</h3><ul>{data.resources.map(row => <li key={row.id}><button type="button" aria-current={resource?.id === row.id ? 'true' : undefined} onClick={() => { setSearch(previous => { const next = new URLSearchParams(previous); next.delete('paper'); next.set('resource', String(row.id)); return next }, { replace: true }); closePanel() }}><span>{row.displayName}</span><small>{row.attachmentType.replaceAll('_', ' ')} · v{row.version}</small></button></li>)}</ul></>}
     {data.readings.length > 0 && <><h3>Paper readings</h3><ul>{data.readings.map(row => <li key={row.relationId}><Link to={`/papers/${encodeURIComponent(row.paper!.slug)}`} state={{ from: `${path}?paper=${row.relationId}` }}><span>{row.paper!.title} ↗</span><small>{row.readingType === 'required' ? 'Required reading' : 'Recommended reading'}</small></Link></li>)}</ul></>}
   </nav>
   const tools = data && <aside className="mw-tools" aria-label="Current resource tools"><h2>Tools</h2>
@@ -95,7 +97,7 @@ export default function ModuleWorkspacePage() {
     <div className="mw-global-nav"><Navbar /></div>
     <div className="mw-mobile-brand"><Link to="/">Brain Research</Link><Link to={coursePath(courseSlug)}>Course</Link></div>
     <main id="module-main" tabIndex={-1} className="mw-main" aria-busy={state.loading}>
-      <Link className="mw-back" to={`${coursePath(courseSlug)}#modules`}>← Back to Course</Link>
+      <Link className="mw-back" to={searchBack?.path ?? `${coursePath(courseSlug)}#modules`}>← {searchBack?.label ?? 'Back to Course'}</Link>
       {!data ? <section className="mw-load-state"><h1>{state.loading ? 'Loading module…' : state.error === 'not-found' ? 'Module not found' : 'Module unavailable'}</h1><p role={state.error ? 'alert' : 'status'}>{state.loading ? 'Loading available materials.' : state.error === 'not-found' ? 'This module does not exist or has not been published.' : 'Materials could not be loaded. Please try again.'}</p>{state.error === 'unavailable' && <button type="button" onClick={state.retry}>Retry materials</button>}</section> : <>
         <header className="mw-header"><p className="mw-eyebrow">Module {String(data.module.number).padStart(2, '0')} <span>· {data.module.durationHours} Hours</span></p><h1>{data.module.title}</h1><p className="mw-title-zh" lang="zh">{data.module.titleZh}</p></header>
         <ModuleProgress learning={learning} slug={moduleSlug} path={path} />

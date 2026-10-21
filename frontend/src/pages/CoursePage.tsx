@@ -10,6 +10,7 @@ import Footer from '../components/Footer'
 import './CoursePage.css'
 import { ResourceLearning } from '../components/learning/LearningControls'
 import BookmarkControl from '../components/learning/BookmarkControl'
+import { useSearchReturn } from '../components/search/useSearchReturn'
 
 function Resources({ courseSlug, learning }: { courseSlug: string; learning: LearningController }) {
   const { state: auth } = useAuth()
@@ -69,6 +70,7 @@ function CourseJourney({ course, learning, hasActivity, target }: { course: Cour
 export default function CoursePage() {
   const { courseSlug = '' } = useParams()
   const location = useLocation()
+  const searchBack = useSearchReturn()
   const learning = useLearningCourse(courseSlug)
   const reader = useCallback((signal: AbortSignal) => getCourse(courseSlug, signal), [courseSlug])
   const state = useCourseRead(courseApiPath(courseSlug), reader)
@@ -100,9 +102,9 @@ export default function CoursePage() {
         <p className="course-eyebrow">Learning Center</p><h1>{state.loading ? 'Loading course…' : state.error === 'not-found' ? 'Course not found' : 'Course unavailable'}</h1>
         <p role={state.error ? 'alert' : 'status'}>{state.loading ? 'Loading the learning path.' : state.error === 'not-found' ? 'This course does not exist or has not been published.' : 'The learning path could not be loaded. Please try again.'}</p>
         {state.error === 'unavailable' && <button onClick={state.retry} type="button">Retry course</button>}
-        {state.error && <Link to="/">Back to Home</Link>}
+        {state.error && <Link to={searchBack?.path ?? '/'}>{searchBack?.label ?? 'Back to Home'}</Link>}
       </section> : <>
-        <nav className="course-breadcrumb" aria-label="Breadcrumb"><Link to="/">Home</Link><span aria-hidden="true">/</span><span aria-current="page">Course Overview</span></nav>
+        <nav className="course-breadcrumb" aria-label="Breadcrumb"><Link to={searchBack?.path ?? '/'}>{searchBack ? `← ${searchBack.label}` : 'Home'}</Link><span aria-hidden="true">/</span><span aria-current="page">Course Overview</span></nav>
         <header className="course-header co-header">
           <div><p className="course-eyebrow">Learning Center</p><h1>Course Overview</h1><p className="co-facts"><span>{course.moduleCount} Modules</span><span>{course.totalHours} Hours</span><span>One semester</span></p></div>
           <BookmarkControl targetType="course" targetId={course.id} showSignInPrompt={false} />

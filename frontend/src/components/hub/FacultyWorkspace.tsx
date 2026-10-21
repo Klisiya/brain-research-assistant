@@ -5,6 +5,7 @@ import type { AuthUser } from '../../types/auth'
 import { useManagementRead } from '../management/useManagementRead'
 import { makeManagementOrigin, managementReturn, withManagementOrigin, listPage } from '../management/managementOrigin'
 import { useManagementOrigin, useManagementListPosition } from '../management/useManagementOrigin'
+import { useSearchReturn } from '../search/useSearchReturn'
 import { useUnsavedChanges, useEditorMounted } from '../management/useUnsavedChanges'
 import ConfirmDialog from '../papers/ConfirmDialog'
 import './FacultyWorkspace.css'
@@ -149,7 +150,8 @@ export default function FacultyWorkspace({ user, managed = false, create = false
   const scope = managed ? user.role === 'admin' && query.get('scope') === 'review' ? 'review' : 'mine' : 'published'
   const page = String(listPage(query.get('page')))
   const origin = useManagementOrigin(user, ['faculty'])
-  const back = origin ? managementReturn(origin) : { path: managed ? '/manage/hub' : '/innovation-hub?view=faculty', label: 'Faculty Resources' }
+  const searchBack = useSearchReturn(Boolean(entryId) && !managed && !create && !origin)
+  const back = origin ? managementReturn(origin) : searchBack ?? { path: managed ? '/manage/hub' : '/innovation-hub?view=faculty', label: 'Faculty Resources' }
   const source = new URLSearchParams({ scope, page })
   const path = entryId ? `/api/hub/entries/${encodeURIComponent(entryId)}${managed ? '/manage' : ''}` : `/api/hub/entries?${new URLSearchParams({ scope, page })}`
   const reader = useCallback((signal: AbortSignal) => create ? Promise.resolve(null) : hubRequest<HubList | { entry: HubEntry }>(path, { signal }), [path, create])
@@ -157,7 +159,7 @@ export default function FacultyWorkspace({ user, managed = false, create = false
   useManagementListPosition(state.data && 'entries' in state.data ? state.data : null, !entryId && !create)
   if (create) return <NewResource user={user} />
   if (state.loading) return <p role="status" className="faculty-workspace">Loading Faculty Resources…</p>
-  if (state.error) return <section className="faculty-workspace" role="alert"><h2>{state.error === 'not-found' ? 'Resource not available' : state.error === 'forbidden' ? 'Access denied' : 'Faculty Resources unavailable'}</h2><p>{state.error === 'not-found' ? 'This resource may be unpublished, archived, or unavailable to your account.' : 'We could not load this workspace.'}</p><button type="button" onClick={state.retry}>Retry</button><Link className="management-return" to={back.path}>{origin ? back.label : 'Back to Faculty Resources'}</Link></section>
+  if (state.error) return <section className="faculty-workspace" role="alert"><h2>{state.error === 'not-found' ? 'Resource not available' : state.error === 'forbidden' ? 'Access denied' : 'Faculty Resources unavailable'}</h2><p>{state.error === 'not-found' ? 'This resource may be unpublished, archived, or unavailable to your account.' : 'We could not load this workspace.'}</p><button type="button" onClick={state.retry}>Retry</button><Link className="management-return" to={back.path}>{origin || searchBack ? back.label : 'Back to Faculty Resources'}</Link></section>
   const data = state.data
   if (!data) return null
   if ('entry' in data) {

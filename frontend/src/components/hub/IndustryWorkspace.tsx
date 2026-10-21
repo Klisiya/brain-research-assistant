@@ -5,6 +5,7 @@ import type { AuthUser } from '../../types/auth'
 import { useManagementRead } from '../management/useManagementRead'
 import { makeManagementOrigin, managementReturn, withManagementOrigin, listPage } from '../management/managementOrigin'
 import { useManagementOrigin, useManagementListPosition } from '../management/useManagementOrigin'
+import { useSearchReturn } from '../search/useSearchReturn'
 import { useUnsavedChanges, useEditorMounted } from '../management/useUnsavedChanges'
 import ConfirmDialog from '../papers/ConfirmDialog'
 import './FacultyWorkspace.css'
@@ -169,7 +170,8 @@ export default function IndustryWorkspace({ user, managed = false, create = fals
   const scope = managed ? user.role === 'admin' && (requested === 'all' || requested === 'review') ? requested : 'mine' : 'published'
   const page = String(listPage(query.get('page')))
   const origin = useManagementOrigin(user, ['industry'])
-  const back = origin ? managementReturn(origin) : { path: managed ? manage : published, label: 'Industry Updates' }
+  const searchBack = useSearchReturn(Boolean(entryId) && !managed && !create && !origin)
+  const back = origin ? managementReturn(origin) : searchBack ?? { path: managed ? manage : published, label: 'Industry Updates' }
   const source = new URLSearchParams({ scope, page })
   const path = entryId ? `${api}/${encodeURIComponent(entryId)}${managed ? '/manage' : ''}` : `${api}?${new URLSearchParams({ scope, page })}`
   const reader = useCallback(async (signal: AbortSignal) => {
@@ -182,7 +184,7 @@ export default function IndustryWorkspace({ user, managed = false, create = fals
   useManagementListPosition(state.data && 'entries' in state.data ? state.data : null, !entryId && !create)
   if (create) return <NewUpdate user={user} />
   if (state.loading) return <p role="status" className="faculty-workspace">Loading Industry Updates…</p>
-  if (state.error) return <section className="faculty-workspace" role="alert"><h2>{state.error === 'not-found' ? 'Update not available' : state.error === 'forbidden' ? 'Access denied' : 'Industry Updates unavailable'}</h2><p>This update may be unpublished, archived, or unavailable to your account.</p><button onClick={state.retry}>Retry</button><Link className="management-return" to={back.path}>{origin ? back.label : 'Back to Industry Updates'}</Link></section>
+  if (state.error) return <section className="faculty-workspace" role="alert"><h2>{state.error === 'not-found' ? 'Update not available' : state.error === 'forbidden' ? 'Access denied' : 'Industry Updates unavailable'}</h2><p>This update may be unpublished, archived, or unavailable to your account.</p><button onClick={state.retry}>Retry</button><Link className="management-return" to={back.path}>{origin || searchBack ? back.label : 'Back to Industry Updates'}</Link></section>
   const data = state.data
   if (!data) return null
   if ('entry' in data) {

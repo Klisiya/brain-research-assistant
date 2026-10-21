@@ -10,6 +10,7 @@ import Navbar from '../components/Navbar'
 import Footer from '../components/Footer'
 import PageParticleBackground from '../components/PageParticleBackground'
 import ResearchOrbitalIndex from '../components/research/ResearchOrbitalIndex'
+import { useSearchReturn } from '../components/search/useSearchReturn'
 import './ResearchAreaPage.css'
 import '../components/learning/PersonalReading.css'
 
@@ -42,13 +43,13 @@ function ResearchBookmark({ areaId }: { areaId: number }) {
   </div>
 }
 
-function AreaContent({ detail, account }: { detail: ResearchDetail; account: number | null }) {
+function AreaContent({ detail, account, back }: { detail: ResearchDetail; account: number | null; back: { path: string; label: string } }) {
   const { area } = detail
   const papers = detail.papers.flatMap(row => row.paper ? [{ relationId: row.relationId, paper: row.paper }] : [])
   const modules = detail.modules.flatMap(row => row.course && row.module ? [{ relationId: row.relationId, course: row.course, module: row.module }] : [])
   const hasContent = papers.length > 0 || modules.length > 0 || detail.resources.length > 0 || detail.brainRegions.length > 0
   return <>
-    <nav className="research-breadcrumb" aria-label="Research navigation"><Link to="/research">← Back to Research Areas</Link></nav>
+    <nav className="research-breadcrumb" aria-label="Research navigation"><Link to={back.path}>← {back.label}</Link></nav>
     <header className={`research-header research-accent-${area.slug}`}>
       <div><p className="research-eyebrow">{area.code} · Research Area</p><h1>{area.name}</h1></div>
       <ResearchBookmark key={`${account}:${area.id}`} areaId={area.id} />
@@ -94,6 +95,8 @@ function AreaContent({ detail, account }: { detail: ResearchDetail; account: num
 
 export default function ResearchAreaPage() {
   const { slug } = useParams()
+  const searchBack = useSearchReturn(Boolean(slug))
+  const back = searchBack ?? { path: '/research', label: 'Back to Research Areas' }
   const { state: auth } = useAuth()
   const account = auth.status === 'authenticated' ? auth.user.id : null
   const reader = useCallback((signal: AbortSignal): Promise<ResearchDetail | ResearchArea[]> => slug ? getResearchDetail(slug, signal) : getResearchList(false, signal), [slug])
@@ -108,8 +111,8 @@ export default function ResearchAreaPage() {
         <h1>{state.loading ? 'Loading research…' : state.error === 'not-found' ? 'Research area not found' : 'Research unavailable'}</h1>
         <p role={state.error ? 'alert' : 'status'}>{state.loading ? 'Loading available content.' : state.error === 'not-found' ? 'This area does not exist or is unavailable.' : 'We could not load this content. Please try again.'}</p>
         {state.error === 'unavailable' && <button onClick={state.retry} type="button">Refresh research</button>}
-        {!state.loading && <Link to="/research">Back to Research Areas →</Link>}
-      </section> : detail ? <AreaContent detail={detail} account={account} /> : <>
+        {!state.loading && <Link to={back.path}>{back.label} →</Link>}
+      </section> : detail ? <AreaContent detail={detail} account={account} back={back} /> : <>
         <header className="research-header research-index-header"><div><p className="research-eyebrow">Explore research</p><h1>Research Areas</h1><p>Find the content linked to each research area.</p></div></header>
         {areas?.length ? <ResearchOrbitalIndex areas={areas} /> : <p className="research-empty">No research areas are currently available.</p>}
       </>}
