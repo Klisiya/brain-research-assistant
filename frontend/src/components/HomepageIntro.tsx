@@ -37,6 +37,7 @@ function HomepageIntro() {
     let frame = 0
     let watchdog = 0
     let done = false
+    let playbackStarted = false
     let motion: MediaQueryList | undefined
     const restore: (() => void)[] = []
     const animations: Animation[] = []
@@ -57,6 +58,11 @@ function HomepageIntro() {
     const finish = () => {
       if (done) return
       done = true
+      // An effect cleanup (StrictMode or an auth-driven parent remount) is not
+      // a completed intro. Consume the session only on an actual exit after start.
+      if (playbackStarted) {
+        try { sessionStorage.setItem(SESSION_KEY, '1') } catch { /* Storage may be unavailable. */ }
+      }
       const returnFocus = overlay.contains(document.activeElement)
       release()
       // Hide synchronously, including when animation initialization failed.
@@ -70,8 +76,9 @@ function HomepageIntro() {
       setVisible(false)
     }
     function onKey(event: KeyboardEvent) {
-      if (event.key === 'Escape') { event.preventDefault(); finish() }
+      if (event.key === 'Escape') { event.preventDefault(); skip() }
     }
+    function skip() { playbackStarted = true; finish() }
     function onVisibility() { if (document.hidden) finish() }
     function onMotion() { if (motion?.matches) finish() }
     function preserveStyle(element: HTMLElement, property: string, value: string) {
@@ -84,11 +91,10 @@ function HomepageIntro() {
       element.style.setProperty(property, value)
     }
 
-    skipRef.current = finish
+    skipRef.current = skip
     // Independent of rAF: even a stalled animation must release the page.
     watchdog = window.setTimeout(finish, 4500)
     try {
-      sessionStorage.setItem(SESSION_KEY, '1')
       motion = window.matchMedia('(prefers-reduced-motion: reduce)')
       overlay.dataset.motion = motion.matches ? 'reduced' : 'full'
       overlay.dataset.density = window.innerWidth < 620 || navigator.hardwareConcurrency <= 4 ? 'compact' : 'full'
@@ -115,6 +121,7 @@ function HomepageIntro() {
       motion.addEventListener('change', onMotion)
       if (document.hidden) { finish(); return release }
       if (motion.matches) {
+        playbackStarted = true
         window.clearTimeout(watchdog)
         watchdog = window.setTimeout(finish, 400)
         return () => { done = true; release() }
@@ -191,12 +198,13 @@ function HomepageIntro() {
               : phase === 'convergence' ? 'Synaptic synchronization' : 'Interface ready'
             lastPhase = phase
           }
+          playbackStarted = true
           if (elapsed >= DURATION) finish()
           else frame = window.requestAnimationFrame(tick)
-        } catch { finish() }
+        } catch { playbackStarted = false; finish() }
       }
       frame = window.requestAnimationFrame(tick)
-    } catch { finish() }
+    } catch { playbackStarted = false; finish() }
 
     return () => { done = true; release(); skipRef.current = () => {} }
   }, [visible])
