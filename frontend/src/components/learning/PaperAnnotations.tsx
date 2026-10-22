@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { Link, useLocation } from 'react-router-dom'
+import { AuthLoginLink } from '../auth/AuthLoginNavigation'
 import { deleteAnnotation, getAnnotations, saveAnnotation, type AnnotationItem, type AnnotationKind, type AnnotationSource, type NoteType, type SourceResource } from '../../api/annotations'
 import { useAuth } from '../../auth/useAuth'
 import { usePersonalState } from '../../hooks/usePersonalState'
@@ -98,9 +98,9 @@ function PersonalAnnotations({ slug, kind }: { slug: string; kind: AnnotationKin
 }
 
 function AnnotationPanel({ slug, kind }: { slug: string; kind: AnnotationKind }) {
-  const { state, refreshAuth } = useAuth(), location = useLocation(), title = kind === 'notes' ? 'Guided Notes' : 'Concept Highlights'
+  const { state, refreshAuth } = useAuth(), title = kind === 'notes' ? 'Guided Notes' : 'Concept Highlights'
   if (state.status === 'authenticated') return <PersonalAnnotations key={`${state.user.id}:${slug}:${kind}`} slug={slug} kind={kind} />
-  return <section className="annotation-panel" aria-label={title}><h3>{title}</h3>{state.status === 'anonymous' ? <Link to="/login" state={{from:location.pathname}}>Sign in to use {title.toLowerCase()}</Link> : state.status === 'loading' ? <p role="status">Checking sign-in…</p> : <><p role="alert">Sign-in status unavailable.</p><button type="button" onClick={() => void refreshAuth()}>Retry sign-in</button></>}</section>
+  return <section className="annotation-panel" aria-label={title}><h3>{title}</h3>{state.status === 'anonymous' ? <AuthLoginLink>Sign in to use {title.toLowerCase()}</AuthLoginLink> : state.status === 'loading' ? <p role="status">Checking sign-in…</p> : <><p role="alert">Sign-in status unavailable.</p><button type="button" onClick={() => void refreshAuth()}>Retry sign-in</button></>}</section>
 }
 export function GuidedNotesPanel({ slug }: { slug: string }) { return <AnnotationPanel slug={slug} kind="notes" /> }
 export function ConceptHighlightsPanel({ slug }: { slug: string }) { return <AnnotationPanel slug={slug} kind="highlights" /> }

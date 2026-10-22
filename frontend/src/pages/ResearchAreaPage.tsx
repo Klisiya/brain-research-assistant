@@ -1,5 +1,6 @@
+import { AuthLoginLink } from '../components/auth/AuthLoginNavigation'
 import { useCallback, useEffect, useRef } from 'react'
-import { Link, useLocation, useParams } from 'react-router-dom'
+import { Link, useParams } from 'react-router-dom'
 import { getResearchDetail, getResearchList, type ResearchDetail, type ResearchArea } from '../api/research'
 import { modulePath } from '../api/courses'
 import { useCourseRead } from '../hooks/useCourseRead'
@@ -16,7 +17,6 @@ import '../components/learning/PersonalReading.css'
 
 function ResearchBookmark({ areaId }: { areaId: number }) {
   const state = usePersonalState(`bookmark:research_area:${areaId}`, getBookmarks)
-  const location = useLocation()
   const button = useRef<HTMLButtonElement>(null)
   const restoreFocus = useRef(false)
   const saved = state.data?.find(row => row.targetType === 'research_area' && row.available && row.target.id === areaId)
@@ -26,7 +26,7 @@ function ResearchBookmark({ areaId }: { areaId: number }) {
     if (document.activeElement === document.body) button.current?.focus()
   }, [state.busy, state.loading, state.data, state.errorMessage])
   return <div className="personal-controls bookmark-control" role="group" aria-label="Bookmark research area">
-    {state.auth.status === 'anonymous' ? <Link to="/login" state={{ from: location.pathname }}>Sign in to save</Link>
+    {state.auth.status === 'anonymous' ? <AuthLoginLink>Sign in to save</AuthLoginLink>
       : state.auth.status === 'unavailable' ? <><p role="alert">Sign-in status unavailable.</p><button type="button" onClick={() => void state.refreshAuth()}>Retry sign-in</button></>
       : state.auth.status === 'loading' ? <p role="status">Loading bookmark…</p>
       : state.error ? <><p role="alert">Bookmark state unavailable.</p><button ref={button} type="button" onClick={() => {

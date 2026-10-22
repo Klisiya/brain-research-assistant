@@ -1,7 +1,8 @@
 import { sessionFetch } from '../api/session'
 import { useCallback, useEffect, useRef, useState, type FormEvent, type KeyboardEvent } from 'react'
 import ReactMarkdown, { type Components } from 'react-markdown'
-import { useNavigate } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
+import { authLoginState } from './auth/authOrigin'
 import remarkGfm from 'remark-gfm'
 import BorderGlow from './BorderGlow'
 import TextType from './TextType'
@@ -233,6 +234,7 @@ function StreamingMarkdown({ text }: StreamingMarkdownProps) {
 
 function AITutorSection() {
   const navigate = useNavigate()
+  const location = useLocation()
   const [question, setQuestion] = useState('')
   const [isLoading, setIsLoading] = useState(false)
   const [exchange, setExchange] = useState<TutorExchange | null>(null)
@@ -305,11 +307,7 @@ function AITutorSection() {
       if (error instanceof AuthRequiredError) {
         const loginPath = getSameOriginLoginPath(error.loginUrl)
 
-        if (loginPath) {
-          navigate(loginPath, { state: { authRequired: true } })
-        } else {
-          window.location.assign(error.loginUrl)
-        }
+        navigate(loginPath ?? '/login', { state: authLoginState({ ...location, hash: '#ai-section' }, 'tutor') })
 
         return
       }

@@ -1,3 +1,4 @@
+import { AuthLoginLink } from '../components/auth/AuthLoginNavigation'
 import { useEffect, useState } from 'react'
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom'
 import {
@@ -195,7 +196,7 @@ function PaperEditorPage({ currentUser }: { currentUser: AuthUser }) {
         {loadError === 'unavailable' ? (
           <button onClick={() => setRequestVersion((value) => value + 1)} type="button">Try Again</button>
         ) : loadError === 'session' ? (
-          <Link state={{ from: location.pathname, managementRequired: true }} to="/login">Sign In</Link>
+          <AuthLoginLink notice="management">Sign In</AuthLoginLink>
         ) : (
           <Link className="management-return" to={back.path}>{back.label}</Link>
         )}

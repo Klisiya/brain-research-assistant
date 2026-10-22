@@ -1,3 +1,4 @@
+import { AuthLoginLink } from '../components/auth/AuthLoginNavigation'
 import { useCallback, useMemo, useState, type FormEvent } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { getSearch, parseSearchUrl, SEARCH_TYPES, searchPath, searchResultPath, type SearchResult, type SearchType } from '../api/search'
@@ -51,7 +52,7 @@ export default function SearchPage() {
         {invalid ? <div className="global-search-status" role="alert"><h2>Invalid search parameters</h2><p>Use a query of up to 200 characters, a valid content type, and a positive page number.</p><Link to="/search">Reset search parameters</Link></div>
           : auth.status === 'loading' ? <p role="status">Checking access…</p>
           : auth.status === 'unavailable' ? <p role="alert">Authentication check unavailable. Refresh to retry.</p>
-          : hubDenied ? <div className="global-search-status"><h2>Sign in to search Innovation Hub</h2><Link to="/login" state={{ from: `/search?${url}` }}>Sign in</Link></div>
+          : hubDenied ? <div className="global-search-status"><h2>Sign in to search Innovation Hub</h2><AuthLoginLink>Sign in</AuthLoginLink></div>
           : !params.q ? <div className="global-search-status"><h2>Search the Brain Research platform</h2><p>Enter a query to explore published content.</p></div>
           : state.loading ? <p className="global-search-status" role="status">Searching published content…</p>
           : state.error ? <div className="global-search-status" role="alert"><h2>Search unavailable</h2><p>We could not load your results. Please try again.</p><button onClick={state.retry} type="button">Retry</button></div>

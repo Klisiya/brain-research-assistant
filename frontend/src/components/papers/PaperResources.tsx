@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { Link, useLocation } from 'react-router-dom'
+import { AuthLoginLink } from '../auth/AuthLoginNavigation'
 import { fetchAttachmentFile, fetchManagedAttachments, fetchPublicAttachments, PaperApiError } from '../../api/papers'
 import { SESSION_EXPIRED_EVENT } from '../../api/session'
 import { useAuth } from '../../auth/useAuth'
@@ -11,7 +11,7 @@ import type { PaperReadingController } from '../../hooks/usePaperReading'
 type ResourceActionError = { message: string; signIn: boolean }
 function ResourceFileActions({ attachment, onError }: { attachment: PaperAttachment; onError: (error: ResourceActionError) => void }) {
   const [busy, setBusy] = useState(false), [error, setError] = useState<string | null>(null), [signIn, setSignIn] = useState(false)
-  const active = useRef<AbortController | null>(null), location = useLocation()
+  const active = useRef<AbortController | null>(null)
   useEffect(() => () => active.current?.abort(), [])
   const open = async (download: boolean) => {
     if (active.current) return
@@ -44,7 +44,7 @@ function ResourceFileActions({ attachment, onError }: { attachment: PaperAttachm
       <button type="button" disabled={busy} onClick={() => void open(true)} aria-label={`Download ${attachment.displayName}`}>{busy ? 'Opening...' : 'Download'}</button>
     </div>
     {error ? <p className="resource-error" role="alert">{error}</p> : null}
-    {signIn ? <Link state={{ from: location.pathname }} to="/login">Sign In</Link> : null}
+    {signIn ? <AuthLoginLink>Sign In</AuthLoginLink> : null}
   </div>
 }
 function ResourceCard({ item, onError, reading, slug }: { item: PaperAttachment; onError: (error: ResourceActionError) => void; reading?: PaperReadingController; slug: string }) {
@@ -61,7 +61,6 @@ function ResourceCard({ item, onError, reading, slug }: { item: PaperAttachment;
 }
 export default function PaperResources({ paperId, slug, managed = false, reading }: { paperId: number; slug: string; managed?: boolean; reading?: PaperReadingController }) {
   const { state } = useAuth()
-  const location = useLocation()
   const [actionError, setActionError] = useState<ResourceActionError | null>(null)
   const [version, setVersion] = useState(0)
   const [result, setResult] = useState<{ key: string; items: PaperAttachment[] | null; error: string | null } | null>(null)
@@ -85,7 +84,7 @@ export default function PaperResources({ paperId, slug, managed = false, reading
   const covers = current?.items?.filter(item => item.attachmentType === 'cover') ?? []
   return <section className="paper-detail-block paper-resources" aria-labelledby="paper-resources-heading" key={authKey}>
     <span>Reading Materials</span><h2 id="paper-resources-heading">Resources</h2>
-    {actionError?.signIn ? <div role="alert"><p>{actionError.message}</p><Link state={{ from: location.pathname, managementRequired: managed }} to="/login">Sign In</Link></div> : null}
+    {actionError?.signIn ? <div role="alert"><p>{actionError.message}</p><AuthLoginLink notice={managed ? 'management' : undefined}>Sign In</AuthLoginLink></div> : null}
     {managed ? <p>Management preview · Resources for this paper, including unpublished content.</p> : null}
     {!current ? <p role="status" aria-busy="true">Loading resources...</p> : current.error ? <div role="alert"><p>{current.error}</p><button onClick={() => setVersion(value => value + 1)} type="button">Retry Resources</button></div>
       : current.items?.length ? <>

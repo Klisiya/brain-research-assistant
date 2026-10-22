@@ -1,3 +1,4 @@
+import { AuthLoginLink } from '../components/auth/AuthLoginNavigation'
 import { useEffect, useState, type FormEvent } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { makeManagementOrigin, readPaperListFilters, withManagementOrigin } from '../components/management/managementOrigin'
@@ -157,7 +158,7 @@ function PaperManagementPage({ currentUser }: { currentUser: AuthUser }) {
                 : "We couldn't load your paper management workspace."}
           </p>
           {currentResult.error === 'session' ? (
-            <Link state={{ from: '/manage/papers', managementRequired: true }} to="/login">Sign In</Link>
+            <AuthLoginLink notice="management">Sign In</AuthLoginLink>
           ) : currentResult.error === 'unavailable' ? (
             <button onClick={() => setRequestVersion((value) => value + 1)} type="button">Try Again</button>
           ) : (

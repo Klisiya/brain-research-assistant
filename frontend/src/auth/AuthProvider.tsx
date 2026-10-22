@@ -34,7 +34,7 @@ export default function AuthProvider({ children }: { children: ReactNode }) {
       }
     } finally { mutating.current = false }
   }, [refreshAuth])
-  const signOut = useCallback(async () => {
+  const signOut = useCallback(async (onSuccess?: () => void) => {
     ++generation.current
     controller.current?.abort()
     mutating.current = true
@@ -42,7 +42,8 @@ export default function AuthProvider({ children }: { children: ReactNode }) {
       await logout()
       ++generation.current
       controller.current?.abort()
-      setState({ status: 'anonymous', user: null })
+      // Leave the old protected route before its anonymous guard can capture it.
+      try { onSuccess?.() } finally { setState({ status: 'anonymous', user: null }) }
     } finally { mutating.current = false }
   }, [])
   const cancelRequests = useCallback(() => {

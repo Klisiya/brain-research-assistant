@@ -236,9 +236,8 @@ function Navbar() {
     setIsSigningOut(true)
     setSignOutError(null)
     try {
-      await signOut()
+      await signOut(() => { navigate('/', { replace: false }) })
       setIsAccountMenuOpen(false)
-      navigate('/', { replace: false })
     } catch {
       setSignOutError('Unable to sign out. Please try again.')
     } finally { setIsSigningOut(false) }

@@ -7,6 +7,6 @@ export type AuthContextValue = {
   state: AuthState
   refreshAuth: () => Promise<void>
   signIn: (email: string, password: string, remember: boolean) => Promise<void>
-  signOut: () => Promise<void>
+  signOut: (onSuccess?: () => void) => Promise<void>
 }
 export const AuthContext = createContext<AuthContextValue | null>(null)

@@ -1,3 +1,4 @@
+import { AuthLoginLink } from '../components/auth/AuthLoginNavigation'
 import { useEffect, useState } from 'react'
 import { Link, useLocation, useParams } from 'react-router-dom'
 import { useAuth } from '../auth/useAuth'
@@ -202,7 +203,7 @@ function PaperDetailStatus({
             Try Again
           </button>
         )}
-        {error === 'session' ? <Link state={{ from: window.location.pathname, managementRequired: true }} to="/login">Sign In</Link> : null}
+        {error === 'session' ? <AuthLoginLink notice="management">Sign In</AuthLoginLink> : null}
         <Link to={returnPath}>{backLabel}</Link>
       </div>
     </section>

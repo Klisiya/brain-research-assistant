@@ -1,17 +1,16 @@
-import { Link, useLocation } from 'react-router-dom'
+import { AuthLoginLink } from '../auth/AuthLoginNavigation'
 import { changePaperReading, readingLabel } from '../../api/reading'
 import type { PaperReadingController } from '../../hooks/usePaperReading'
 import './PersonalReading.css'
 
 export default function PaperReadingControls({ state, slug, attachment }: { state: PaperReadingController; slug: string; attachment?: { id: number; version: number; displayName: string } }) {
-  const location = useLocation()
   const item = attachment ? state.data?.resources.find(r => r.attachmentId === attachment.id && r.version === attachment.version) : state.data
   const name = attachment ? `Reading status for ${attachment.displayName}` : 'Paper reading progress'
   const target = attachment ? 'Resource' : 'Paper'
   const act = (action: 'start' | 'complete' | 'incomplete') => state.run(signal => changePaperReading(slug, action, signal, attachment))
   return <section className="personal-controls paper-reading-controls" aria-label={name}>
     {!attachment && <><h3>Paper Progress</h3><p>Your self-reported paper reading state. Resource completion is recorded separately.</p></>}
-    {state.auth.status === 'anonymous' ? <Link to="/login" state={{ from: location.pathname }}>Sign in to record reading</Link>
+    {state.auth.status === 'anonymous' ? <AuthLoginLink>Sign in to record reading</AuthLoginLink>
       : state.auth.status === 'unavailable' ? <><p role="alert">Sign-in status unavailable.</p><button type="button" onClick={() => void state.refreshAuth()}>Retry sign-in</button></>
       : state.auth.status === 'loading' || state.loading ? <p role={attachment ? undefined : 'status'}>Loading reading state…</p>
       : state.error ? <><p role={attachment ? undefined : 'alert'}>Reading state unavailable.</p><button type="button" onClick={state.retry}>Retry reading state</button></>

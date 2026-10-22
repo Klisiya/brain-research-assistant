@@ -1,7 +1,8 @@
-import { useEffect, useState, type FormEvent, type MouseEvent } from 'react'
+import { useEffect, useMemo, useState, type FormEvent, type MouseEvent } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { AuthLoginError } from '../api/auth'
 import { useAuth } from '../auth/useAuth'
+import { loginReturn } from '../components/auth/authOrigin'
 import Footer from '../components/Footer'
 import LoginShaderBackground from './LoginShaderBackground'
 import './LoginPage.css'
@@ -25,23 +26,6 @@ function isManagementRequiredLocationState(value: unknown): value is { managemen
   return isRecord(value) && value.managementRequired === true
 }
 
-function getLoginReturnPath(value: unknown) {
-  if (
-    isRecord(value)
-    && typeof value.from === 'string'
-    && value.from.startsWith('/')
-    && !value.from.startsWith('//')
-    && !value.from.includes('\\')
-    && !Array.from(value.from).some(char => char.charCodeAt(0) < 32 || char.charCodeAt(0) === 127)
-    && new URL(value.from, window.location.origin).origin === window.location.origin
-    && new URL(value.from, window.location.origin).pathname !== '/login'
-  ) {
-    return value.from
-  }
-
-  return '/'
-}
-
 function LoginPage() {
   const { state: authState, signIn } = useAuth()
   const location = useLocation()
@@ -52,11 +36,11 @@ function LoginPage() {
   const [remember, setRemember] = useState(false)
   const [status, setStatus] = useState<LoginStatus | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
-  const returnPath = getLoginReturnPath(location.state)
+  const destination = useMemo(() => loginReturn(location.state), [location.state])
 
   useEffect(() => {
-    if (authState.status === 'authenticated') navigate(returnPath, { replace: true })
-  }, [authState.status, navigate, returnPath])
+    if (authState.status === 'authenticated') navigate(destination.path, { replace: true, state: destination.state })
+  }, [authState.status, navigate, destination])
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()

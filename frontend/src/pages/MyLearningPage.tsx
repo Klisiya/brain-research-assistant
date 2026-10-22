@@ -1,5 +1,6 @@
+import { AuthLoginRedirect } from '../components/auth/AuthLoginNavigation'
 import { useCallback } from 'react'
-import { Link, Navigate, useLocation } from 'react-router-dom'
+import { Link } from 'react-router-dom'
 import { coursePath, getCourse, modulePath, PRIMARY_COURSE_SLUG } from '../api/courses'
 import { getLearningCourse, statusLabel } from '../api/learning'
 import { getPaperReadings, readingLabel } from '../api/reading'
@@ -68,8 +69,7 @@ function MyLearningContent({ account }: { account: number }) {
 
 export default function MyLearningPage() {
   const { state, refreshAuth } = useAuth()
-  const location = useLocation()
-  if (state.status === 'anonymous') return <Navigate replace to="/login" state={{ from: location.pathname }} />
+  if (state.status === 'anonymous') return <AuthLoginRedirect />
   return <div className="app-shell my-learning-page">
     <PageParticleBackground />
     <a className="ml-skip" href="#my-learning-main">Skip to My Learning</a>

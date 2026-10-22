@@ -1,6 +1,7 @@
+import { AuthLoginLink } from '../components/auth/AuthLoginNavigation'
 import { useCallback, useEffect, useRef } from 'react'
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom'
-import { courseApiPath, coursePath, getCourse, getResources, modulePath, type CourseDetail } from '../api/courses'
+import { courseApiPath, getCourse, getResources, modulePath, type CourseDetail } from '../api/courses'
 import { statusLabel } from '../api/learning'
 import { useAuth } from '../auth/useAuth'
 import { useCourseRead } from '../hooks/useCourseRead'
@@ -50,7 +51,7 @@ function CourseJourney({ course, learning, hasActivity, target }: { course: Cour
       <p className="course-eyebrow">Your learning</p>
       <h2>{available && data?.selfCompleted ? 'All required modules completed' : available && target ? `${hasActivity ? 'Continue with' : 'Start with'} Module ${String(target.number).padStart(2, '0')}` : 'Learning progress'}</h2>
       {available && target && <p className="co-next-title">{target.title}</p>}
-      {auth.status === 'anonymous' ? <Link className="co-primary" to="/login" state={{ from: coursePath(course.slug) }}>Sign in to start learning</Link>
+      {auth.status === 'anonymous' ? <AuthLoginLink className="co-primary">Sign in to start learning</AuthLoginLink>
         : auth.status === 'unavailable' ? <><p role="alert">Sign-in status unavailable.</p><button type="button" onClick={() => void learning.refreshAuth()}>Retry sign-in</button></>
         : auth.status === 'loading' || loading ? <p role="status">Loading learning progress…</p>
         : error ? <><p role="alert">Learning progress is unavailable. You can still open the modules below.</p><button type="button" onClick={learning.retry}>Retry progress</button></>

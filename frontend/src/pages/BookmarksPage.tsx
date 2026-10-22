@@ -1,5 +1,6 @@
+import { AuthLoginRedirect } from '../components/auth/AuthLoginNavigation'
 import { Fragment, useEffect, useId, useLayoutEffect, useRef, useState, type CSSProperties, type PointerEvent } from 'react'
-import { Link, Navigate, useLocation } from 'react-router-dom'
+import { Link } from 'react-router-dom'
 import { bookmarkPath, getBookmarks, removeBookmark, type Bookmark, type BookmarkType } from '../api/reading'
 import { coursePath, PRIMARY_COURSE_SLUG } from '../api/courses'
 import { useAuth } from '../auth/useAuth'
@@ -229,8 +230,7 @@ function BookmarksContent() {
 
 export default function BookmarksPage() {
   const { state, refreshAuth } = useAuth()
-  const location = useLocation()
-  if (state.status === 'anonymous') return <Navigate replace to="/login" state={{ from: location.pathname }} />
+  if (state.status === 'anonymous') return <AuthLoginRedirect />
   return <div className="app-shell course-page learning-page"><PageParticleBackground /><Navbar />
     <main className="course-main bookmarks-main bw-main" id="bookmarks-main" tabIndex={-1}>
       <header className="bw-header"><h1>Bookmarks</h1><p>Your saved places in research and learning.</p></header>

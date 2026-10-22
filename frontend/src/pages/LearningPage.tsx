@@ -1,5 +1,6 @@
+import { AuthLoginRedirect } from '../components/auth/AuthLoginNavigation'
 import { useCallback } from 'react'
-import { Link, Navigate, useLocation } from 'react-router-dom'
+import { Link } from 'react-router-dom'
 import { useAuth } from '../auth/useAuth'
 import { getEnrollments, statusLabel } from '../api/learning'
 import { coursePath, modulePath, PRIMARY_COURSE_SLUG } from '../api/courses'
@@ -30,8 +31,8 @@ function LearningContent({ account, detailed }: { account: number; detailed: boo
   </>
 }
 export default function LearningPage({ detailed = false }: { detailed?: boolean }) {
-  const { state, refreshAuth } = useAuth(), location = useLocation()
-  if (state.status === 'anonymous') return <Navigate replace to="/login" state={{ from: location.pathname }} />
+  const { state, refreshAuth } = useAuth()
+  if (state.status === 'anonymous') return <AuthLoginRedirect />
   return <div className="app-shell course-page learning-page"><PageParticleBackground /><Navbar /><main className="course-main">
     {state.status === 'authenticated' ? <LearningContent key={`${state.user.id}:${detailed}`} account={state.user.id} detailed={detailed} /> : state.status === 'loading' ? <p role="status">Checking sign-in…</p> : <section className="learning-panel"><p role="alert">Sign-in status unavailable.</p><button type="button" onClick={() => void refreshAuth()}>Retry sign-in</button></section>}
   </main><Footer /></div>

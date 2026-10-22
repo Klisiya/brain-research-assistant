@@ -1,3 +1,4 @@
+import { AuthLoginLink } from '../components/auth/AuthLoginNavigation'
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import { Link, useParams, useSearchParams } from 'react-router-dom'
 import { courseApiPath, coursePath, getCourse, getModule, getResources, modulePath } from '../api/courses'
@@ -13,10 +14,10 @@ import { ResourceLearning } from '../components/learning/LearningControls'
 import ModuleResourceViewer, { ResourceFallback } from '../components/modules/ModuleResourceViewer'
 import './ModuleWorkspacePage.css'
 
-function ModuleProgress({ learning, slug, path }: { learning: LearningController; slug: string; path: string }) {
+function ModuleProgress({ learning, slug }: { learning: LearningController; slug: string; path: string }) {
   const activity = learning.data?.modules.find(module => module.slug === slug)
   return <div className="mw-progress" aria-label="Module learning status">
-    {learning.auth.status === 'anonymous' ? <Link to="/login" state={{ from: path }}>Sign in to save progress</Link>
+    {learning.auth.status === 'anonymous' ? <AuthLoginLink>Sign in to save progress</AuthLoginLink>
       : learning.auth.status === 'unavailable' ? <><span role="alert">Sign-in status unavailable.</span><button onClick={() => void learning.refreshAuth()} type="button">Retry sign-in</button></>
       : learning.auth.status === 'loading' || learning.loading ? <span role="status">Loading learning state…</span>
       : learning.error ? <><span role="alert">Learning state unavailable.</span><button type="button" onClick={learning.retry}>Retry learning state</button></>

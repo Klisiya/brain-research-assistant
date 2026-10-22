@@ -1,5 +1,6 @@
+import { AuthLoginRedirect } from '../components/auth/AuthLoginNavigation'
 import { useCallback } from 'react'
-import { Link, Navigate, useLocation } from 'react-router-dom'
+import { Link } from 'react-router-dom'
 import { coursePath, getCourse, modulePath, PRIMARY_COURSE_SLUG } from '../api/courses'
 import { getEnrollments, type LearningResource, type LearningStatus } from '../api/learning'
 import { getPaperReadings } from '../api/reading'
@@ -115,8 +116,7 @@ function ProgressContent({ account }: { account: number }) {
 
 export default function ProgressPage() {
   const { state, refreshAuth } = useAuth()
-  const location = useLocation()
-  if (state.status === 'anonymous') return <Navigate replace to="/login" state={{ from: location.pathname }} />
+  if (state.status === 'anonymous') return <AuthLoginRedirect />
   return <div className="app-shell course-page learning-page"><PageParticleBackground /><Navbar />
     <main className="course-main pw-main" id="progress-main" tabIndex={-1}>
       <header className="pw-header"><div><h1>Progress</h1><p>Your self-reported learning record. Completion is not an assessment result.</p></div><Link to="/my-learning">My Learning →</Link></header>
