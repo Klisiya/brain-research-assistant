@@ -37,7 +37,7 @@ class SearchService:
 
     def hub_visibility(self):
         E, D = self.HubEntry, self.HubDiscussion
-        catalog = E.kind.in_(['faculty', 'industry'])
+        catalog = E.kind.in_(['faculty', 'industry', 'collaboration'])
         return catalog if D is None else or_(catalog, and_(E.kind == 'discussions',
             exists(select(D.entry_id).where(D.entry_id == E.id, D.thread_id.is_(None)))))
 

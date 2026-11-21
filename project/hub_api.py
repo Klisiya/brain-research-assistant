@@ -2,6 +2,7 @@
 from datetime import date, datetime
 from functools import wraps
 from math import ceil
+import re
 from flask import g, jsonify, request, send_file
 from flask_login import current_user
 from sqlalchemy import select, text, func
@@ -18,6 +19,8 @@ def register_hub_api(app, db, User, Entry, Revision, Attachment, Event, roles_re
 
     def request_kind():
         # Route identity, never client-provided JSON/query fields, selects the namespace.
+        if request.path.startswith('/api/hub/collaboration/'):
+            return 'collaboration'
         return 'industry' if request.path.startswith('/api/hub/industry/') else 'faculty'
 
     def fail(message, code='HUB_VALIDATION_ERROR', status=400):
@@ -46,7 +49,7 @@ def register_hub_api(app, db, User, Entry, Revision, Attachment, Event, roles_re
         if not actor().is_authenticated:
             return False
         entry = db.session.get(Entry, revision.entry_id)
-        return bool(entry and entry.kind in {'faculty', 'industry'} and
+        return bool(entry and entry.kind in {'faculty', 'industry', 'collaboration'} and
                     (owns(entry) or published(entry) is not None and entry.published_revision_id == revision.id))
 
     def can_manage(revision):
@@ -139,13 +142,37 @@ def register_hub_api(app, db, User, Entry, Revision, Attachment, Event, roles_re
                     raise ValueError('Use YYYY-MM-DD.')
             except (TypeError, ValueError):
                 fail('Source date must be a real date in YYYY-MM-DD format.')
+        if request_kind() == 'collaboration':
+            if not result['body'] or not result['source_name']:
+                fail('A description and a real partner / source name are required.')
+            for key, column, limit in [('requirements', 'requirements', 10000),
+                    ('contactName', 'contact_name', 200), ('contactEmail', 'contact_email', 254)]:
+                value = data.get(key)
+                value = '' if value is None else value
+                if not isinstance(value, str) or len(value) > limit or any((ord(c) < 32 and (key != 'requirements' or c not in '\n\r\t')) or ord(c) == 127 for c in value):
+                    fail(f'{key} must be valid text of at most {limit} characters.')
+                result[column] = value.strip() or None
+            if result['contact_email'] and not re.fullmatch(r"[A-Za-z0-9.!#$%&'*+/=?^_`{|}~-]+@[A-Za-z0-9](?:[A-Za-z0-9.-]*[A-Za-z0-9])?\.[A-Za-z]{2,63}", result['contact_email']):
+                fail('Provide a valid contact email address.')
+            value = data.get('deadline')
+            try:
+                result['deadline'] = None if value in (None, '') else date.fromisoformat(value)
+                if value not in (None, '') and result['deadline'].isoformat() != value:
+                    raise ValueError
+            except (TypeError, ValueError):
+                fail('Deadline must be a real date in YYYY-MM-DD format.')
         return result
+
+    def content_payload(edit=False):
+        required = {'title', 'body', 'sourceName'}
+        optional = {'sourceUrl', 'sourceDate'} if request_kind() == 'industry' else {'sourceUrl', 'requirements', 'deadline', 'contactName', 'contactEmail'}
+        return payload(required | ({'expectedVersion'} if edit else set()), optional)
 
     def entry_for(identifier, *, manage=False):
         query = select(Entry).where(Entry.id == identifier, Entry.kind == request_kind())
         entry = db.session.scalar(query.with_for_update() if request.method not in {'GET', 'HEAD'} else query)
         if entry is None or (manage and not owns(entry)) or (not manage and published(entry) is None):
-            fail('Industry update is not available.' if request_kind() == 'industry' else
+            fail('Collaboration opportunity is not available.' if request_kind() == 'collaboration' else 'Industry update is not available.' if request_kind() == 'industry' else
                  'Faculty resource is not available.', 'HUB_NOT_FOUND', 404)
         return entry
 
@@ -186,7 +213,8 @@ def register_hub_api(app, db, User, Entry, Revision, Attachment, Event, roles_re
         for item in attachments:
             assets.authorize('hub', revision, item)
             asset = item.asset
-            prefix = '/api/hub/industry/entries' if db.session.get(Entry, revision.entry_id).kind == 'industry' else '/api/hub/entries'
+            kind = db.session.get(Entry, revision.entry_id).kind
+            prefix = f'/api/hub/{kind}/entries' if kind in {'industry', 'collaboration'} else '/api/hub/entries'
             items.append(dict(id=item.id, displayName=item.display_name, attachmentType=asset.asset_type,
                 mimeType=asset.mime_type, fileSize=asset.file_size, externalUrl=asset.external_url,
                 downloadUrl=None if asset.external_url else f'{prefix}/{revision.entry_id}/revisions/{revision.id}/attachments/{item.id}/download'))
@@ -196,6 +224,9 @@ def register_hub_api(app, db, User, Entry, Revision, Attachment, Event, roles_re
         if industry:
             result.update(sourceDate=revision.source_date.isoformat() if revision.source_date else None,
                           createdAt=revision.created_at.isoformat()+'Z')
+        if db.session.get(Entry, revision.entry_id).kind == 'collaboration':
+            result.update(requirements=revision.requirements, deadline=revision.deadline.isoformat() if revision.deadline else None,
+                          contactName=revision.contact_name, contactEmail=revision.contact_email)
         if manage:
             result.update(state=revision.state, reviewNote=revision.review_note,
                           submittedAt=revision.submitted_at.isoformat()+'Z' if revision.submitted_at else None)
@@ -214,23 +245,34 @@ def register_hub_api(app, db, User, Entry, Revision, Attachment, Event, roles_re
         if manage:
             result.update(version=entry.version, ownerId=entry.owner_id,
                           working=serialize_revision(revision_for(entry, entry.working_revision_id), manage=True))
+        if entry.kind == 'collaboration':
+            result.update(businessStatus='archived' if entry.archived_at else entry.collaboration_status or 'open')
+            if manage:
+                result.update(submittedById=entry.owner_id, createdAt=entry.created_at.isoformat()+'Z', updatedAt=entry.updated_at.isoformat()+'Z')
         return result
 
     def saved(entry, response_status=200):
         db.session.commit()
         return jsonify(entry=serialize(entry, manage=True)), response_status
 
+    @app.get('/api/hub/collaboration/entries')
     @app.get('/api/hub/industry/entries')
     @app.get('/api/hub/entries')
     @guarded
     def hub_list():
-        if set(request.args) - {'scope', 'page'} or any(len(request.args.getlist(k)) != 1 for k in request.args):
+        if set(request.args) - ({'scope', 'page', 'status'} if request_kind() == 'collaboration' else {'scope', 'page'}) or any(len(request.args.getlist(k)) != 1 for k in request.args):
             fail('Invalid or repeated list parameters.')
         scope, page = request.args.get('scope', 'published'), request.args.get('page', '1')
-        scopes = {'published', 'mine', 'review', 'all'} if request_kind() == 'industry' else {'published', 'mine', 'review'}
+        scopes = {'published', 'mine', 'review', 'all'} if request_kind() in {'industry', 'collaboration'} else {'published', 'mine', 'review'}
         if scope not in scopes or not page.isascii() or not page.isdecimal() or len(page) > 5 or not 1 <= int(page) <= 10000:
             fail('Invalid list parameters.')
         query = select(Entry).where(Entry.kind == request_kind())
+        if request_kind() == 'collaboration':
+            business = request.args.get('status', 'all')
+            if business not in {'open', 'closed', 'all'}:
+                fail('Invalid business status.')
+            if business != 'all':
+                query = query.where(Entry.archived_at.is_(None), func.coalesce(Entry.collaboration_status, 'open') == business)
         manage = scope != 'published'
         if scope == 'published':
             query = query.join(Revision, (Revision.id == Entry.published_revision_id) & (Revision.entry_id == Entry.id)).where(
@@ -242,13 +284,14 @@ def register_hub_api(app, db, User, Entry, Revision, Attachment, Event, roles_re
         else:
             if account_role(actor().role) != 'admin':
                 fail('Access denied.', 'FORBIDDEN', 403)
-            if request_kind() == 'industry' and scope == 'review':
+            if request_kind() in {'industry', 'collaboration'} and scope == 'review':
                 query = query.join(Revision, (Revision.id == Entry.working_revision_id) & (Revision.entry_id == Entry.id)).where(
                     Entry.archived_at.is_(None), Revision.state == 'pending')
         total = db.session.scalar(select(func.count()).select_from(query.subquery()))
         rows = db.session.scalars(query.order_by(Entry.id.desc()).limit(12).offset((int(page)-1)*12)).all()
         return jsonify(entries=[serialize(row, manage=manage) for row in rows], page=int(page), total=total, totalPages=ceil(total/12))
 
+    @app.get('/api/hub/collaboration/entries/<int:entry_id>')
     @app.get('/api/hub/industry/entries/<int:entry_id>')
     @app.get('/api/hub/entries/<int:entry_id>')
     @guarded
@@ -257,6 +300,7 @@ def register_hub_api(app, db, User, Entry, Revision, Attachment, Event, roles_re
             fail('Query parameters are not supported.')
         return jsonify(entry=serialize(entry_for(entry_id)))
 
+    @app.get('/api/hub/collaboration/entries/<int:entry_id>/manage')
     @app.get('/api/hub/industry/entries/<int:entry_id>/manage')
     @app.get('/api/hub/entries/<int:entry_id>/manage')
     @guarded
@@ -265,15 +309,18 @@ def register_hub_api(app, db, User, Entry, Revision, Attachment, Event, roles_re
             fail('Query parameters are not supported.')
         return jsonify(entry=serialize(entry_for(entry_id, manage=True), manage=True))
 
+    @app.post('/api/hub/collaboration/entries')
     @app.post('/api/hub/industry/entries')
     @app.post('/api/hub/entries')
     @guarded
     def hub_create():
         if account_role(actor().role) not in {'teacher','admin'}:
             fail('Access denied.', 'FORBIDDEN', 403)
-        data = (payload({'title', 'body', 'sourceName'}, {'sourceUrl', 'sourceDate'}) if request_kind() == 'industry'
+        data = (content_payload() if request_kind() in {'industry', 'collaboration'}
                 else payload({'title'}, {'body', 'sourceName', 'sourceUrl'}))
         entry = Entry(kind=request_kind(), owner_id=actor().id)
+        if request_kind() == 'collaboration':
+            entry.collaboration_status = 'open'
         db.session.add(entry); db.session.flush()
         revision = Revision(entry_id=entry.id, number=1, **content(data))
         db.session.add(revision); db.session.flush()
@@ -281,12 +328,13 @@ def register_hub_api(app, db, User, Entry, Revision, Attachment, Event, roles_re
         event(entry, revision, 'created')
         return saved(entry, 201)
 
+    @app.patch('/api/hub/collaboration/entries/<int:entry_id>')
     @app.patch('/api/hub/industry/entries/<int:entry_id>')
     @app.patch('/api/hub/entries/<int:entry_id>')
     @guarded
     def hub_edit(entry_id):
         entry = entry_for(entry_id, manage=True)
-        data = (payload({'expectedVersion', 'title', 'body', 'sourceName'}, {'sourceUrl', 'sourceDate'}) if request_kind() == 'industry'
+        data = (content_payload(edit=True) if request_kind() in {'industry', 'collaboration'}
                 else payload({'expectedVersion', 'title'}, {'body','sourceName','sourceUrl'}))
         token(entry, data); revision = working(entry)
         for key, value in content(data).items():
@@ -294,6 +342,7 @@ def register_hub_api(app, db, User, Entry, Revision, Attachment, Event, roles_re
         event(entry, revision, 'edited')
         return saved(entry)
 
+    @app.post('/api/hub/collaboration/entries/<int:entry_id>/draft')
     @app.post('/api/hub/industry/entries/<int:entry_id>/draft')
     @app.post('/api/hub/entries/<int:entry_id>/draft')
     @guarded
@@ -304,7 +353,9 @@ def register_hub_api(app, db, User, Entry, Revision, Attachment, Event, roles_re
         if entry.archived_at or previous is None or previous.state not in {'approved', 'rejected'}:
             fail('A new draft is not available in this state.', 'HUB_STATE_CONFLICT', 409)
         revision = Revision(entry_id=entry.id, number=next_revision_number(entry), title=previous.title, body=previous.body,
-                            source_name=previous.source_name, source_url=previous.source_url, source_date=previous.source_date)
+                            source_name=previous.source_name, source_url=previous.source_url, source_date=previous.source_date,
+                            requirements=previous.requirements, deadline=previous.deadline,
+                            contact_name=previous.contact_name, contact_email=previous.contact_email)
         db.session.add(revision); db.session.flush()
         for item in db.session.scalars(select(Attachment).where(Attachment.revision_id == previous.id)).all():
             db.session.add(Attachment(revision_id=revision.id, asset_id=item.asset_id, display_name=item.display_name))
@@ -312,18 +363,27 @@ def register_hub_api(app, db, User, Entry, Revision, Attachment, Event, roles_re
         event(entry, revision, 'draft_created')
         return saved(entry)
 
+    @app.post('/api/hub/collaboration/entries/<int:entry_id>/<action>')
     @app.post('/api/hub/industry/entries/<int:entry_id>/<action>')
     @app.post('/api/hub/entries/<int:entry_id>/<action>')
     @guarded
     def hub_transition(entry_id, action):
-        if action not in {'submit', 'withdraw', 'approve', 'reject', 'archive'}:
+        if action not in ({'submit', 'withdraw', 'approve', 'reject', 'archive', 'close', 'reopen'} if request_kind() == 'collaboration' else {'submit', 'withdraw', 'approve', 'reject', 'archive'}):
             fail('Action not found.', 'HUB_NOT_FOUND', 404)
         entry = entry_for(entry_id, manage=True)
         data = payload({'expectedVersion'}, {'reviewNote'} if action == 'reject' else ())
         token(entry, data)
         if action in {'approve', 'reject', 'archive'} and account_role(actor().role) != 'admin':
             fail('Only administrators can review or archive Hub content.', 'FORBIDDEN', 403)
-        if action == 'archive':
+        if action in {'close', 'reopen'}:
+            if published(entry) is None:
+                fail('Only a published opportunity can be closed or reopened.', 'HUB_STATE_CONFLICT', 409)
+            next_status = 'closed' if action == 'close' else 'open'
+            if (entry.collaboration_status or 'open') == next_status:
+                fail('Opportunity already has this business status.', 'HUB_STATE_CONFLICT', 409)
+            entry.collaboration_status = next_status
+            event(entry, approved_snapshot(entry), 'closed' if action == 'close' else 'reopened')
+        elif action == 'archive':
             if entry.archived_at:
                 fail('Resource is already archived.', 'HUB_STATE_CONFLICT', 409)
             entry.archived_at = datetime.utcnow()
@@ -394,6 +454,7 @@ def register_hub_api(app, db, User, Entry, Revision, Attachment, Event, roles_re
         assets.retire_unreferenced(asset_ids)
         return keys
 
+    @app.post('/api/hub/collaboration/entries/<int:entry_id>/discard-revision')
     @app.post('/api/hub/industry/entries/<int:entry_id>/discard-revision')
     @app.post('/api/hub/entries/<int:entry_id>/discard-revision')
     @guarded
@@ -407,6 +468,7 @@ def register_hub_api(app, db, User, Entry, Revision, Attachment, Event, roles_re
         pending = assets.drain_cleanup(keys)
         return jsonify(entry=serialize(entry, manage=True), cleanupPending=bool(pending))
 
+    @app.delete('/api/hub/collaboration/entries/<int:entry_id>')
     @app.delete('/api/hub/industry/entries/<int:entry_id>')
     @app.delete('/api/hub/entries/<int:entry_id>')
     @guarded
@@ -457,6 +519,7 @@ def register_hub_api(app, db, User, Entry, Revision, Attachment, Event, roles_re
         pending = assets.drain_cleanup(keys)
         return jsonify(deleted=True, cleanupPending=bool(pending))
 
+    @app.post('/api/hub/collaboration/entries/<int:entry_id>/attachments')
     @app.post('/api/hub/industry/entries/<int:entry_id>/attachments')
     @app.post('/api/hub/entries/<int:entry_id>/attachments')
     @limiter.limit('10/minute', exempt_when=lambda: app.testing)
@@ -489,6 +552,7 @@ def register_hub_api(app, db, User, Entry, Revision, Attachment, Event, roles_re
         event(entry, revision, 'attachment_added')
         return saved(entry, 201)
 
+    @app.delete('/api/hub/collaboration/entries/<int:entry_id>/attachments/<int:attachment_id>')
     @app.delete('/api/hub/industry/entries/<int:entry_id>/attachments/<int:attachment_id>')
     @app.delete('/api/hub/entries/<int:entry_id>/attachments/<int:attachment_id>')
     @guarded
@@ -506,6 +570,7 @@ def register_hub_api(app, db, User, Entry, Revision, Attachment, Event, roles_re
         assets.drain_cleanup([key] if key else [])
         return jsonify(entry=serialize(entry, manage=True))
 
+    @app.get('/api/hub/collaboration/entries/<int:entry_id>/revisions/<int:revision_id>/attachments/<int:attachment_id>/download')
     @app.get('/api/hub/industry/entries/<int:entry_id>/revisions/<int:revision_id>/attachments/<int:attachment_id>/download')
     @app.get('/api/hub/entries/<int:entry_id>/revisions/<int:revision_id>/attachments/<int:attachment_id>/download')
     @guarded
@@ -523,6 +588,7 @@ def register_hub_api(app, db, User, Entry, Revision, Attachment, Event, roles_re
         response.headers['Content-Security-Policy'] = "sandbox; default-src 'none'"
         return response
 
+    @app.get('/api/hub/collaboration/entries/<int:entry_id>/history')
     @app.get('/api/hub/industry/entries/<int:entry_id>/history')
     @app.get('/api/hub/entries/<int:entry_id>/history')
     @guarded

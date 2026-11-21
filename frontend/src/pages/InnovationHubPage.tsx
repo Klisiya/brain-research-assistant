@@ -6,6 +6,7 @@ import RequireRole from '../components/auth/RequireRole'
 import FacultyWorkspace from '../components/hub/FacultyWorkspace'
 import IndustryWorkspace from '../components/hub/IndustryWorkspace'
 import DiscussionWorkspace, { type DiscussionMode } from '../components/hub/DiscussionWorkspace'
+import CollaborationWorkspace from '../components/hub/CollaborationWorkspace'
 import '../pages/PaperManagementPage.css'
 import './InnovationHubPage.css'
 
@@ -39,11 +40,10 @@ function isInnovationView(value: string | null): value is InnovationView {
   return value !== null && Object.prototype.hasOwnProperty.call(innovationViews, value)
 }
 
-function InnovationHubPage({ detail = false, kind = 'faculty', discussionMode = 'read' }: { detail?: boolean; kind?: 'faculty' | 'industry' | 'discussions'; discussionMode?: DiscussionMode }) {
+function InnovationHubPage({ detail = false, kind = 'faculty', discussionMode = 'read' }: { detail?: boolean; kind?: 'faculty' | 'industry' | 'discussions' | 'collaboration'; discussionMode?: DiscussionMode }) {
   const [searchParams] = useSearchParams()
   const requestedView = searchParams.get('view')
   const activeView: InnovationView = detail ? kind : isInnovationView(requestedView) ? requestedView : 'faculty'
-  const activeContent = innovationViews[activeView]
 
   return (
     <div className="innovation-hub-page">
@@ -73,11 +73,7 @@ function InnovationHubPage({ detail = false, kind = 'faculty', discussionMode = 
           ))}
         </nav></>}
 
-        {activeView === 'faculty' ? <FacultyWorkspace user={user} /> : activeView === 'industry' ? <IndustryWorkspace user={user} /> : activeView === 'discussions' ? <DiscussionWorkspace user={user} mode={discussionMode}/> : <section aria-live="polite" className="innovation-view-card">
-          <span>Selected View</span>
-          <h2>{activeContent.title}</h2>
-          <p>This workspace is not available yet.</p>
-        </section>}
+        {activeView === 'faculty' ? <FacultyWorkspace user={user} /> : activeView === 'industry' ? <IndustryWorkspace user={user} /> : activeView === 'discussions' ? <DiscussionWorkspace user={user} mode={discussionMode}/> : <CollaborationWorkspace user={user} />}
         </div>}</RequireRole>
       </main>
 

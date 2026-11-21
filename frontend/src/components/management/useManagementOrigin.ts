@@ -25,7 +25,7 @@ export function useManagementListPosition(data: { totalPages: number } | null | 
     if (!enabled || total === undefined || !Number.isSafeInteger(total) || total < 0) return
     const page = listPage(params.get('page')), last = Math.max(1, total)
     if (page > last) { const next = new URLSearchParams(params); next.set('page', String(last)); setParams(next, { replace: true }); return }
-    if (!/^#(?:faculty|industry|discussions|reports|papers)-[1-9]\d*$/.test(location.hash)) return
+    if (!/^#(?:faculty|industry|collaboration|discussions|reports|papers)-[1-9]\d*$/.test(location.hash)) return
     const row = [...document.querySelectorAll<HTMLElement>('[data-management-row]')]
       .find(element => element.dataset.managementRow === location.hash.slice(1) && element.getClientRects().length > 0)
     if (row) { row.focus({ preventScroll: true }); row.scrollIntoView({ block: 'nearest' }) }

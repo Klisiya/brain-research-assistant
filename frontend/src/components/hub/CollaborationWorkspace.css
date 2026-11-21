@@ -1,0 +1,9 @@
+.collaboration-workspace { overflow-wrap: anywhere; }
+.collaboration-workspace fieldset { min-width: 0; }
+.collaboration-workspace input, .collaboration-workspace textarea, .collaboration-workspace select { max-width: 100%; box-sizing: border-box; }
+.collaboration-workspace button, .collaboration-workspace .faculty-actions a, .collaboration-workspace summary { min-height: 44px; }
+.collaboration-content section { margin-block: 1.5rem; }
+.collaboration-content h3 { font-size: 1rem; }
+.collaboration-workspace > section[aria-label] { margin-block: 2rem; }
+.collaboration-workspace .industry-delete { border-color: #c78291; color: #ffd3db; }
+.collaboration-workspace :is(button,a,input,textarea,select,summary):focus-visible { outline: 2px solid #8ddce9; outline-offset: 3px; }

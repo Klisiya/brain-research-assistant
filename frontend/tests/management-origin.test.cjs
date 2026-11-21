@@ -19,6 +19,15 @@ const roundtrip = (kind, user, params, selectedId) => {
   assert.equal(JSON.stringify(read(path.slice(path.indexOf('?')), user, [kind])), JSON.stringify(origin));
   return origin;
 };
+test('Collaboration preserves review/page/business filter and rejects role/account/unbounded return values', () => {
+  const origin = roundtrip('collaboration', admin, 'scope=review&page=2&status=closed', 77);
+  assert.equal(back(origin).path, '/manage/hub/collaboration?scope=review&status=closed&page=2#collaboration-77');
+  assert.equal(back(roundtrip('collaboration', teacher, 'scope=mine&page=2')).label, 'Back to my opportunities');
+  assert.equal(validate(origin, teacher, ['collaboration']), null);
+  assert.equal(validate({...origin, returnTo:'https://evil.test'}, admin, ['collaboration']), null);
+  assert.equal(validate({...origin, status:'pending'}, admin, ['collaboration']), null);
+  assert.equal(back(roundtrip('collaboration', teacher, 'scope=published&page=3&status=open')).path, '/innovation-hub?view=collaboration&status=open&page=3');
+});
 test('Industry admin review and teacher mine retain page and selected row', () => {
   assert.equal(back(roundtrip('industry', admin, 'scope=review&page=2', 21)).path, '/manage/hub/industry?scope=review&page=2#industry-21');
   assert.equal(back(roundtrip('industry', teacher, 'scope=mine&page=4')).path, '/manage/hub/industry?scope=mine&page=4');

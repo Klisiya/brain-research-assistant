@@ -19,6 +19,13 @@ test('Search and Management query contexts remain independent intact strings', (
     assert.equal(back(make({ ...location, search })).path, location.pathname + search + location.hash);
   }
 });
+test('Collaboration routes retain full auth return context with existing bounded origins', () => {
+  for (const pathname of ['/innovation-hub/collaboration/5', '/manage/hub/collaboration', '/manage/hub/collaboration/new', '/manage/hub/collaboration/5']) {
+    const target = {pathname, search:'?scope=review&page=2', hash:'#contact'};
+    assert.equal(back(make(target)).path, pathname+target.search+target.hash);
+  }
+  assert.equal(safe('/manage/hub/collaboration/5/delete'),null);
+});
 test('public Paper Module return state preserved; other history state omitted', () => {
   const result = back(make({ pathname: '/papers/one', search: '?resource=4', hash: '#reader', state: { from: '/course/brain/modules/one?paper=2', password: 'MUST NOT COPY', token: 'MUST NOT COPY' } }));
   assert.equal(result.state.from, '/course/brain/modules/one?paper=2');

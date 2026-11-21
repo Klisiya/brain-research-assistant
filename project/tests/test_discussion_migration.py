@@ -24,11 +24,12 @@ class DiscussionMigrationTests(unittest.TestCase):
                 connection.execute("INSERT INTO hub_revisions(id,entry_id,number,state,title,body,source_name,created_at) VALUES(1,1,1,'draft','TEST ONLY preserved','TEST ONLY body','TEST ONLY source','2026-01-01')")
                 connection.commit()
                 tables=[row[0] for row in connection.execute("SELECT name FROM sqlite_master WHERE type='table' AND name NOT IN ('alembic_version','sqlite_sequence')")]
+                columns={table:[row[1] for row in connection.execute('PRAGMA table_info("'+table+'")')] for table in tables}
                 before={table:connection.execute('SELECT * FROM "'+table+'" ORDER BY rowid').fetchall() for table in tables}
             for direction,target in [('upgrade','head'),('downgrade','b3d970ef624a'),('upgrade','head')]:
                 migrate(direction,target)
                 with closing(sqlite3.connect(path)) as connection:
-                    for table,rows in before.items():self.assertEqual(connection.execute('SELECT * FROM "'+table+'" ORDER BY rowid').fetchall(),rows,table)
+                    for table,rows in before.items():self.assertEqual(connection.execute('SELECT '+','.join('"'+c+'"' for c in columns[table])+' FROM "'+table+'" ORDER BY rowid').fetchall(),rows,table)
                     self.assertEqual(connection.execute('PRAGMA foreign_key_check').fetchall(),[])
                     if direction=='upgrade':
                         for table in ['hub_discussions','hub_reports','hub_report_events']:

@@ -2,8 +2,8 @@ import { sessionFetch } from './session'
 
 export type HubState = 'draft' | 'pending' | 'published' | 'rejected' | 'archived'
 export type HubAttachment = { id: number; displayName: string; attachmentType: string; mimeType: string | null; fileSize: number | null; externalUrl: string | null; downloadUrl: string | null }
-export type HubRevision = { id: number; number: number; title: string; body: string; sourceName: string | null; sourceUrl: string | null; sourceDate?: string | null; createdAt?: string; reviewedById?: number | null; reviewedAt?: string | null; attachments: HubAttachment[]; state?: 'draft' | 'pending' | 'approved' | 'rejected'; reviewNote?: string | null }
-export type HubEntry = { id: number; kind: 'faculty' | 'industry'; status: HubState; published: HubRevision | null; version?: number; ownerId?: number; working?: HubRevision | null; submittedById?: number; createdAt?: string; updatedAt?: string }
+export type HubRevision = { id: number; number: number; title: string; body: string; sourceName: string | null; sourceUrl: string | null; sourceDate?: string | null; requirements?: string | null; deadline?: string | null; contactName?: string | null; contactEmail?: string | null; createdAt?: string; reviewedById?: number | null; reviewedAt?: string | null; attachments: HubAttachment[]; state?: 'draft' | 'pending' | 'approved' | 'rejected'; reviewNote?: string | null }
+export type HubEntry = { id: number; kind: 'faculty' | 'industry' | 'collaboration'; businessStatus?: 'open' | 'closed' | 'archived'; status: HubState; published: HubRevision | null; version?: number; ownerId?: number; working?: HubRevision | null; submittedById?: number; createdAt?: string; updatedAt?: string }
 export type HubList = { entries: HubEntry[]; page: number; total: number; totalPages: number }
 export type HubFields = { title: string; body: string; sourceName: string; sourceUrl: string }
 export const hubPath = (id: number) => `/innovation-hub/faculty/${id}`

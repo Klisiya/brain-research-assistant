@@ -22,14 +22,15 @@ class HubMigrationTests(unittest.TestCase):
                 connection.execute("INSERT INTO user(id,username,email,password_hash,role,created_at,auth_version) VALUES(1,'TEST ONLY','test@example.test','fixture','teacher','2026-01-01',1)")
                 connection.commit()
                 tables=[row[0] for row in connection.execute("SELECT name FROM sqlite_master WHERE type='table' AND name NOT IN ('alembic_version','sqlite_sequence')")]
+                columns={t:[row[1] for row in connection.execute('PRAGMA table_info("'+t+'")')] for t in tables}
                 baseline={t:connection.execute('SELECT * FROM "'+t+'" ORDER BY rowid').fetchall() for t in tables}
             for direction,target in [('upgrade','head'),('downgrade','e63a9d20bf17'),('upgrade','head')]:
                 migrate(direction,target)
                 with closing(sqlite3.connect(path)) as connection:
-                    for table,rows in baseline.items():self.assertEqual(connection.execute('SELECT * FROM "'+table+'" ORDER BY rowid').fetchall(),rows,table)
+                    for table,rows in baseline.items():self.assertEqual(connection.execute('SELECT '+','.join('"'+c+'"' for c in columns[table])+' FROM "'+table+'" ORDER BY rowid').fetchall(),rows,table)
                     self.assertEqual(connection.execute('PRAGMA foreign_key_check').fetchall(),[])
                     if direction=='upgrade':
-                        self.assertEqual(connection.execute('SELECT version_num FROM alembic_version').fetchone()[0],'c491e8d62a70')
+                        self.assertEqual(connection.execute('SELECT version_num FROM alembic_version').fetchone()[0],'e6b25c14d930')
                         for table in ['hub_entries','hub_revisions','hub_attachments','hub_moderation_events','hub_deletion_audits']:
                             self.assertEqual(connection.execute('SELECT COUNT(*) FROM '+table).fetchone()[0],0)
             with closing(sqlite3.connect(path)) as connection:

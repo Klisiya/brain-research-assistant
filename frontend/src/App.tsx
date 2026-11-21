@@ -23,6 +23,7 @@ import BookmarksPage from './pages/BookmarksPage'
 import InnovationHubPage from './pages/InnovationHubPage'
 import FacultyWorkspace from './components/hub/FacultyWorkspace'
 import IndustryWorkspace from './components/hub/IndustryWorkspace'
+import CollaborationWorkspace from './components/hub/CollaborationWorkspace'
 import LoginPage from './pages/LoginPage'
 import NotFoundPage from './pages/NotFoundPage'
 import PaperDetailPage from './pages/PaperDetailPage'
@@ -131,12 +132,16 @@ function App() {
       <Route element={<InnovationHubPage />} path="/innovation-hub" />
       <Route element={<InnovationHubPage detail />} path="/innovation-hub/faculty/:entryId" />
       <Route element={<InnovationHubPage detail kind="industry" />} path="/innovation-hub/industry/:entryId" />
+      <Route element={<InnovationHubPage detail kind="collaboration" />} path="/innovation-hub/collaboration/:entryId" />
       <Route element={<InnovationHubPage detail kind="discussions" discussionMode="create" />} path="/innovation-hub/discussions/new" />
       <Route element={<InnovationHubPage detail kind="discussions" discussionMode="manage" />} path="/innovation-hub/discussions/manage/:entryId" />
       <Route element={<InnovationHubPage detail kind="discussions" />} path="/innovation-hub/discussions/:entryId" />
       <Route element={<PapersManagementGuard adminOnly>{user=><DiscussionWorkspace user={user} mode="review"/>}</PapersManagementGuard>} path="/manage/hub/discussions" />
       <Route element={<PapersManagementGuard adminOnly>{user=><DiscussionWorkspace user={user} mode="reports"/>}</PapersManagementGuard>} path="/manage/hub/discussions/reports" />
       <Route element={<PapersManagementGuard>{user => <IndustryWorkspace user={user} managed />}</PapersManagementGuard>} path="/manage/hub/industry" />
+      <Route element={<PapersManagementGuard>{user => <CollaborationWorkspace user={user} managed />}</PapersManagementGuard>} path="/manage/hub/collaboration" />
+      <Route element={<PapersManagementGuard>{user => <CollaborationWorkspace user={user} managed create />}</PapersManagementGuard>} path="/manage/hub/collaboration/new" />
+      <Route element={<PapersManagementGuard>{user => <CollaborationWorkspace user={user} managed />}</PapersManagementGuard>} path="/manage/hub/collaboration/:entryId" />
       <Route element={<PapersManagementGuard>{user => <IndustryWorkspace user={user} managed create />}</PapersManagementGuard>} path="/manage/hub/industry/new" />
       <Route element={<PapersManagementGuard>{user => <IndustryWorkspace user={user} managed />}</PapersManagementGuard>} path="/manage/hub/industry/:entryId" />
       <Route element={<PapersManagementGuard>{user => <FacultyWorkspace user={user} managed />}</PapersManagementGuard>} path="/manage/hub" />

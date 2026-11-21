@@ -2,7 +2,7 @@ import type { AuthUser, UserRole } from '../../types/auth'
 
 // A small, account-bound list description, never a user-provided return URL.
 export const MANAGEMENT_ORIGIN = 'managementOrigin'
-export type ManagementKind = 'faculty' | 'industry' | 'discussions' | 'reports' | 'papers'
+export type ManagementKind = 'faculty' | 'industry' | 'collaboration' | 'discussions' | 'reports' | 'papers'
 export type ManagementOrigin = {
   v: 1; accountId: number; role: UserRole; kind: ManagementKind; scope: string; page: number
   selectedId?: number; status?: string; q?: string; sort?: string
@@ -11,6 +11,7 @@ export const paperSorts = ['recommended', 'newest', 'oldest', 'readingTime', 'ti
 export const paperStatuses = ['all', 'draft', 'published', 'archived'] as const
 const scopes: Record<ManagementKind, readonly string[]> = {
   faculty: ['mine', 'review', 'published'], industry: ['mine', 'review', 'all', 'published'],
+  collaboration: ['mine', 'review', 'all', 'published'],
   discussions: ['review', 'published', 'mine', 'all'], reports: ['reports'], papers: ['managed'],
 }
 const positive = (v: unknown): v is number => typeof v === 'number' && Number.isSafeInteger(v) && v > 0
@@ -25,16 +26,18 @@ export function validateManagementOrigin(value: unknown, user: AuthUser, allowed
   if (v.v !== 1 || v.accountId !== user.id || v.role !== user.role || !positive(v.accountId)
     || typeof v.kind !== 'string' || !allowed.includes(v.kind as ManagementKind)) return null
   const kind = v.kind as ManagementKind
-  const keys = ['v', 'accountId', 'role', 'kind', 'scope', 'page', 'selectedId', ...(kind === 'papers' ? ['q', 'status', 'sort'] : kind === 'reports' ? ['status'] : [])]
+  const keys = ['v', 'accountId', 'role', 'kind', 'scope', 'page', 'selectedId', ...(kind === 'papers' ? ['q', 'status', 'sort'] : kind === 'reports' || kind === 'collaboration' ? ['status'] : [])]
   if (Object.keys(v).some(key => !keys.includes(key)) || typeof v.scope !== 'string' || !scopes[kind].includes(v.scope)
     || !positive(v.page) || v.page > 10000 || (v.selectedId !== undefined && !positive(v.selectedId))) return null
   if (user.role === 'student' || ((kind === 'reports' || kind === 'discussions' || ['review', 'all'].includes(v.scope)) && user.role !== 'admin')) return null
   if (kind === 'reports' && !['open', 'resolved', 'dismissed', 'all'].includes(String(v.status))) return null
+  if (kind === 'collaboration' && !['open', 'closed', 'all'].includes(String(v.status))) return null
   if (kind === 'papers' && (!safeQuery(v.q) || !paperStatuses.includes(v.status as typeof paperStatuses[number]) || !paperSorts.includes(v.sort as typeof paperSorts[number]))) return null
   // Rebuild rather than retaining an untrusted object's extra fields/prototype.
   return { v: 1, accountId: user.id, role: user.role, kind, scope: v.scope, page: v.page,
     ...(v.selectedId === undefined ? {} : { selectedId: v.selectedId as number }),
     ...(kind === 'reports' ? { status: v.status as string } : {}),
+    ...(kind === 'collaboration' ? { status: v.status as string } : {}),
     ...(kind === 'papers' ? { q: v.q as string, status: v.status as string, sort: v.sort as string } : {}) }
 }
 export function readManagementOrigin(search: string, user: AuthUser, allowed: readonly ManagementKind[]) {
@@ -47,6 +50,7 @@ export function makeManagementOrigin(user: AuthUser, kind: ManagementKind, param
     scope: params.get('scope') ?? (kind === 'reports' ? 'reports' : kind === 'papers' ? 'managed' : 'mine'), page: listPage(params.get('page')),
     ...(selectedId === undefined ? {} : { selectedId }),
     ...(kind === 'reports' ? { status: params.get('status') ?? 'open' } : {}),
+    ...(kind === 'collaboration' ? { status: params.get('status') ?? 'all' } : {}),
     ...(kind === 'papers' ? { q: params.get('q') ?? '', status: params.get('status') ?? 'all', sort: params.get('sort') ?? 'recommended' } : {}),
   }, user, [kind])
 }
@@ -67,6 +71,12 @@ export function managementReturn(origin: ManagementOrigin) {
   } else if (kind === 'reports') {
     path = '/manage/hub/discussions'; label = 'Back to reports'
     params.set('scope', 'reports'); params.set('status', origin.status!)
+  } else if (kind === 'collaboration') {
+    path = scope === 'published' ? '/innovation-hub' : '/manage/hub/collaboration'
+    if (scope === 'published') params.set('view', 'collaboration')
+    else params.set('scope', scope)
+    params.set('status', origin.status!)
+    label = scope === 'review' ? 'Back to review queue' : scope === 'published' ? 'Back to published opportunities' : scope === 'all' ? 'Back to all opportunities' : 'Back to my opportunities'
   } else if (kind === 'discussions') {
     path = '/manage/hub/discussions'; params.set('scope', scope)
     label = scope === 'review' ? 'Back to review queue' : scope === 'mine' ? 'Back to my discussions' : scope === 'all' ? 'Back to all discussions' : 'Back to published threads'

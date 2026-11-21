@@ -18,6 +18,8 @@ def define_hub_models(db):
         published_revision_id = db.Column(db.Integer)
         working_revision_id = db.Column(db.Integer)
         archived_at = db.Column(db.DateTime)
+        # Collaboration business lifecycle is independent of moderation/revisions.
+        collaboration_status = db.Column(db.String(12))
         version = db.Column(db.Integer, nullable=False, default=1)
         created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
         updated_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
@@ -40,6 +42,10 @@ def define_hub_models(db):
         source_name = db.Column(db.String(300))
         source_url = db.Column(db.String(1500))
         source_date = db.Column(db.Date)
+        requirements = db.Column(db.Text)
+        deadline = db.Column(db.Date)
+        contact_name = db.Column(db.String(200))
+        contact_email = db.Column(db.String(254))
         submitted_at = db.Column(db.DateTime)
         reviewed_at = db.Column(db.DateTime)
         reviewed_by_id = db.Column(db.Integer, db.ForeignKey('user.id', ondelete='RESTRICT'))
@@ -58,7 +64,7 @@ def define_hub_models(db):
     class HubModerationEvent(db.Model):
         __tablename__ = 'hub_moderation_events'
         __table_args__ = (
-            db.CheckConstraint("action IN ('created','edited','draft_created','submitted','withdrawn','approved','rejected','archived','attachment_added','attachment_removed')", name='ck_hub_event_action'),
+            db.CheckConstraint("action IN ('created','edited','draft_created','submitted','withdrawn','approved','rejected','archived','attachment_added','attachment_removed','closed','reopened')", name='ck_hub_event_action'),
             {'sqlite_autoincrement': True},
         )
         id = db.Column(db.Integer, primary_key=True)

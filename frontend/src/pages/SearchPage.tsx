@@ -13,7 +13,7 @@ import './SearchPage.css'
 const labels: Record<SearchType, string> = { all: 'All', papers: 'Papers', courses: 'Courses', modules: 'Modules', research: 'Research Areas', hub: 'Innovation Hub' }
 const badges = { papers: 'Paper', courses: 'Course', modules: 'Module', research: 'Research Area', hub: 'Faculty Resource' }
 function ResultCard({ item, origin }: { item: SearchResult; origin: SearchOrigin | null }) {
-  const badge = item.type === 'hub' && item.metadata.kind === 'discussions' ? 'Discussion' : item.type === 'hub' && item.metadata.kind === 'industry' ? 'Industry Update' : badges[item.type]
+  const badge = item.type === 'hub' && item.metadata.kind === 'collaboration' ? 'Collaboration Opportunity' : item.type === 'hub' && item.metadata.kind === 'discussions' ? 'Discussion' : item.type === 'hub' && item.metadata.kind === 'industry' ? 'Industry Update' : badges[item.type]
   return <li className="global-search-card">
     <p className="global-search-eyebrow">{badge}{item.type === 'modules' && ` · Module ${String(item.metadata.number).padStart(2, '0')}`}{item.type === 'research' && ` · ${item.code}`}</p>
     <h2><Link to={withSearchOrigin(searchResultPath(item), origin)}>{item.title || badge}</Link></h2>

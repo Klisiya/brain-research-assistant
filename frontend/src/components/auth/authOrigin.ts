@@ -12,8 +12,8 @@ const routes = [
   /^\/admin\/(?:users|audit-log)$/,
   /^\/manage\/(?:courses|research-areas)(?:\/[1-9]\d*)?$/,
   /^\/manage\/papers(?:\/new|\/[1-9]\d*\/(?:edit|preview))?$/,
-  /^\/manage\/hub(?:\/new|\/[1-9]\d*|\/industry(?:\/new|\/[1-9]\d*)?|\/discussions(?:\/reports)?)?$/,
-  /^\/innovation-hub(?:\/(?:faculty|industry)\/[1-9]\d*|\/discussions\/(?:new|manage\/[1-9]\d*|[1-9]\d*))?$/,
+  /^\/manage\/hub(?:\/new|\/[1-9]\d*|\/(?:industry|collaboration)(?:\/new|\/[1-9]\d*)?|\/discussions(?:\/reports)?)?$/,
+  /^\/innovation-hub(?:\/(?:faculty|industry|collaboration)\/[1-9]\d*|\/discussions\/(?:new|manage\/[1-9]\d*|[1-9]\d*))?$/,
 ]
 
 // A known application route only; never API/file/credential endpoints or an absolute URL.
