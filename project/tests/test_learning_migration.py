@@ -44,7 +44,14 @@ class LearningMigrationTests(unittest.TestCase):
             for direction,target in [('upgrade','head'),('downgrade','b9e27f104c63'),('upgrade','head')]:
                 migrate(direction,target)
                 with closing(sqlite3.connect(database)) as con:
-                    for table,rows in before.items(): self.assertEqual(con.execute('SELECT * FROM '+table+' ORDER BY rowid').fetchall(),rows,table)
+                    for table, rows in before.items():
+                        after = con.execute(f'SELECT * FROM "{table}" ORDER BY rowid').fetchall()
+                        if table == 'sqlite_sequence':
+                            # The head migration initializes the empty moderation audit sequence.
+                            expected_sequences = rows + [('hub_moderation_events', 0)] if target == 'head' else rows
+                            self.assertCountEqual(after, expected_sequences, table)
+                        else:
+                            self.assertEqual(after, rows, table)
                     self.assertEqual(con.execute('PRAGMA foreign_key_check').fetchall(),[])
                     if direction=='upgrade':self.assertEqual(con.execute('SELECT COUNT(*) FROM learning_enrollments').fetchone()[0],0)
                 self.assertEqual(stored.read_bytes(),content)

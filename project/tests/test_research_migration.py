@@ -49,7 +49,13 @@ class ResearchMigrationTests(unittest.TestCase):
                 migrate(direction, target)
                 with closing(sqlite3.connect(database)) as connection:
                     for table, rows in snapshots.items():
-                        self.assertEqual(connection.execute(f'SELECT * FROM {table} ORDER BY rowid').fetchall(), rows, table)
+                        after = connection.execute(f'SELECT * FROM "{table}" ORDER BY rowid').fetchall()
+                        if table == 'sqlite_sequence':
+                            # The head migration initializes the empty moderation audit sequence.
+                            expected_sequences = rows + [('hub_moderation_events', 0)] if target == 'head' else rows
+                            self.assertCountEqual(after, expected_sequences, table)
+                        else:
+                            self.assertEqual(after, rows, table)
                     self.assertEqual(connection.execute('PRAGMA foreign_key_check').fetchall(), [])
                     if direction == 'upgrade':
                         self.assertEqual(connection.execute('SELECT COUNT(*) FROM courses').fetchone()[0], 1)

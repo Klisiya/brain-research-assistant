@@ -42,6 +42,26 @@ with app.app_context():
     entry=db.session.get(HubEntry,1);revision=db.session.get(HubRevision,1)
     assert (revision.state=='approved')==(entry.published_revision_id==1)
     assert HubModerationEvent.query.filter(HubModerationEvent.action.in_(['approved','rejected'])).count()==1
+# Race archive against approval using separate admins, connections and the same version.
+for route in ('/api/hub/entries', '/api/hub/industry/entries', '/api/hub/collaboration/entries'):
+    c,h=client(1)
+    draft=c.post(route,json={'title':'TEST ONLY archive race','body':'TEST ONLY','sourceName':'TEST ONLY'},headers=h)
+    assert draft.status_code==201,draft.json
+    entry=draft.json['entry'];path=f"{route}/{entry['id']}"
+    pending=c.post(path+'/submit',json={'expectedVersion':entry['version']},headers=h).json['entry']
+    barrier=Barrier(2)
+    def compete(pair):
+        uid,action=pair
+        c,h=client(uid);barrier.wait()
+        return c.post(path+'/'+action,json={'expectedVersion':pending['version']},headers=h).status_code
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        assert list(pool.map(compete,[(2,'archive'),(3,'approve')]))==[409,200]
+    with app.app_context():
+        entry=db.session.get(HubEntry,pending['id'])
+        assert entry.archived_at is None and entry.working_revision_id is None
+        assert entry.published_revision_id==pending['working']['id']
+        assert HubModerationEvent.query.filter_by(entry_id=entry.id,action='archived').count()==0
+        assert HubModerationEvent.query.filter_by(entry_id=entry.id,action='approved').count()==1
 print('HUB_CONCURRENCY_PASS')
 '''
             result=subprocess.run([sys.executable,'-c',script],cwd=Path(__file__).resolve().parents[1],env=env,capture_output=True,text=True,timeout=60)

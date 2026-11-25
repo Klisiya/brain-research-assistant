@@ -185,9 +185,9 @@ def register_hub_api(app, db, User, Entry, Revision, Attachment, Event, roles_re
         if expected != entry.version:
             fail('This resource changed. Refresh before editing.', 'HUB_CONFLICT', 409)
 
-    def working(entry, state='draft'):
+    def working(entry, state='draft', *, allow_archived=False):
         revision = revision_for(entry, entry.working_revision_id)
-        if entry.archived_at or revision is None or revision.state != state:
+        if (entry.archived_at and not allow_archived) or revision is None or revision.state != state:
             fail('This action is not allowed in the current state.', 'HUB_STATE_CONFLICT', 409)
         return revision
 
@@ -386,11 +386,15 @@ def register_hub_api(app, db, User, Entry, Revision, Attachment, Event, roles_re
         elif action == 'archive':
             if entry.archived_at:
                 fail('Resource is already archived.', 'HUB_STATE_CONFLICT', 409)
-            entry.archived_at = datetime.utcnow()
             revision = revision_for(entry, entry.working_revision_id)
+            if revision is not None and revision.state == 'pending':
+                fail('Resolve or withdraw the pending revision before archiving.', 'HUB_STATE_CONFLICT', 409)
+            entry.archived_at = datetime.utcnow()
             event(entry, revision, 'archived')
         else:
-            revision = working(entry, 'draft' if action == 'submit' else 'pending')
+            # Administrators can withdraw legacy pending revisions without restoring public visibility.
+            recover_archived = action == 'withdraw' and account_role(actor().role) == 'admin'
+            revision = working(entry, 'draft' if action == 'submit' else 'pending', allow_archived=recover_archived)
             if action == 'submit':
                 revision.state, revision.submitted_at = 'pending', datetime.utcnow()
             elif action == 'withdraw':

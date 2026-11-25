@@ -26,11 +26,16 @@ class IndustryDeleteMigrationTests(unittest.TestCase):
                 connection.execute("INSERT INTO hub_revisions(id,entry_id,number,state,title,body,source_name,source_date,created_at) VALUES(1,1,1,'draft','TEST ONLY existing','TEST ONLY body','TEST ONLY source','2020-01-02','2026-01-01')")
                 connection.commit()
                 tables = [row[0] for row in connection.execute("SELECT name FROM sqlite_master WHERE type='table' AND name NOT IN ('alembic_version','sqlite_sequence')")]
-                baseline = {name:connection.execute('SELECT * FROM "'+name+'" ORDER BY rowid').fetchall() for name in tables}
+                columns = {name: [row[1] for row in connection.execute(f'PRAGMA table_info("{name}")')] for name in tables}
+                baseline = {name: connection.execute(f'SELECT * FROM "{name}" ORDER BY rowid').fetchall() for name in tables}
             migrate('upgrade','head')
             with closing(sqlite3.connect(path)) as connection:
                 for name, rows in baseline.items():
-                    self.assertEqual(connection.execute('SELECT * FROM "'+name+'" ORDER BY rowid').fetchall(), rows, name)
+                    old_columns = ', '.join(f'"{column}"' for column in columns[name])
+                    self.assertEqual(connection.execute(f'SELECT {old_columns} FROM "{name}" ORDER BY rowid').fetchall(), rows, name)
+                self.assertEqual(connection.execute('SELECT collaboration_status FROM hub_entries').fetchall(), [(None,)])
+                self.assertEqual(connection.execute('SELECT requirements, deadline, contact_name, contact_email FROM hub_revisions').fetchall(),
+                                 [(None, None, None, None)])
                 self.assertEqual(connection.execute('PRAGMA foreign_key_check').fetchall(), [])
                 self.assertEqual(connection.execute('SELECT COUNT(*) FROM hub_deletion_audits').fetchone()[0], 0)
             migrate('downgrade', 'a27e6b904c15')

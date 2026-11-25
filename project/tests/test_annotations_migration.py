@@ -41,7 +41,14 @@ with app.app_context():
             for direction,target in [('upgrade','head'),('downgrade','d42b7c901ea6'),('upgrade','head')]:
                 command('-m','flask','db',direction,target)
                 with closing(sqlite3.connect(database)) as con:
-                    for table,rows in before.items():self.assertEqual(con.execute('SELECT * FROM "'+table+'" ORDER BY rowid').fetchall(),rows,table)
+                    for table, rows in before.items():
+                        after = con.execute(f'SELECT * FROM "{table}" ORDER BY rowid').fetchall()
+                        if table == 'sqlite_sequence':
+                            # The head migration initializes the empty moderation audit sequence.
+                            expected_sequences = rows + [('hub_moderation_events', 0)] if target == 'head' else rows
+                            self.assertCountEqual(after, expected_sequences, table)
+                        else:
+                            self.assertEqual(after, rows, table)
                     self.assertEqual(con.execute('PRAGMA foreign_key_check').fetchall(),[])
                     self.assertEqual(con.execute('PRAGMA integrity_check').fetchone()[0],'ok')
                     self.assertEqual(con.execute('SELECT COUNT(*),SUM(duration_hours) FROM course_modules').fetchone(),(12,36))
